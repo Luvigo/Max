@@ -23,6 +23,10 @@ BASE_DIR = Path(settings.BASE_DIR)
 SKETCH_DIR = BASE_DIR / 'sketches'
 SKETCH_DIR.mkdir(exist_ok=True)
 
+# Directorio de datos de Arduino (para que persista en Render)
+ARDUINO_DATA_DIR = BASE_DIR / 'arduino-data'
+ARDUINO_DATA_DIR.mkdir(exist_ok=True)
+
 # Arduino CLI path - buscar en diferentes ubicaciones
 def find_arduino_cli():
     """Busca arduino-cli en diferentes ubicaciones."""
@@ -46,6 +50,12 @@ def find_arduino_cli():
     return str(BASE_DIR / 'bin' / 'arduino-cli')
 
 ARDUINO_CLI = find_arduino_cli()
+
+# Variables de entorno para arduino-cli (usar directorio del proyecto)
+ARDUINO_ENV = os.environ.copy()
+ARDUINO_ENV['ARDUINO_DATA_DIR'] = str(ARDUINO_DATA_DIR)
+ARDUINO_ENV['ARDUINO_DOWNLOADS_DIR'] = str(ARDUINO_DATA_DIR / 'staging')
+ARDUINO_ENV['ARDUINO_SKETCHBOOK_DIR'] = str(SKETCH_DIR)
 
 # Conexión serial global
 serial_connection = None
@@ -107,7 +117,8 @@ def list_ports(request):
             [ARDUINO_CLI, 'board', 'list', '--format', 'json'],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            env=ARDUINO_ENV
         )
         
         if result.returncode == 0 and result.stdout.strip():
@@ -201,7 +212,8 @@ def compile_code(request):
             [ARDUINO_CLI, 'compile', '--fqbn', board, str(sketch_path)],
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
+            env=ARDUINO_ENV
         )
         
         if result.returncode == 0:
@@ -267,7 +279,8 @@ def compile_and_download(request):
              '--output-dir', str(build_path), str(sketch_path)],
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
+            env=ARDUINO_ENV
         )
         
         if result.returncode == 0:
@@ -367,7 +380,8 @@ def upload_code(request):
             ],
             capture_output=True,
             text=True,
-            timeout=180
+            timeout=180,
+            env=ARDUINO_ENV
         )
         
         if result.returncode == 0:
