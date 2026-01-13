@@ -14,12 +14,16 @@ python manage.py collectstatic --noinput
 
 echo "==> Creando directorios necesarios..."
 mkdir -p sketches
-mkdir -p bin
 
 echo "==> Instalando arduino-cli (instalador oficial)..."
-cd bin
+# El instalador crea bin/ en el directorio actual
 curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-cd ..
+
+# Mover el binario a bin/ si está en bin/bin/
+if [ -f "./bin/bin/arduino-cli" ]; then
+    mv ./bin/bin/arduino-cli ./bin/arduino-cli
+    rm -rf ./bin/bin 2>/dev/null || true
+fi
 
 echo "==> Verificando instalación de arduino-cli..."
 ./bin/arduino-cli version
