@@ -23,8 +23,29 @@ BASE_DIR = Path(settings.BASE_DIR)
 SKETCH_DIR = BASE_DIR / 'sketches'
 SKETCH_DIR.mkdir(exist_ok=True)
 
-# Arduino CLI path
-ARDUINO_CLI = str(BASE_DIR / 'bin' / 'arduino-cli')
+# Arduino CLI path - buscar en diferentes ubicaciones
+def find_arduino_cli():
+    """Busca arduino-cli en diferentes ubicaciones."""
+    possible_paths = [
+        BASE_DIR / 'bin' / 'arduino-cli',  # Render / Local con bin
+        Path('/usr/local/bin/arduino-cli'),  # Sistema
+        Path('/usr/bin/arduino-cli'),  # Sistema alternativo
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            return str(path)
+    
+    # Intentar encontrar en PATH
+    import shutil as sh
+    which_result = sh.which('arduino-cli')
+    if which_result:
+        return which_result
+    
+    # Fallback al path local
+    return str(BASE_DIR / 'bin' / 'arduino-cli')
+
+ARDUINO_CLI = find_arduino_cli()
 
 # Conexión serial global
 serial_connection = None

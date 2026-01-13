@@ -6,13 +6,15 @@ Guía completa para desplegar MAX-IDE en Render.
 
 ### Build Command:
 ```bash
-pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput
+chmod +x render_build.sh && ./render_build.sh
 ```
 
 ### Start Command:
 ```bash
 gunicorn arduino_ide.wsgi:application
 ```
+
+> **Nota:** El script `render_build.sh` instala Python deps, arduino-cli y los cores de Arduino AVR.
 
 ## 🔧 Configuración en Render Dashboard
 
