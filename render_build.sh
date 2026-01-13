@@ -16,13 +16,13 @@ echo "==> Creando directorios necesarios..."
 mkdir -p sketches
 mkdir -p bin
 
-echo "==> Descargando arduino-cli..."
-ARDUINO_CLI_VERSION="1.3.2"
-curl -fsSL "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}_Linux_64bit.tar.gz" -o arduino-cli.tar.gz
+echo "==> Instalando arduino-cli (instalador oficial)..."
+cd bin
+curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+cd ..
 
-echo "==> Extrayendo arduino-cli..."
-tar -xzf arduino-cli.tar.gz -C bin/
-rm arduino-cli.tar.gz
+echo "==> Verificando instalación de arduino-cli..."
+./bin/arduino-cli version
 
 echo "==> Configurando arduino-cli..."
 ./bin/arduino-cli config init --overwrite || true
@@ -33,5 +33,4 @@ echo "==> Instalando core de Arduino AVR..."
 
 echo "==> Build completado!"
 echo "    arduino-cli instalado en: $(pwd)/bin/arduino-cli"
-./bin/arduino-cli version
 
