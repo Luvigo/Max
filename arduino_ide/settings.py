@@ -11,28 +11,43 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Detectar si estamos en Render
+IS_RENDER = os.environ.get('RENDER') == 'true'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-0!9&%or9y-xe^5%6!$wnbyic^te)djeql^mn!rr&a0%=$0nxl6'
+# Usar variable de entorno en producción, fallback a clave insegura solo en desarrollo
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-0!9&%or9y-xe^5%6!$wnbyic^te)djeql^mn!rr&a0%=$0nxl6')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG desde variable de entorno, por defecto False en producción
+DEBUG = os.environ.get('DEBUG', 'False' if IS_RENDER else 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+# Allowed hosts desde variable de entorno o por defecto
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 # HTTPS Settings
-SECURE_SSL_REDIRECT = False  # Desactivado para desarrollo, activar en producción
-SESSION_COOKIE_SECURE = False  # Desactivado para desarrollo, activar en producción
-CSRF_COOKIE_SECURE = False  # Desactivado para desarrollo, activar en producción
-SECURE_PROXY_SSL_HEADER = None  # Configurar si hay proxy reverso
-USE_TLS = True  # Flag personalizado para indicar uso de TLS
+# En Render, activar todas las configuraciones de seguridad HTTPS
+if IS_RENDER:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    USE_TLS = True
+else:
+    # Configuración para desarrollo local
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_PROXY_SSL_HEADER = None
+    USE_TLS = True  # Flag personalizado para indicar uso de TLS
 
 
 # Application definition
@@ -124,6 +139,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'  # Para producción (Render)
 STATICFILES_DIRS = [
     BASE_DIR / 'editor' / 'static',
 ]

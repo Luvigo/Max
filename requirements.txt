@@ -3,4 +3,5 @@ pyserial>=3.5
 django-extensions>=4.0
 Werkzeug>=3.0
 pyOpenSSL>=25.0
+gunicorn>=21.0
 

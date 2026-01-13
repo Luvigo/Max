@@ -58,3 +58,6 @@ Desktop.ini
 *.swp
 *~
 
+# Documentación temporal
+PUSH_TO_GITHUB.md
+
