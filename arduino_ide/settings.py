@@ -65,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Servir archivos estáticos en producción
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -144,8 +145,12 @@ STATICFILES_DIRS = [
     BASE_DIR / 'editor' / 'static',
 ]
 
-# Deshabilitar caché de archivos estáticos en desarrollo
-if DEBUG:
+# Configuración de archivos estáticos según el entorno
+if IS_RENDER or not DEBUG:
+    # En producción: usar WhiteNoise para servir archivos estáticos
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+else:
+    # En desarrollo: sin caché
     STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Arduino CLI configuration
