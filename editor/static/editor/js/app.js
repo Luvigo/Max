@@ -123,101 +123,39 @@ class ArduinoUploader {
     async sync() {
         console.log('Iniciando sincronización con bootloader...');
         
-        // Intentar múltiples resets con diferentes timings
-        // El bootloader de Arduino tiene ~500ms-1s de ventana después del reset
-        const resetTimings = [
-            { dtrOff: 250, waitAfter: 150 },  // Timing estándar
-            { dtrOff: 100, waitAfter: 200 },  // Timing rápido con más espera
-            { dtrOff: 300, waitAfter: 250 },  // Timing lento
-            { dtrOff: 50,  waitAfter: 100 },  // Timing muy rápido
-        ];
-        
-        for (const timing of resetTimings) {
-            console.log(`Reset: DTR off ${timing.dtrOff}ms, espera después: ${timing.waitAfter}ms`);
-            
-            // Reset Arduino (toggle DTR/RTS) - método clásico
-            await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-            await new Promise(r => setTimeout(r, timing.dtrOff));
-            await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-            
-            // Esperar a que el bootloader esté listo
-            // El bootloader necesita tiempo para inicializarse después del reset
-            await new Promise(r => setTimeout(r, timing.waitAfter));
-
-            // Limpiar cualquier dato en el buffer
-            await this.flushInput();
-
-            // Enviar múltiples comandos de sincronización rápidamente
-            // El bootloader espera recibir GET_SYNC dentro de su ventana de tiempo
-            const syncSuccess = await this.trySyncBurst();
-            if (syncSuccess) {
-                console.log('¡Sincronización exitosa!');
-                return true;
-            }
-        }
-        
-        // Último intento: reset más agresivo con RTS
-        console.log('Intentando reset agresivo con RTS...');
-        await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
-        await new Promise(r => setTimeout(r, 50));
+        // Reset Arduino usando DTR (método estándar)
         await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
         await new Promise(r => setTimeout(r, 250));
         await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        await new Promise(r => setTimeout(r, 200));
-        await this.flushInput();
         
-        if (await this.trySyncBurst()) {
-            console.log('¡Sincronización exitosa con reset agresivo!');
-            return true;
-        }
-        
-        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado y el puerto sea correcto.');
-    }
-    
-    async flushInput() {
-        // Limpiar buffer de entrada
-        try {
-            const deadline = Date.now() + 100;
-            while (Date.now() < deadline) {
-                const result = await Promise.race([
-                    this.reader.read(),
-                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 20))
-                ]);
-                if (result.done || !result.value || result.value.length === 0) break;
-                console.log('Flush:', Array.from(result.value).map(b => b.toString(16)).join(' '));
-            }
-        } catch (e) {}
-    }
-    
-    async trySyncBurst() {
-        // Enviar ráfaga de comandos de sincronización
-        // Intentar 15 veces con intervalos cortos (dentro de la ventana del bootloader)
-        for (let attempt = 0; attempt < 15; attempt++) {
+        // Esperar a que el bootloader inicie
+        await new Promise(r => setTimeout(r, 50));
+
+        // Intentar sincronizar varias veces
+        for (let attempt = 0; attempt < 10; attempt++) {
             try {
-                // Enviar comando de sincronización
+                // Enviar comando GET_SYNC
                 await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
                 
-                // Esperar respuesta con timeout corto
-                const response = await this.receive(2, 100);
+                // Esperar respuesta
+                const response = await this.receive(2, 500);
                 
-                if (response.length > 0) {
-                    console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
-                }
+                console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
                 
                 if (response.length >= 2 && 
                     response[0] === ArduinoUploader.STK.INSYNC && 
                     response[1] === ArduinoUploader.STK.OK) {
+                    console.log('¡Sincronización exitosa!');
                     return true;
                 }
-                
-                // Intervalo corto entre intentos
-                await new Promise(r => setTimeout(r, 20));
-                
             } catch (e) {
-                // Ignorar errores de timeout, seguir intentando
+                console.log(`Intento ${attempt + 1}: timeout`);
             }
+            
+            await new Promise(r => setTimeout(r, 100));
         }
-        return false;
+        
+        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
     }
 
     async enterProgramMode() {
@@ -1130,11 +1068,12 @@ async function uploadCode() {
         btn.innerHTML = '<span class="loading"></span> Subiendo...';
         logToConsole('Conectando al Arduino...', 'info');
         
-        // Determinar baudrates según la placa
-        // Probar múltiples baudrates porque algunos clones usan 57600
-        let baudratesToTry = [115200, 57600];
-        if (currentBoard.includes('mega')) {
-            baudratesToTry = [115200, 57600];
+        // Determinar baudrate según la placa
+        let uploadBaud = 115200;
+        if (currentBoard.includes('uno') || currentBoard.includes('nano')) {
+            uploadBaud = 115200;
+        } else if (currentBoard.includes('mega')) {
+            uploadBaud = 115200;
         } else if (currentBoard.includes('leonardo')) {
             // Leonardo usa CDC, diferente protocolo
             showToast('Arduino Leonardo requiere modo especial (no soportado aún)', 'warning');
@@ -1143,40 +1082,14 @@ async function uploadCode() {
             return;
         }
         
-        let uploadSuccess = false;
-        let lastError = null;
+        await uploader.connect(selectedPort, uploadBaud);
         
-        for (const baudrate of baudratesToTry) {
-            try {
-                logToConsole(`Intentando con baudrate ${baudrate}...`, 'info');
-                await uploader.connect(selectedPort, baudrate);
-                
-                await uploader.upload(hexContent, (msg, progress) => {
-                    logToConsole(msg, 'info');
-                    btn.innerHTML = `<span class="loading"></span> ${progress}%`;
-                });
-                
-                await uploader.disconnect();
-                uploadSuccess = true;
-                break; // Éxito, salir del loop
-                
-            } catch (error) {
-                lastError = error;
-                logToConsole(`Fallo con ${baudrate}: ${error.message}`, 'warning');
-                try {
-                    await uploader.disconnect();
-                } catch (e) {}
-                
-                // Si el error no es de sincronización, no intentar otro baudrate
-                if (!error.message.includes('sincronizar')) {
-                    throw error;
-                }
-            }
-        }
+        await uploader.upload(hexContent, (msg, progress) => {
+            logToConsole(msg, 'info');
+            btn.innerHTML = `<span class="loading"></span> ${progress}%`;
+        });
         
-        if (!uploadSuccess) {
-            throw lastError || new Error('No se pudo subir el código');
-        }
+        await uploader.disconnect();
         
         logToConsole('✓ ¡Código subido exitosamente!', 'success');
         showToast('¡Código subido exitosamente!', 'success');
