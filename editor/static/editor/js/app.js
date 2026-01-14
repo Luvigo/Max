@@ -121,35 +121,56 @@ class ArduinoUploader {
     }
 
     async sync() {
-        // Reset Arduino (toggle DTR)
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise(r => setTimeout(r, 250));
-        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        await new Promise(r => setTimeout(r, 50));
+        console.log('Iniciando sincronización con bootloader...');
+        
+        // Intentar múltiples resets con diferentes timings
+        const resetTimings = [
+            { dtrOff: 250, dtrOn: 50 },   // Timing estándar
+            { dtrOff: 100, dtrOn: 50 },   // Timing rápido
+            { dtrOff: 300, dtrOn: 100 },  // Timing lento
+        ];
+        
+        for (const timing of resetTimings) {
+            console.log(`Intentando reset con timing: ${timing.dtrOff}ms off, ${timing.dtrOn}ms on`);
+            
+            // Reset Arduino (toggle DTR/RTS)
+            await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+            await new Promise(r => setTimeout(r, timing.dtrOff));
+            await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
+            await new Promise(r => setTimeout(r, timing.dtrOn));
 
-        // Limpiar buffer
-        try {
-            while (true) {
-                const { value, done } = await Promise.race([
-                    this.reader.read(),
-                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 100))
-                ]);
-                if (done || !value || value.length === 0) break;
-            }
-        } catch (e) {}
+            // Limpiar buffer de entrada
+            try {
+                const deadline = Date.now() + 200;
+                while (Date.now() < deadline) {
+                    const result = await Promise.race([
+                        this.reader.read(),
+                        new Promise(resolve => setTimeout(() => resolve({ done: true }), 50))
+                    ]);
+                    if (result.done || !result.value || result.value.length === 0) break;
+                }
+            } catch (e) {}
 
-        // Intentar sincronizar múltiples veces
-        for (let i = 0; i < 5; i++) {
-            await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
-            const response = await this.receive(2, 500);
-            if (response.length >= 2 && 
-                response[0] === ArduinoUploader.STK.INSYNC && 
-                response[1] === ArduinoUploader.STK.OK) {
-                return true;
+            // Intentar sincronizar múltiples veces
+            for (let attempt = 0; attempt < 8; attempt++) {
+                try {
+                    await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
+                    const response = await this.receive(2, 300);
+                    
+                    if (response.length >= 2 && 
+                        response[0] === ArduinoUploader.STK.INSYNC && 
+                        response[1] === ArduinoUploader.STK.OK) {
+                        console.log('¡Sincronización exitosa!');
+                        return true;
+                    }
+                } catch (e) {
+                    // Ignorar errores de timeout
+                }
+                await new Promise(r => setTimeout(r, 50));
             }
-            await new Promise(r => setTimeout(r, 100));
         }
-        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
+        
+        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado y el puerto sea correcto.');
     }
 
     async enterProgramMode() {
@@ -197,10 +218,12 @@ class ArduinoUploader {
 
     /**
      * Parsea archivo Intel HEX
+     * Retorna solo los bytes reales del programa, sin espacios vacíos
      */
     parseHex(hexString) {
-        const data = new Map();
+        const segments = []; // Array de {address, data}
         let baseAddress = 0;
+        let currentSegment = null;
         
         for (const line of hexString.split('\n')) {
             const trimmed = line.trim();
@@ -220,8 +243,16 @@ class ArduinoUploader {
             
             if (type === 0x00) { // Data record
                 const fullAddress = baseAddress + address;
-                for (let i = 0; i < count && (4 + i) < bytes.length; i++) {
-                    data.set(fullAddress + i, bytes[4 + i]);
+                const recordData = bytes.slice(4, 4 + count);
+                
+                // Si es continuación del segmento actual
+                if (currentSegment && 
+                    fullAddress === currentSegment.address + currentSegment.data.length) {
+                    currentSegment.data.push(...recordData);
+                } else {
+                    // Nuevo segmento
+                    if (currentSegment) segments.push(currentSegment);
+                    currentSegment = { address: fullAddress, data: [...recordData] };
                 }
             } else if (type === 0x02) { // Extended Segment Address
                 if (bytes.length >= 6) {
@@ -236,21 +267,29 @@ class ArduinoUploader {
             }
         }
         
-        if (data.size === 0) {
+        if (currentSegment) segments.push(currentSegment);
+        
+        if (segments.length === 0) {
             throw new Error('Archivo HEX vacío o inválido');
         }
         
-        // Convertir a Uint8Array continuo
-        const addresses = [...data.keys()].sort((a, b) => a - b);
-        const minAddr = addresses[0];
-        const maxAddr = addresses[addresses.length - 1];
-        const result = new Uint8Array(maxAddr - minAddr + 1);
+        // Para Arduino, normalmente solo hay un segmento continuo desde 0x0000
+        // Combinar todos los segmentos en uno solo
+        const allData = [];
+        let startAddress = segments[0].address;
         
-        for (const [addr, byte] of data) {
-            result[addr - minAddr] = byte;
+        for (const seg of segments) {
+            // Llenar gaps pequeños (< 256 bytes) con 0xFF
+            const gap = seg.address - (startAddress + allData.length);
+            if (gap > 0 && gap < 256) {
+                for (let i = 0; i < gap; i++) allData.push(0xFF);
+            }
+            allData.push(...seg.data);
         }
         
-        return { data: result, startAddress: minAddr };
+        console.log(`HEX parseado: ${allData.length} bytes desde 0x${startAddress.toString(16)}`);
+        
+        return { data: new Uint8Array(allData), startAddress };
     }
 
     /**
