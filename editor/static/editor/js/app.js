@@ -1130,12 +1130,11 @@ async function uploadCode() {
         btn.innerHTML = '<span class="loading"></span> Subiendo...';
         logToConsole('Conectando al Arduino...', 'info');
         
-        // Determinar baudrate según la placa
-        let uploadBaud = 115200;
-        if (currentBoard.includes('uno') || currentBoard.includes('nano')) {
-            uploadBaud = 115200;
-        } else if (currentBoard.includes('mega')) {
-            uploadBaud = 115200;
+        // Determinar baudrates según la placa
+        // Probar múltiples baudrates porque algunos clones usan 57600
+        let baudratesToTry = [115200, 57600];
+        if (currentBoard.includes('mega')) {
+            baudratesToTry = [115200, 57600];
         } else if (currentBoard.includes('leonardo')) {
             // Leonardo usa CDC, diferente protocolo
             showToast('Arduino Leonardo requiere modo especial (no soportado aún)', 'warning');
@@ -1144,14 +1143,40 @@ async function uploadCode() {
             return;
         }
         
-        await uploader.connect(selectedPort, uploadBaud);
+        let uploadSuccess = false;
+        let lastError = null;
         
-        await uploader.upload(hexContent, (msg, progress) => {
-            logToConsole(msg, 'info');
-            btn.innerHTML = `<span class="loading"></span> ${progress}%`;
-        });
+        for (const baudrate of baudratesToTry) {
+            try {
+                logToConsole(`Intentando con baudrate ${baudrate}...`, 'info');
+                await uploader.connect(selectedPort, baudrate);
+                
+                await uploader.upload(hexContent, (msg, progress) => {
+                    logToConsole(msg, 'info');
+                    btn.innerHTML = `<span class="loading"></span> ${progress}%`;
+                });
+                
+                await uploader.disconnect();
+                uploadSuccess = true;
+                break; // Éxito, salir del loop
+                
+            } catch (error) {
+                lastError = error;
+                logToConsole(`Fallo con ${baudrate}: ${error.message}`, 'warning');
+                try {
+                    await uploader.disconnect();
+                } catch (e) {}
+                
+                // Si el error no es de sincronización, no intentar otro baudrate
+                if (!error.message.includes('sincronizar')) {
+                    throw error;
+                }
+            }
+        }
         
-        await uploader.disconnect();
+        if (!uploadSuccess) {
+            throw lastError || new Error('No se pudo subir el código');
+        }
         
         logToConsole('✓ ¡Código subido exitosamente!', 'success');
         showToast('¡Código subido exitosamente!', 'success');
