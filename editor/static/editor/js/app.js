@@ -124,53 +124,100 @@ class ArduinoUploader {
         console.log('Iniciando sincronización con bootloader...');
         
         // Intentar múltiples resets con diferentes timings
+        // El bootloader de Arduino tiene ~500ms-1s de ventana después del reset
         const resetTimings = [
-            { dtrOff: 250, dtrOn: 50 },   // Timing estándar
-            { dtrOff: 100, dtrOn: 50 },   // Timing rápido
-            { dtrOff: 300, dtrOn: 100 },  // Timing lento
+            { dtrOff: 250, waitAfter: 150 },  // Timing estándar
+            { dtrOff: 100, waitAfter: 200 },  // Timing rápido con más espera
+            { dtrOff: 300, waitAfter: 250 },  // Timing lento
+            { dtrOff: 50,  waitAfter: 100 },  // Timing muy rápido
         ];
         
         for (const timing of resetTimings) {
-            console.log(`Intentando reset con timing: ${timing.dtrOff}ms off, ${timing.dtrOn}ms on`);
+            console.log(`Reset: DTR off ${timing.dtrOff}ms, espera después: ${timing.waitAfter}ms`);
             
-            // Reset Arduino (toggle DTR/RTS)
+            // Reset Arduino (toggle DTR/RTS) - método clásico
             await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
             await new Promise(r => setTimeout(r, timing.dtrOff));
             await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-            await new Promise(r => setTimeout(r, timing.dtrOn));
+            
+            // Esperar a que el bootloader esté listo
+            // El bootloader necesita tiempo para inicializarse después del reset
+            await new Promise(r => setTimeout(r, timing.waitAfter));
 
-            // Limpiar buffer de entrada
-            try {
-                const deadline = Date.now() + 200;
-                while (Date.now() < deadline) {
-                    const result = await Promise.race([
-                        this.reader.read(),
-                        new Promise(resolve => setTimeout(() => resolve({ done: true }), 50))
-                    ]);
-                    if (result.done || !result.value || result.value.length === 0) break;
-                }
-            } catch (e) {}
+            // Limpiar cualquier dato en el buffer
+            await this.flushInput();
 
-            // Intentar sincronizar múltiples veces
-            for (let attempt = 0; attempt < 8; attempt++) {
-                try {
-                    await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
-                    const response = await this.receive(2, 300);
-                    
-                    if (response.length >= 2 && 
-                        response[0] === ArduinoUploader.STK.INSYNC && 
-                        response[1] === ArduinoUploader.STK.OK) {
-                        console.log('¡Sincronización exitosa!');
-                        return true;
-                    }
-                } catch (e) {
-                    // Ignorar errores de timeout
-                }
-                await new Promise(r => setTimeout(r, 50));
+            // Enviar múltiples comandos de sincronización rápidamente
+            // El bootloader espera recibir GET_SYNC dentro de su ventana de tiempo
+            const syncSuccess = await this.trySyncBurst();
+            if (syncSuccess) {
+                console.log('¡Sincronización exitosa!');
+                return true;
             }
         }
         
+        // Último intento: reset más agresivo con RTS
+        console.log('Intentando reset agresivo con RTS...');
+        await this.port.setSignals({ dataTerminalReady: true, requestToSend: true });
+        await new Promise(r => setTimeout(r, 50));
+        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        await new Promise(r => setTimeout(r, 250));
+        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
+        await new Promise(r => setTimeout(r, 200));
+        await this.flushInput();
+        
+        if (await this.trySyncBurst()) {
+            console.log('¡Sincronización exitosa con reset agresivo!');
+            return true;
+        }
+        
         throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado y el puerto sea correcto.');
+    }
+    
+    async flushInput() {
+        // Limpiar buffer de entrada
+        try {
+            const deadline = Date.now() + 100;
+            while (Date.now() < deadline) {
+                const result = await Promise.race([
+                    this.reader.read(),
+                    new Promise(resolve => setTimeout(() => resolve({ done: true }), 20))
+                ]);
+                if (result.done || !result.value || result.value.length === 0) break;
+                console.log('Flush:', Array.from(result.value).map(b => b.toString(16)).join(' '));
+            }
+        } catch (e) {}
+    }
+    
+    async trySyncBurst() {
+        // Enviar ráfaga de comandos de sincronización
+        // Intentar 15 veces con intervalos cortos (dentro de la ventana del bootloader)
+        for (let attempt = 0; attempt < 15; attempt++) {
+            try {
+                // Enviar comando de sincronización
+                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
+                
+                // Esperar respuesta con timeout corto
+                const response = await this.receive(2, 100);
+                
+                if (response.length > 0) {
+                    console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
+                }
+                
+                if (response.length >= 2 && 
+                    response[0] === ArduinoUploader.STK.INSYNC && 
+                    response[1] === ArduinoUploader.STK.OK) {
+                    return true;
+                }
+                
+                // Intervalo corto entre intentos
+                await new Promise(r => setTimeout(r, 20));
+                
+            } catch (e) {
+                // Ignorar errores de timeout, seguir intentando
+            }
+        }
+        return false;
     }
 
     async enterProgramMode() {
