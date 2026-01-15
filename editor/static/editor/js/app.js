@@ -162,7 +162,29 @@ async function checkAgentLocal(manual = false) {
             throw new Error(`HTTP ${response.status}`);
         }
     } catch (error) {
-        const errorMsg = error.name === 'AbortError' ? 'Timeout' : error.message;
+        let errorMsg = error.name === 'AbortError' ? 'Timeout' : error.message;
+        let hint = '';
+        
+        // Detectar problemas comunes
+        if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+            // Verificar si es problema de mixed content (HTTPS -> HTTP)
+            if (window.location.protocol === 'https:' && AgentConfig.baseUrl.startsWith('http://')) {
+                errorMsg = 'Bloqueado por seguridad del navegador';
+                hint = 'El navegador bloquea conexiones HTTP desde HTTPS. ';
+                
+                // Chrome y algunos navegadores permiten localhost como excepción
+                // pero puede requerir configuración
+                if (navigator.userAgent.includes('Chrome')) {
+                    hint += 'En Chrome, ve a chrome://flags/#unsafely-treat-insecure-origin-as-secure y agrega http://127.0.0.1:8765';
+                } else if (navigator.userAgent.includes('Firefox')) {
+                    hint += 'En Firefox, puede funcionar automáticamente. Verifica que el Agent esté corriendo.';
+                } else {
+                    hint += 'Verifica que el Agent esté corriendo en http://127.0.0.1:8765';
+                }
+            } else {
+                hint = 'Verifica que el Agent esté corriendo: bash start_agent.sh';
+            }
+        }
         
         AgentConfig.available = false;
         AgentConfig.lastCheck = now;
@@ -171,13 +193,16 @@ async function checkAgentLocal(manual = false) {
         // Solo loguear si cambió el estado o es manual
         if (previousState || manual) {
             logToConsole(`[AGENT] ✗ Agent no disponible: ${errorMsg}`, 'warning');
+            if (hint && manual) {
+                logToConsole(`[AGENT] 💡 ${hint}`, 'info');
+            }
         }
         
         updateAgentUI(false);
         updateDiagnostics({ available: false, error: errorMsg });
         
         AgentConfig.isChecking = false;
-        return { available: false, error: errorMsg };
+        return { available: false, error: errorMsg, hint };
     }
 }
 

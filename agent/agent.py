@@ -54,17 +54,9 @@ VERSION = "1.1.0"
 DEFAULT_PORT = 8765
 
 # Dominios permitidos para CORS
-ALLOWED_ORIGINS = [
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "https://localhost:8000",
-    "https://127.0.0.1:8000",
-    "http://localhost:5000",
-    "http://127.0.0.1:5000",
-    # Render domains (ajustar según tu deploy)
-    "https://max-ide.onrender.com",
-    "https://*.onrender.com",
-]
+# El Agent corre localmente, así que permitimos todos los orígenes
+# ya que solo es accesible desde localhost de todos modos
+ALLOWED_ORIGINS = "*"  # Permitir todos los orígenes (el Agent solo es accesible localmente)
 
 # Buscar arduino-cli en diferentes ubicaciones
 def find_arduino_cli():
@@ -103,20 +95,24 @@ ARDUINO_CLI = find_arduino_cli()
 
 app = Flask(__name__)
 
-# Configurar CORS
-CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
+# Configurar CORS - Permitir todos los orígenes ya que el Agent solo es accesible localmente
+# Esto es necesario porque el frontend puede venir de HTTPS (Render) o HTTP (local)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=False)
 
 # ============================================
-# MIDDLEWARE - Headers de seguridad
+# MIDDLEWARE - Headers de seguridad y CORS
 # ============================================
 
 @app.after_request
 def add_security_headers(response):
-    """Añade headers de seguridad a todas las respuestas."""
+    """Añade headers de seguridad y CORS a todas las respuestas."""
     response.headers['X-MAX-IDE-Agent'] = '1'
     response.headers['X-Agent-Version'] = VERSION
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-MAX-IDE-Client'
+    # CORS headers explícitos para máxima compatibilidad
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-MAX-IDE-Client, X-Requested-With'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Max-Age'] = '86400'  # Cache preflight por 24h
     return response
 
 # ============================================
