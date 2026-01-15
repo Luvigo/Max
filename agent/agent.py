@@ -351,8 +351,10 @@ def compile_code():
         log(f"Iniciando compilación para {fqbn}")
         log(f"arduino-cli: {ARDUINO_CLI}")
         
-        # Crear directorio temporal
-        temp_dir = tempfile.mkdtemp(prefix='maxide_compile_')
+        # Crear directorio temporal en home del usuario (snap no puede acceder a /tmp)
+        home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
+        os.makedirs(home_tmp, exist_ok=True)
+        temp_dir = tempfile.mkdtemp(prefix='compile_', dir=home_tmp)
         
         # Crear sketch
         sketch_name = 'sketch_verify'
@@ -534,8 +536,10 @@ def upload():
         
         log(f"Iniciando upload a {port} con {fqbn}")
         
-        # Crear directorio temporal
-        temp_dir = tempfile.mkdtemp(prefix='maxide_')
+        # Crear directorio temporal en home del usuario (snap no puede acceder a /tmp)
+        home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
+        os.makedirs(home_tmp, exist_ok=True)
+        temp_dir = tempfile.mkdtemp(prefix='upload_', dir=home_tmp)
         log(f"Directorio temporal: {temp_dir}")
         
         hex_file = None
