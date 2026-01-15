@@ -230,57 +230,8 @@ async function getAgentPorts() {
 }
 
 /**
- * Compila el código en el servidor y obtiene un token para el HEX
- * @param {string} code - Código Arduino
- * @param {string} fqbn - Board FQBN (ej: arduino:avr:uno)
- * @param {Function} onLog - Callback para logs
- * @returns {Promise<{success: boolean, token?: string, hex_url?: string, error?: string}>}
- */
-async function compileOnServer(code, fqbn, onLog = () => {}) {
-    onLog('[COMPILE] Enviando código al servidor para compilación...');
-    
-    try {
-        const response = await fetch('/api/compile/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, fqbn })
-        });
-        
-        const data = await response.json();
-        
-        // Mostrar logs de compilación
-        if (data.logs && Array.isArray(data.logs)) {
-            data.logs.forEach(log => onLog(`[COMPILE] ${log}`));
-        }
-        
-        if (data.ok && data.token) {
-            onLog(`[COMPILE] ✓ Compilación exitosa (${data.size} bytes)`);
-            return {
-                success: true,
-                token: data.token,
-                hex_url: data.hex_url,
-                size: data.size
-            };
-        } else {
-            onLog(`[COMPILE] ✗ Error: ${data.error || 'Error desconocido'}`);
-            return {
-                success: false,
-                error: data.error || 'Error de compilación',
-                errorCode: data.error_code
-            };
-        }
-    } catch (error) {
-        onLog(`[COMPILE] ✗ Error de conexión: ${error.message}`);
-        return {
-            success: false,
-            error: error.message
-        };
-    }
-}
-
-/**
  * Sube código al Arduino via Agent local
- * Flujo: Servidor compila -> genera token -> Agent descarga HEX -> sube al Arduino
+ * El Agent compila y sube el código localmente usando arduino-cli
  * 
  * @param {string} code - Código Arduino
  * @param {string} port - Puerto serial (ej: /dev/ttyUSB0, COM3)
@@ -290,36 +241,18 @@ async function compileOnServer(code, fqbn, onLog = () => {}) {
  */
 async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
     onLog('[UPLOAD-AGENT] Iniciando proceso de upload...');
+    onLog(`[UPLOAD-AGENT] Puerto: ${port}, Placa: ${fqbn}`);
     
     // ========================================
-    // PASO 1: Compilar en el servidor
-    // ========================================
-    const compileResult = await compileOnServer(code, fqbn, onLog);
-    
-    if (!compileResult.success) {
-        return {
-            success: false,
-            error: compileResult.error,
-            errorCode: compileResult.errorCode
-        };
-    }
-    
-    // ========================================
-    // PASO 2: Construir URL absoluta del HEX
-    // ========================================
-    // El Agent necesita una URL completa para descargar el HEX
-    const hexUrl = window.location.origin + compileResult.hex_url;
-    onLog(`[UPLOAD-AGENT] URL del HEX: ${hexUrl}`);
-    
-    // ========================================
-    // PASO 3: Enviar al Agent para upload
+    // Enviar código directamente al Agent
+    // El Agent compila y sube localmente
     // ========================================
     const agentUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
-    onLog('[UPLOAD-AGENT] Enviando HEX al Agent local para upload...');
+    onLog('[UPLOAD-AGENT] Enviando código al Agent local...');
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), AgentConfig.timeout);
+        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout para compilar+upload
         
         const response = await fetch(agentUrl, {
             method: 'POST',
@@ -329,7 +262,7 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
             body: JSON.stringify({
                 port: port,
                 fqbn: fqbn,
-                hex_url: hexUrl
+                code: code  // Enviar código directamente, el Agent compila localmente
             }),
             signal: controller.signal
         });
@@ -369,7 +302,7 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
         }
     } catch (error) {
         const errorMsg = error.name === 'AbortError' 
-            ? 'Timeout - El Agent no respondió a tiempo'
+            ? 'Timeout - El Agent no respondió a tiempo (¿compilación muy larga?)'
             : error.message;
         onLog(`[UPLOAD-AGENT] ✗ Error de conexión: ${errorMsg}`);
         return {
@@ -1068,25 +1001,39 @@ async function verifyCode() {
         return;
     }
     
+    // Verificar que el Agent esté disponible
+    if (!AgentConfig.available) {
+        logToConsole('[VERIFY] ✗ Agent no disponible. Instálalo para verificar código.', 'error');
+        showToast('Instala el Agent para verificar código', 'warning');
+        showAgentInstallModal();
+        return;
+    }
+    
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Verificando...';
-    logToConsole('[VERIFY] Iniciando verificación en servidor...', 'info');
+    logToConsole('[VERIFY] Compilando código en tu PC...', 'info');
     
     try {
-        const response = await fetch('/api/compile/', {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+        
+        const response = await fetch(AgentConfig.baseUrl + '/compile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, fqbn: currentBoard })
+            body: JSON.stringify({ code, fqbn: currentBoard }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         const data = await response.json();
         
         // Mostrar logs de compilación
         if (data.logs && Array.isArray(data.logs)) {
-            data.logs.slice(-8).forEach(log => logToConsole(`[COMPILE] ${log}`, 'info'));
+            data.logs.slice(-10).forEach(log => logToConsole(`[COMPILE] ${log}`, 'info'));
         }
         
-        if (data.ok || data.success) {
+        if (data.ok) {
             logToConsole(`[VERIFY] ✓ Verificación exitosa (${data.size || '?'} bytes)`, 'success');
             showToast(`Verificación exitosa (${data.size || '?'} bytes)`, 'success');
         } else {
@@ -1101,8 +1048,14 @@ async function verifyCode() {
             showToast('Error de verificación', 'error');
         }
     } catch (error) {
-        logToConsole(`[VERIFY] ✗ Error de conexión: ${error.message}`, 'error');
-        showToast('Error de conexión al servidor', 'error');
+        if (error.name === 'AbortError') {
+            logToConsole('[VERIFY] ✗ Timeout: la compilación tardó más de 2 minutos', 'error');
+            showToast('Timeout de compilación', 'error');
+        } else {
+            logToConsole(`[VERIFY] ✗ Error de conexión: ${error.message}`, 'error');
+            logToConsole('[VERIFY] ¿El Agent está corriendo?', 'warning');
+            showToast('Error conectando con Agent', 'error');
+        }
     }
     
     btn.disabled = false;

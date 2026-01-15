@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
 MAX-IDE Agent Local
-Agente que corre en el PC del usuario para subir código a Arduino.
+Agente que corre en el PC del usuario para compilar y subir código a Arduino.
 
 Uso:
-    python agent.py [--port 5000] [--arduino-cli /path/to/arduino-cli]
+    python agent.py [--port 8765] [--arduino-cli /path/to/arduino-cli]
 
 Endpoints:
-    GET  /health  - Estado del agent
-    GET  /ports   - Lista de puertos seriales
-    POST /upload  - Subir código al Arduino
+    GET  /health   - Estado del agent
+    GET  /ports    - Lista de puertos seriales
+    POST /compile  - Compilar código (sin subir)
+    POST /upload   - Compilar y subir código al Arduino
 """
 
 import os
@@ -272,6 +273,173 @@ def list_ports():
         'count': len(ports),
         'total_scanned': len(all_ports)
     })
+
+# ============================================
+# ENDPOINT: POST /compile
+# ============================================
+
+@app.route('/compile', methods=['POST', 'OPTIONS'])
+def compile_code():
+    """
+    Compila código Arduino sin subirlo.
+    Útil para verificar que el código es correcto.
+    
+    Request body:
+        {
+            "code": "void setup() {} void loop() {}",
+            "fqbn": "arduino:avr:uno"
+        }
+    
+    Response:
+        {
+            "ok": true/false,
+            "logs": ["log1", "log2", ...],
+            "size": 1234,
+            "message": "..."
+        }
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    logs = []
+    temp_dir = None
+    
+    def log(msg):
+        """Añade mensaje al log."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        log_entry = f"[{timestamp}] {msg}"
+        logs.append(log_entry)
+        print(f"[COMPILE] {msg}")
+    
+    try:
+        # Verificar que arduino-cli esté disponible
+        if not ARDUINO_CLI:
+            return jsonify({
+                'ok': False,
+                'error': 'arduino-cli no encontrado. Instálalo desde https://arduino.github.io/arduino-cli/',
+                'logs': logs,
+                'hint': 'Ejecuta: curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh'
+            }), 500
+        
+        # Parsear request
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'ok': False,
+                'error': 'JSON body requerido',
+                'logs': logs
+            }), 400
+        
+        code = data.get('code', '')
+        fqbn = data.get('fqbn', 'arduino:avr:uno')
+        
+        if not code or not code.strip():
+            return jsonify({
+                'ok': False,
+                'error': 'No hay código para compilar',
+                'logs': logs
+            }), 400
+        
+        log(f"Iniciando compilación para {fqbn}")
+        log(f"arduino-cli: {ARDUINO_CLI}")
+        
+        # Crear directorio temporal
+        temp_dir = tempfile.mkdtemp(prefix='maxide_compile_')
+        
+        # Crear sketch
+        sketch_name = 'sketch_verify'
+        sketch_dir = os.path.join(temp_dir, sketch_name)
+        os.makedirs(sketch_dir)
+        
+        sketch_file = os.path.join(sketch_dir, f'{sketch_name}.ino')
+        with open(sketch_file, 'w', encoding='utf-8') as f:
+            f.write(code)
+        
+        log(f"Sketch creado: {len(code)} caracteres")
+        
+        # Compilar
+        build_dir = os.path.join(temp_dir, 'build')
+        os.makedirs(build_dir)
+        
+        compile_cmd = [
+            ARDUINO_CLI, 'compile',
+            '--fqbn', fqbn,
+            '--output-dir', build_dir,
+            sketch_dir
+        ]
+        
+        log(f"Compilando...")
+        
+        compile_result = subprocess.run(
+            compile_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        
+        # Capturar salida
+        if compile_result.stdout:
+            for line in compile_result.stdout.strip().split('\n'):
+                if line.strip():
+                    logs.append(f"[stdout] {line}")
+        
+        if compile_result.stderr:
+            for line in compile_result.stderr.strip().split('\n'):
+                if line.strip():
+                    logs.append(f"[stderr] {line}")
+        
+        if compile_result.returncode != 0:
+            error_msg = compile_result.stderr or compile_result.stdout or 'Error desconocido'
+            log(f"Error de compilación (exit code: {compile_result.returncode})")
+            return jsonify({
+                'ok': False,
+                'error': error_msg,
+                'logs': logs,
+                'exit_code': compile_result.returncode
+            }), 400
+        
+        # Buscar archivo HEX para obtener tamaño
+        hex_size = 0
+        for f in os.listdir(build_dir):
+            if f.endswith('.hex'):
+                hex_path = os.path.join(build_dir, f)
+                hex_size = os.path.getsize(hex_path)
+                break
+        
+        log(f"✓ Compilación exitosa ({hex_size} bytes)")
+        
+        return jsonify({
+            'ok': True,
+            'message': 'Compilación exitosa',
+            'logs': logs,
+            'size': hex_size,
+            'fqbn': fqbn
+        })
+        
+    except subprocess.TimeoutExpired:
+        log("Timeout de compilación (120s)")
+        return jsonify({
+            'ok': False,
+            'error': 'Timeout de compilación',
+            'logs': logs,
+            'hint': 'La compilación tardó más de 2 minutos.'
+        }), 408
+        
+    except Exception as e:
+        log(f"Error inesperado: {str(e)}")
+        return jsonify({
+            'ok': False,
+            'error': str(e),
+            'logs': logs
+        }), 500
+        
+    finally:
+        # Limpiar directorio temporal
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                print(f"[COMPILE] Error limpiando temp: {e}")
 
 # ============================================
 # ENDPOINT: POST /upload
@@ -634,11 +802,12 @@ def index():
     return jsonify({
         'name': 'MAX-IDE Agent',
         'version': VERSION,
-        'description': 'Agente local para subir código a Arduino',
+        'description': 'Agente local para compilar y subir código a Arduino',
         'endpoints': {
             'GET /health': 'Estado del agent',
             'GET /ports': 'Lista de puertos seriales',
-            'POST /upload': 'Subir código al Arduino'
+            'POST /compile': 'Compilar código (sin subir)',
+            'POST /upload': 'Compilar y subir código al Arduino'
         },
         'arduino_cli': ARDUINO_CLI,
         'status': 'running'
