@@ -98,25 +98,36 @@ async function forceBootloaderReset(port, bootloaderBaud = 115200, log = console
             log('[RESET] Puerto abierto a 1200 baud');
             
             // ========================================
-            // 4. TOGGLE DTR/RTS PARA RESET
+            // 4. TOGGLE DTR/RTS PARA RESET (múltiples pulsos)
             // ========================================
             if (port.setSignals) {
-                log('[RESET] Ejecutando secuencia DTR/RTS...');
+                log('[RESET] Ejecutando secuencia DTR/RTS extendida...');
                 
-                // Paso 1: Ambas señales LOW
+                // El Arduino se resetea cuando DTR pasa de HIGH a LOW
+                // El capacitor en el circuito de auto-reset genera un pulso
+                
+                // Secuencia 1: Pulso DTR clásico
                 await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] DTR=LOW, RTS=LOW');
-                await new Promise(r => setTimeout(r, 50));
+                await new Promise(r => setTimeout(r, 100));
+                await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                await new Promise(r => setTimeout(r, 100));
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                log('[RESET] Pulso DTR enviado');
                 
-                // Paso 2: Ambas señales HIGH (genera pulso de reset)
+                // Secuencia 2: Pulso RTS (algunos clones CH340 lo necesitan)
+                await new Promise(r => setTimeout(r, 50));
+                await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+                await new Promise(r => setTimeout(r, 100));
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                log('[RESET] Pulso RTS enviado');
+                
+                // Secuencia 3: Ambos a la vez (máxima compatibilidad)
+                await new Promise(r => setTimeout(r, 50));
                 await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-                log('[RESET] DTR=HIGH, RTS=HIGH');
-                await new Promise(r => setTimeout(r, 50));
-                
-                // Paso 3: Ambas señales LOW otra vez
+                await new Promise(r => setTimeout(r, 100));
                 await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] DTR=LOW, RTS=LOW');
-                await new Promise(r => setTimeout(r, 50));
+                log('[RESET] Pulso DTR+RTS enviado');
+                
             } else {
                 log('[RESET] setSignals no disponible, saltando toggle DTR/RTS');
             }
@@ -136,7 +147,8 @@ async function forceBootloaderReset(port, bootloaderBaud = 115200, log = console
         // ========================================
         // 6. ESPERAR A QUE EL BOOTLOADER INICIE
         // ========================================
-        const bootloaderWait = 350; // ms - tiempo típico de inicio del bootloader
+        // Aumentado a 500ms - algunos bootloaders tardan más en iniciar
+        const bootloaderWait = 500;
         log(`[RESET] Esperando ${bootloaderWait}ms para que el bootloader inicie...`);
         await new Promise(r => setTimeout(r, bootloaderWait));
         
@@ -153,8 +165,23 @@ async function forceBootloaderReset(port, bootloaderBaud = 115200, log = console
         });
         log(`[RESET] Puerto abierto a ${bootloaderBaud} baud`);
         
-        // Espera adicional para estabilizar
-        const stabilizeWait = 200; // ms
+        // ========================================
+        // 8. TOGGLE DTR ADICIONAL A BAUD DEL BOOTLOADER
+        // ========================================
+        // Algunos bootloaders necesitan el toggle después de abrir al baud correcto
+        if (port.setSignals) {
+            try {
+                await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                await new Promise(r => setTimeout(r, 50));
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                log('[RESET] Toggle DTR adicional a baud del bootloader');
+            } catch (e) {
+                log(`[RESET] Error en toggle adicional: ${e.message}`);
+            }
+        }
+        
+        // Espera adicional para estabilizar (aumentada a 300ms)
+        const stabilizeWait = 300;
         log(`[RESET] Esperando ${stabilizeWait}ms para estabilizar...`);
         await new Promise(r => setTimeout(r, stabilizeWait));
         
@@ -200,8 +227,13 @@ class ArduinoUploader {
         READ_SIGN: 0x75,
     };
     
-    // Baudrates a probar para el bootloader (Optiboot vs bootloader antiguo)
-    static BOOTLOADER_BAUDS = [115200, 57600];
+    // Baudrates a probar para el bootloader (orden de probabilidad)
+    // 115200: Optiboot (Arduino UNO R3, Nano moderno)
+    // 57600: Bootloader antiguo (Nano clones, Duemilanove)
+    // 19200: Algunos clones antiguos
+    // 9600: Bootloaders muy antiguos o configuraciones especiales
+    // 38400: Algunos bootloaders ATmega8
+    static BOOTLOADER_BAUDS = [115200, 57600, 19200, 9600, 38400];
 
     /**
      * Conecta al Arduino con auto-fallback de baudrate.
@@ -213,73 +245,93 @@ class ArduinoUploader {
         // Lista de baudrates a probar, empezando por el preferido
         const baudsToTry = [preferredBaud, ...ArduinoUploader.BOOTLOADER_BAUDS.filter(b => b !== preferredBaud)];
         
+        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
         this.logFunc('[CONNECT] Iniciando conexión con auto-fallback de baudrate...');
         this.logFunc(`[CONNECT] Baudrates a probar: ${baudsToTry.join(', ')}`);
+        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
         
         let lastError = null;
         
         for (const baud of baudsToTry) {
-            this.logFunc(`[CONNECT] ═══════════════════════════════════════`);
+            this.logFunc(`[CONNECT] ───────────────────────────────────────`);
             this.logFunc(`[CONNECT] Probando baud ${baud}...`);
             
-            try {
-                // ========================================
-                // 1. RESET ROBUSTO DEL BOOTLOADER
-                // ========================================
-                this.logFunc(`[CONNECT] Ejecutando reset robusto a ${baud} baud...`);
-                const resetOk = await forceBootloaderReset(port, baud, this.logFunc);
-                
-                if (!resetOk) {
-                    this.logFunc(`[CONNECT] Reset falló a ${baud} baud, probando siguiente...`);
-                    continue;
+            // Intentar hasta 2 veces por baudrate (a veces el primer reset no funciona)
+            let syncSuccess = false;
+            
+            for (let resetAttempt = 0; resetAttempt < 2 && !syncSuccess; resetAttempt++) {
+                if (resetAttempt > 0) {
+                    this.logFunc(`[CONNECT] Reintentando reset a ${baud} baud (intento ${resetAttempt + 1})...`);
+                    await new Promise(r => setTimeout(r, 200)); // Espera extra antes de reintentar
                 }
                 
-                // ========================================
-                // 2. VERIFICAR QUE EL PUERTO ESTÉ ABIERTO
-                // ========================================
-                if (!this.port.readable || !this.port.writable) {
-                    this.logFunc(`[CONNECT] Abriendo puerto a ${baud} baud...`);
-                    await this.port.open({ 
-                        baudRate: baud, 
-                        dataBits: 8, 
-                        stopBits: 1, 
-                        parity: 'none',
-                        flowControl: 'none'
-                    });
+                try {
+                    // ========================================
+                    // 1. RESET ROBUSTO DEL BOOTLOADER
+                    // ========================================
+                    this.logFunc(`[CONNECT] Ejecutando reset a ${baud} baud...`);
+                    const resetOk = await forceBootloaderReset(port, baud, this.logFunc);
+                    
+                    if (!resetOk) {
+                        this.logFunc(`[CONNECT] Reset falló a ${baud} baud`);
+                        continue;
+                    }
+                    
+                    // ========================================
+                    // 2. VERIFICAR QUE EL PUERTO ESTÉ ABIERTO
+                    // ========================================
+                    if (!this.port.readable || !this.port.writable) {
+                        this.logFunc(`[CONNECT] Abriendo puerto a ${baud} baud...`);
+                        await this.port.open({ 
+                            baudRate: baud, 
+                            dataBits: 8, 
+                            stopBits: 1, 
+                            parity: 'none',
+                            flowControl: 'none'
+                        });
+                    }
+                    
+                    // Obtener reader/writer
+                    this.writable = this.port.writable;
+                    this.readable = this.port.readable;
+                    this.writer = this.writable.getWriter();
+                    this.reader = this.readable.getReader();
+                    
+                    // ========================================
+                    // 3. SYNC RÁPIDO (8 intentos, 200ms timeout)
+                    // ========================================
+                    this.logFunc(`[CONNECT] Probando sync STK500 a ${baud} baud...`);
+                    const syncOk = await this.tryQuickSync(8, 200);
+                    
+                    if (syncOk) {
+                        this.baudRate = baud;
+                        this.logFunc(`[CONNECT] ════════════════════════════════════════════════`);
+                        this.logFunc(`[CONNECT] ✓ SYNC OK a ${baud} baud!`);
+                        this.logFunc(`[CONNECT] ✓ Conectado y listo para comunicación STK500`);
+                        this.logFunc(`[CONNECT] ════════════════════════════════════════════════`);
+                        return; // Éxito!
+                    }
+                    
+                    // Sync falló, limpiar para reintentar
+                    this.logFunc(`[CONNECT] Sync falló a ${baud} baud (intento ${resetAttempt + 1})`);
+                    await this.cleanupForRetry();
+                    
+                } catch (error) {
+                    this.logFunc(`[CONNECT] Error a ${baud} baud: ${error.message}`);
+                    lastError = error;
+                    await this.cleanupForRetry();
                 }
-                
-                // Obtener reader/writer
-                this.writable = this.port.writable;
-                this.readable = this.port.readable;
-                this.writer = this.writable.getWriter();
-                this.reader = this.readable.getReader();
-                
-                // ========================================
-                // 3. SYNC RÁPIDO (5 intentos, 150ms timeout)
-                // ========================================
-                this.logFunc(`[CONNECT] Probando sync STK500 a ${baud} baud (5 intentos rápidos)...`);
-                const syncOk = await this.tryQuickSync(5, 150);
-                
-                if (syncOk) {
-                    this.baudRate = baud;
-                    this.logFunc(`[CONNECT] ✓ Sync OK a ${baud} baud!`);
-                    this.logFunc(`[CONNECT] ✓ Conectado y listo para comunicación STK500`);
-                    return; // Éxito!
-                }
-                
-                // Sync falló, limpiar y probar siguiente baudrate
-                this.logFunc(`[CONNECT] ✗ Sync falló a ${baud} baud`);
-                await this.cleanupForRetry();
-                
-            } catch (error) {
-                this.logFunc(`[CONNECT] ✗ Error a ${baud} baud: ${error.message}`);
-                lastError = error;
-                await this.cleanupForRetry();
             }
+            
+            // Después de todos los intentos para este baud, pasar al siguiente
+            this.logFunc(`[CONNECT] ✗ No se pudo sincronizar a ${baud} baud`);
         }
         
         // Ningún baudrate funcionó
-        throw new Error(`No se pudo conectar al bootloader. Probados: ${baudsToTry.join(', ')}. ¿Está el Arduino conectado correctamente?`);
+        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
+        this.logFunc('[CONNECT] ✗ FALLO: Ningún baudrate funcionó');
+        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
+        throw new Error(`No se pudo conectar al bootloader. Probados: ${baudsToTry.join(', ')}. ¿Está el Arduino conectado? Prueba presionar el botón RESET justo antes de subir.`);
     }
     
     /**
