@@ -61,6 +61,65 @@ ARDUINO_ENV['ARDUINO_SKETCHBOOK_DIR'] = str(SKETCH_DIR)
 serial_connection = None
 serial_lock = threading.Lock()
 
+# Lock global para uploads (evitar uploads concurrentes)
+upload_lock = threading.Lock()
+# Lock por puerto (diccionario de locks)
+port_locks = {}
+port_locks_mutex = threading.Lock()
+
+def get_port_lock(port):
+    """Obtiene o crea un lock para un puerto específico."""
+    with port_locks_mutex:
+        if port not in port_locks:
+            port_locks[port] = threading.Lock()
+        return port_locks[port]
+
+def validate_port_exists(port):
+    """Valida que el puerto existe y es accesible."""
+    import os
+    import stat
+    
+    # En Linux/Mac, verificar que el dispositivo existe
+    if os.path.exists(port):
+        try:
+            mode = os.stat(port).st_mode
+            # Verificar que es un dispositivo de caracteres (puerto serial)
+            if stat.S_ISCHR(mode):
+                return True, None
+            else:
+                return False, f"El puerto {port} no es un dispositivo serial válido"
+        except OSError as e:
+            return False, f"No se puede acceder al puerto {port}: {str(e)}"
+    
+    # En Windows, los puertos COM no aparecen como archivos
+    if port.upper().startswith('COM'):
+        # Intentar listar puertos disponibles
+        try:
+            available = [p.device for p in serial.tools.list_ports.comports()]
+            if port in available or port.upper() in [p.upper() for p in available]:
+                return True, None
+            else:
+                return False, f"Puerto {port} no encontrado. Disponibles: {', '.join(available) if available else 'ninguno'}"
+        except Exception as e:
+            return False, f"Error verificando puerto: {str(e)}"
+    
+    return False, f"Puerto {port} no existe"
+
+def close_serial_connection():
+    """Cierra la conexión serial global si está abierta."""
+    global serial_connection
+    closed = False
+    with serial_lock:
+        if serial_connection:
+            try:
+                if serial_connection.is_open:
+                    serial_connection.close()
+                    closed = True
+            except Exception as e:
+                print(f"[UPLOAD] Error cerrando conexión serial: {e}")
+            serial_connection = None
+    return closed
+
 
 def index(request):
     """Vista principal del IDE."""
@@ -339,15 +398,23 @@ def compile_and_download(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_code(request):
-    """Compila y sube el código a la placa Arduino."""
-    global serial_connection
-    sketch_path = None
+    """
+    Compila y sube el código a la placa Arduino.
     
-    # Cerrar conexión serial si está abierta
-    with serial_lock:
-        if serial_connection and serial_connection.is_open:
-            serial_connection.close()
-            serial_connection = None
+    Implementa:
+    - Lock por puerto para evitar uploads concurrentes
+    - Validación de puerto antes de subir
+    - Cierre de conexión serial del servidor
+    - Reintentos con espera progresiva si falla sync
+    - Respuesta JSON estructurada con error_code
+    """
+    sketch_path = None
+    logs = []
+    
+    def log(msg):
+        """Agrega mensaje al log."""
+        logs.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
+        print(f"[UPLOAD] {msg}")
     
     try:
         data = json.loads(request.body)
@@ -355,66 +422,235 @@ def upload_code(request):
         port = data.get('port', '')
         board = data.get('board', 'arduino:avr:uno')
         
+        # Validaciones básicas
         if not code:
-            return JsonResponse({'success': False, 'error': 'No code provided'}, status=400)
+            return JsonResponse({
+                'ok': False,
+                'error_code': 'NO_CODE',
+                'error': 'No se proporcionó código',
+                'details': {'port': port, 'fqbn': board},
+                'logs': logs
+            }, status=400)
+        
         if not port:
-            return JsonResponse({'success': False, 'error': 'No se especificó puerto'}, status=400)
-        
-        # Crear directorio único para el sketch
-        sketch_id = str(uuid.uuid4())[:8]
-        sketch_name = f'sketch_{sketch_id}'
-        sketch_path = SKETCH_DIR / sketch_name
-        sketch_path.mkdir(exist_ok=True)
-        sketch_file = sketch_path / f'{sketch_name}.ino'
-        
-        # Escribir el código
-        sketch_file.write_text(code)
-        
-        # Compilar y subir usando arduino-cli nativo
-        result = subprocess.run(
-            [
-                ARDUINO_CLI, 'compile', '--upload',
-                '--fqbn', board,
-                '--port', port,
-                str(sketch_path)
-            ],
-            capture_output=True,
-            text=True,
-            timeout=180,
-            env=ARDUINO_ENV
-        )
-        
-        if result.returncode == 0:
             return JsonResponse({
-                'success': True,
-                'message': 'Código subido exitosamente',
-                'output': result.stdout
-            })
-        else:
-            error_msg = result.stderr or result.stdout
+                'ok': False,
+                'error_code': 'NO_PORT',
+                'error': 'No se especificó puerto',
+                'details': {'port': None, 'fqbn': board},
+                'logs': logs
+            }, status=400)
+        
+        log(f"Iniciando upload a {port} con placa {board}")
+        
+        # ========================================
+        # 1. VERIFICAR LOCK POR PUERTO
+        # ========================================
+        port_lock = get_port_lock(port)
+        
+        # Intentar adquirir el lock sin bloquear
+        if not port_lock.acquire(blocking=False):
+            log(f"Puerto {port} ocupado por otro upload")
             return JsonResponse({
-                'success': False,
-                'error': error_msg,
-                'output': result.stdout
-            })
+                'ok': False,
+                'error_code': 'PORT_BUSY',
+                'error': f'Ya hay un upload en progreso en el puerto {port}. Espera a que termine.',
+                'details': {'port': port, 'fqbn': board},
+                'logs': logs
+            }, status=409)
+        
+        try:
+            # ========================================
+            # 2. CERRAR CONEXIÓN SERIAL DEL SERVIDOR
+            # ========================================
+            if close_serial_connection():
+                log("Conexión serial del servidor cerrada")
+                time.sleep(0.2)  # Pequeña espera para liberar el puerto
             
-    except subprocess.TimeoutExpired:
-        return JsonResponse({'success': False, 'error': 'Timeout de subida'}, status=408)
+            # ========================================
+            # 3. VALIDAR QUE EL PUERTO EXISTE
+            # ========================================
+            port_valid, port_error = validate_port_exists(port)
+            if not port_valid:
+                log(f"Puerto no válido: {port_error}")
+                return JsonResponse({
+                    'ok': False,
+                    'error_code': 'PORT_NOT_FOUND',
+                    'error': port_error,
+                    'details': {'port': port, 'fqbn': board},
+                    'logs': logs
+                }, status=404)
+            
+            log(f"Puerto {port} validado correctamente")
+            
+            # ========================================
+            # 4. CREAR SKETCH Y COMPILAR
+            # ========================================
+            sketch_id = str(uuid.uuid4())[:8]
+            sketch_name = f'sketch_{sketch_id}'
+            sketch_path = SKETCH_DIR / sketch_name
+            sketch_path.mkdir(exist_ok=True)
+            sketch_file = sketch_path / f'{sketch_name}.ino'
+            sketch_file.write_text(code)
+            
+            log(f"Sketch creado: {sketch_name}")
+            
+            # ========================================
+            # 5. UPLOAD CON REINTENTOS
+            # ========================================
+            max_retries = 3
+            retry_delays = [0, 500, 1000]  # ms de espera antes de cada intento
+            last_result = None
+            last_error = None
+            
+            for attempt in range(max_retries):
+                if attempt > 0:
+                    delay_ms = retry_delays[attempt]
+                    log(f"Reintento {attempt + 1}/{max_retries} después de {delay_ms}ms...")
+                    time.sleep(delay_ms / 1000.0)
+                
+                log(f"Ejecutando arduino-cli compile --upload (intento {attempt + 1})")
+                
+                try:
+                    result = subprocess.run(
+                        [
+                            ARDUINO_CLI, 'compile', '--upload',
+                            '--fqbn', board,
+                            '--port', port,
+                            '--verbose',  # Más información de debug
+                            str(sketch_path)
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                        env=ARDUINO_ENV
+                    )
+                    
+                    last_result = result
+                    
+                    # Capturar stdout y stderr completos
+                    stdout_lines = result.stdout.strip().split('\n') if result.stdout else []
+                    stderr_lines = result.stderr.strip().split('\n') if result.stderr else []
+                    
+                    for line in stdout_lines[-20:]:  # Últimas 20 líneas de stdout
+                        if line.strip():
+                            logs.append(f"[stdout] {line}")
+                    
+                    for line in stderr_lines[-20:]:  # Últimas 20 líneas de stderr
+                        if line.strip():
+                            logs.append(f"[stderr] {line}")
+                    
+                    if result.returncode == 0:
+                        log("Upload exitoso!")
+                        return JsonResponse({
+                            'ok': True,
+                            'success': True,  # Compatibilidad con código existente
+                            'message': 'Código subido exitosamente',
+                            'details': {'port': port, 'fqbn': board},
+                            'logs': logs,
+                            'output': result.stdout
+                        })
+                    
+                    # Analizar el error
+                    error_output = result.stderr + result.stdout
+                    
+                    # Detectar error de sincronización (reintentar)
+                    sync_errors = [
+                        'sync', 'not in sync', 'programmer is not responding',
+                        'stk500', 'avrdude', 'timeout', 'can\'t open device'
+                    ]
+                    
+                    is_sync_error = any(err in error_output.lower() for err in sync_errors)
+                    
+                    if is_sync_error and attempt < max_retries - 1:
+                        log(f"Error de sincronización detectado, reintentando...")
+                        last_error = error_output
+                        continue
+                    else:
+                        # Error no recuperable o último intento
+                        last_error = error_output
+                        break
+                        
+                except subprocess.TimeoutExpired:
+                    log(f"Timeout en intento {attempt + 1}")
+                    last_error = "Timeout de subida (180s)"
+                    if attempt < max_retries - 1:
+                        continue
+                    else:
+                        return JsonResponse({
+                            'ok': False,
+                            'error_code': 'UPLOAD_TIMEOUT',
+                            'error': 'Timeout de subida',
+                            'details': {'port': port, 'fqbn': board},
+                            'logs': logs
+                        }, status=408)
+            
+            # ========================================
+            # 6. TODOS LOS REINTENTOS FALLARON
+            # ========================================
+            error_output = last_error or "Error desconocido"
+            
+            # Determinar el código de error
+            error_code = 'UPLOAD_FAIL'
+            if 'sync' in error_output.lower() or 'not in sync' in error_output.lower():
+                error_code = 'UPLOAD_SYNC_FAIL'
+            elif 'can\'t open device' in error_output.lower() or 'permission' in error_output.lower():
+                error_code = 'PORT_ACCESS_DENIED'
+            elif 'no programmer' in error_output.lower():
+                error_code = 'NO_PROGRAMMER'
+            elif 'compilation' in error_output.lower() or 'error:' in error_output.lower():
+                error_code = 'COMPILE_ERROR'
+            
+            log(f"Upload fallido con error: {error_code}")
+            
+            return JsonResponse({
+                'ok': False,
+                'success': False,  # Compatibilidad
+                'error_code': error_code,
+                'error': error_output[:2000],  # Limitar longitud del error
+                'details': {'port': port, 'fqbn': board},
+                'logs': logs,
+                'output': last_result.stdout if last_result else ''
+            }, status=500)
+            
+        finally:
+            # Liberar el lock del puerto
+            port_lock.release()
+            log("Lock del puerto liberado")
+            
     except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+        return JsonResponse({
+            'ok': False,
+            'error_code': 'INVALID_JSON',
+            'error': 'JSON inválido en la petición',
+            'details': {},
+            'logs': logs
+        }, status=400)
     except FileNotFoundError:
         return JsonResponse({
-            'success': False, 
-            'error': 'arduino-cli no encontrado. Verifica la instalación.'
+            'ok': False,
+            'error_code': 'CLI_NOT_FOUND',
+            'error': 'arduino-cli no encontrado. Verifica la instalación.',
+            'details': {},
+            'logs': logs
         }, status=500)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        log(f"Error inesperado: {str(e)}")
+        return JsonResponse({
+            'ok': False,
+            'error_code': 'UNEXPECTED_ERROR',
+            'error': str(e),
+            'details': {},
+            'logs': logs
+        }, status=500)
     finally:
+        # Limpiar sketch temporal
         if sketch_path and sketch_path.exists():
             try:
                 shutil.rmtree(sketch_path)
-            except:
-                pass
+                log("Sketch temporal eliminado")
+            except Exception as e:
+                log(f"Error eliminando sketch: {e}")
 
 
 # ============================================
