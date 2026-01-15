@@ -41,28 +41,41 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
 
 🪟 WINDOWS
 ──────────
-   1. Haz doble clic en: start_agent.bat
-   2. ¡Listo! Verás una ventana con "Listening on http://localhost:8765"
+   1. Descarga Python de https://python.org (marca "Add to PATH")
+   2. Descarga arduino-cli de https://arduino.cc/en/software
+   3. Haz doble clic en: start_agent.bat
    
-   Opcional: Ejecuta install_autostart.bat para que inicie con Windows
+   Opcional: Ejecuta install_autostart.bat para inicio automático
 
 
 🍎 macOS
 ─────────
-   1. Abre Terminal (Cmd + Espacio → "Terminal")
-   2. Navega a esta carpeta: cd ~/Downloads/maxide-agent
-   3. Ejecuta: bash start_agent.sh
-
-
-🐧 LINUX
-─────────
-   1. Abre Terminal (Ctrl + Alt + T)
-   2. Navega a esta carpeta: cd ~/Descargas/maxide-agent
-   3. Ejecuta: bash start_agent.sh
+   1. Instala arduino-cli:
+      brew install arduino-cli
+      arduino-cli core install arduino:avr
    
-   Primera vez? Agrega permisos de puertos serial:
+   2. Ejecuta el Agent:
+      cd ~/Downloads/maxide-agent
+      bash start_agent.sh
+
+
+🐧 LINUX (Ubuntu/Debian/etc)
+─────────────────────────────
+   ⚠️  NO uses "snap install arduino-cli" - tiene problemas de permisos.
+   
+   1. Instala arduino-cli (versión oficial):
+      curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+      sudo mv bin/arduino-cli /usr/local/bin/
+      arduino-cli core update-index
+      arduino-cli core install arduino:avr
+   
+   2. Agrega permisos de puerto serial:
       sudo usermod -a -G dialout $USER
-      (Luego cierra sesión y vuelve a entrar)
+      (Cierra sesión y vuelve a entrar)
+   
+   3. Ejecuta el Agent:
+      cd ~/Descargas/maxide-agent
+      bash start_agent.sh
 
 
 ✅ VERIFICAR QUE FUNCIONA
@@ -74,21 +87,21 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
 
 ❓ PROBLEMAS COMUNES
 ─────────────────────
+   • "Permission denied" en Linux
+     → NO uses snap. Desinstala con: sudo snap remove arduino-cli
+     → Instala la versión binaria oficial (ver arriba)
+   
    • "Port busy" / Puerto ocupado
-     → Cierra Arduino IDE, Serial Monitor u otras apps que usen el puerto
+     → Cierra Arduino IDE, Serial Monitor u otras apps
    
    • "Sync error" / Error de sincronización
      → Prueba otro cable USB o presiona RESET en el Arduino
-   
-   • Linux no detecta Arduino
-     → Ejecuta: sudo usermod -a -G dialout $USER
-     → Cierra sesión y vuelve a entrar
 
 
 📋 REQUISITOS
 ──────────────
    • Python 3.7 o superior
-   • arduino-cli (el instalador lo configura automáticamente)
+   • arduino-cli (versión binaria oficial, NO snap)
 
 
 ═══════════════════════════════════════════════════════════════════

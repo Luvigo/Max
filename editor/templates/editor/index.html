@@ -391,6 +391,29 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">1</div>
                             <div class="step-content">
+                                <div class="step-title">Instala arduino-cli (si no lo tienes)</div>
+                                <div class="step-desc">Copia y pega en Terminal (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>):</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh<br>sudo mv bin/arduino-cli /usr/local/bin/<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                                <div class="step-note">⚠️ NO uses snap. La versión snap tiene problemas de permisos con puertos seriales.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Permisos para puertos serial</div>
+                                <div class="step-desc">Ejecuta esto y luego <strong>cierra sesión y vuelve a entrar</strong>:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>sudo usermod -a -G dialout $USER</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
                                 <div class="step-title">Descarga el Agent</div>
                                 <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
                                     📥 Descargar MAX-IDE Agent
@@ -399,36 +422,12 @@ void loop() {
                         </div>
                         
                         <div class="install-step">
-                            <div class="step-number">2</div>
-                            <div class="step-content">
-                                <div class="step-title">Abre una Terminal</div>
-                                <div class="step-desc">Presiona <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd></div>
-                            </div>
-                        </div>
-                        
-                        <div class="install-step">
-                            <div class="step-number">3</div>
-                            <div class="step-content">
-                                <div class="step-title">Ejecuta estos comandos</div>
-                                <div class="step-desc">Copia y pega en Terminal (uno por uno):</div>
-                                <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>
-                                        cd ~/Descargas<br>
-                                        unzip maxide-agent.zip<br>
-                                        cd maxide-agent<br>
-                                        bash start_agent.sh
-                                    </code>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="install-step">
                             <div class="step-number">4</div>
                             <div class="step-content">
-                                <div class="step-title">Permisos para Arduino (solo la primera vez)</div>
-                                <div class="step-desc">Si no detecta tu Arduino, ejecuta y reinicia sesión:</div>
+                                <div class="step-title">Ejecuta el Agent</div>
+                                <div class="step-desc">Copia y pega en Terminal:</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>sudo usermod -a -G dialout $USER</code>
+                                    <code>cd ~/Descargas && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>
                                 </div>
                             </div>
                         </div>

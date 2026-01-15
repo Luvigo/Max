@@ -745,7 +745,17 @@ def upload():
             # Permisos
             elif 'permission denied' in error_lower or 'access denied' in error_lower:
                 if platform.system() == 'Linux':
-                    hint = 'Permiso denegado. Ejecuta:\n  sudo usermod -a -G dialout $USER\nY luego cierra sesión y vuelve a entrar.'
+                    # Detectar si es problema de snap
+                    if ARDUINO_CLI and 'snap' in ARDUINO_CLI:
+                        hint = '⚠️ arduino-cli (snap) no puede acceder a puertos seriales.\n' \
+                               'Solución: Instala arduino-cli SIN snap:\n' \
+                               '  sudo snap remove arduino-cli\n' \
+                               '  curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh\n' \
+                               '  sudo mv bin/arduino-cli /usr/local/bin/\n' \
+                               '  arduino-cli core install arduino:avr\n' \
+                               'Luego reinicia el Agent.'
+                    else:
+                        hint = 'Permiso denegado. Ejecuta:\n  sudo usermod -a -G dialout $USER\nY luego cierra sesión y vuelve a entrar.'
                 else:
                     hint = 'Permiso denegado. Ejecuta el Agent como administrador o verifica permisos del puerto.'
                 error_code = 'PERMISSION_DENIED'
