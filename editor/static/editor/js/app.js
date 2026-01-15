@@ -35,6 +35,140 @@ let currentProjectId = null;
 // ARDUINO UPLOADER - Protocolo STK500
 // ============================================
 
+/**
+ * Fuerza un reset robusto del bootloader antes del handshake STK500.
+ * Soluciona el problema de "Recibido []" cuando el bootloader no responde.
+ * 
+ * @param {SerialPort} port - Puerto Web Serial
+ * @param {number} bootloaderBaud - Baudrate del bootloader (ej: 115200)
+ * @param {Function} log - Función de logging opcional
+ * @returns {Promise<boolean>} - true si el reset fue exitoso
+ */
+async function forceBootloaderReset(port, bootloaderBaud = 115200, log = console.log) {
+    try {
+        log('[RESET] Iniciando reset robusto del bootloader...');
+        
+        // ========================================
+        // 1. CERRAR CUALQUIER READER/WRITER ACTIVO
+        // ========================================
+        if (port.readable) {
+            try {
+                const reader = port.readable.getReader();
+                await reader.cancel().catch(() => {});
+                reader.releaseLock();
+                log('[RESET] Reader cancelado y liberado');
+            } catch (e) {
+                log(`[RESET] No había reader activo o error: ${e.message}`);
+            }
+        }
+        
+        if (port.writable) {
+            try {
+                const writer = port.writable.getWriter();
+                writer.releaseLock();
+                log('[RESET] Writer liberado');
+            } catch (e) {
+                log(`[RESET] No había writer activo o error: ${e.message}`);
+            }
+        }
+        
+        // ========================================
+        // 2. CERRAR PUERTO COMPLETAMENTE
+        // ========================================
+        try {
+            if (port.readable || port.writable) {
+                await port.close();
+                log('[RESET] Puerto cerrado');
+            }
+        } catch (e) {
+            log(`[RESET] Puerto ya cerrado o error: ${e.message}`);
+        }
+        
+        // Pequeña espera después de cerrar
+        await new Promise(r => setTimeout(r, 100));
+        
+        // ========================================
+        // 3. ABRIR A 1200 BAUD (TRIGGER DE RESET)
+        // ========================================
+        // 1200 baud es un trigger especial para algunos bootloaders (Leonardo, etc.)
+        // y también funciona para activar el auto-reset en muchos Arduinos
+        try {
+            log('[RESET] Abriendo puerto a 1200 baud (trigger de reset)...');
+            await port.open({ baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none' });
+            log('[RESET] Puerto abierto a 1200 baud');
+            
+            // ========================================
+            // 4. TOGGLE DTR/RTS PARA RESET
+            // ========================================
+            if (port.setSignals) {
+                log('[RESET] Ejecutando secuencia DTR/RTS...');
+                
+                // Paso 1: Ambas señales LOW
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                log('[RESET] DTR=LOW, RTS=LOW');
+                await new Promise(r => setTimeout(r, 50));
+                
+                // Paso 2: Ambas señales HIGH (genera pulso de reset)
+                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+                log('[RESET] DTR=HIGH, RTS=HIGH');
+                await new Promise(r => setTimeout(r, 50));
+                
+                // Paso 3: Ambas señales LOW otra vez
+                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                log('[RESET] DTR=LOW, RTS=LOW');
+                await new Promise(r => setTimeout(r, 50));
+            } else {
+                log('[RESET] setSignals no disponible, saltando toggle DTR/RTS');
+            }
+            
+            // ========================================
+            // 5. CERRAR PUERTO OTRA VEZ
+            // ========================================
+            await port.close();
+            log('[RESET] Puerto cerrado después del reset');
+            
+        } catch (e) {
+            log(`[RESET] Error durante reset a 1200 baud: ${e.message}`);
+            // Intentar cerrar por si quedó abierto
+            try { await port.close(); } catch (e2) {}
+        }
+        
+        // ========================================
+        // 6. ESPERAR A QUE EL BOOTLOADER INICIE
+        // ========================================
+        const bootloaderWait = 350; // ms - tiempo típico de inicio del bootloader
+        log(`[RESET] Esperando ${bootloaderWait}ms para que el bootloader inicie...`);
+        await new Promise(r => setTimeout(r, bootloaderWait));
+        
+        // ========================================
+        // 7. REABRIR AL BAUD DEL BOOTLOADER
+        // ========================================
+        log(`[RESET] Reabriendo puerto a ${bootloaderBaud} baud...`);
+        await port.open({ 
+            baudRate: bootloaderBaud, 
+            dataBits: 8, 
+            stopBits: 1, 
+            parity: 'none',
+            flowControl: 'none'
+        });
+        log(`[RESET] Puerto abierto a ${bootloaderBaud} baud`);
+        
+        // Espera adicional para estabilizar
+        const stabilizeWait = 200; // ms
+        log(`[RESET] Esperando ${stabilizeWait}ms para estabilizar...`);
+        await new Promise(r => setTimeout(r, stabilizeWait));
+        
+        log('[RESET] ✓ Reset del bootloader completado');
+        return true;
+        
+    } catch (error) {
+        log(`[RESET] ✗ Error durante reset: ${error.message}`);
+        // Intentar cerrar el puerto por si quedó en mal estado
+        try { await port.close(); } catch (e) {}
+        return false;
+    }
+}
+
 class ArduinoUploader {
     constructor() {
         this.port = null;
@@ -42,6 +176,14 @@ class ArduinoUploader {
         this.writer = null;
         this.readable = null;
         this.writable = null;
+        this.logFunc = console.log;
+    }
+    
+    /**
+     * Configura la función de logging
+     */
+    setLogger(logFunc) {
+        this.logFunc = logFunc || console.log;
     }
 
     // Constantes del protocolo STK500
@@ -60,40 +202,99 @@ class ArduinoUploader {
 
     async connect(port, baudRate = 115200) {
         this.port = port;
+        this.baudRate = baudRate;
         
-        // Si el puerto ya está abierto, cerrarlo primero
-        if (this.port.readable || this.port.writable) {
-            try {
-                await this.port.close();
-            } catch (e) {
-                // Ignorar errores
-            }
+        // ========================================
+        // RESET ROBUSTO DEL BOOTLOADER
+        // ========================================
+        // Esto soluciona el problema de "Recibido []" cuando el bootloader no responde
+        this.logFunc('[CONNECT] Ejecutando reset robusto del bootloader...');
+        const resetOk = await forceBootloaderReset(port, baudRate, this.logFunc);
+        
+        if (!resetOk) {
+            this.logFunc('[CONNECT] Advertencia: reset del bootloader falló, intentando continuar...');
         }
         
-        await this.port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none' });
+        // Después del forceBootloaderReset, el puerto ya está abierto al baudRate correcto
+        // Solo necesitamos obtener reader/writer
+        
+        // Verificar que el puerto esté abierto
+        if (!this.port.readable || !this.port.writable) {
+            this.logFunc('[CONNECT] Puerto no está abierto, abriendo...');
+            await this.port.open({ 
+                baudRate, 
+                dataBits: 8, 
+                stopBits: 1, 
+                parity: 'none',
+                flowControl: 'none'
+            });
+        }
         
         this.writable = this.port.writable;
         this.readable = this.port.readable;
         this.writer = this.writable.getWriter();
         this.reader = this.readable.getReader();
+        
+        this.logFunc('[CONNECT] ✓ Conectado y listo para comunicación STK500');
     }
 
     async disconnect() {
+        this.logFunc('[DISCONNECT] Iniciando limpieza de conexión...');
+        
         try {
+            // 1. Cancelar y liberar reader
             if (this.reader) {
-                await this.reader.cancel().catch(() => {});
-                this.reader.releaseLock();
+                try {
+                    await this.reader.cancel();
+                    this.logFunc('[DISCONNECT] Reader cancelado');
+                } catch (e) {
+                    this.logFunc(`[DISCONNECT] Error cancelando reader: ${e.message}`);
+                }
+                try {
+                    this.reader.releaseLock();
+                    this.logFunc('[DISCONNECT] Reader lock liberado');
+                } catch (e) {
+                    this.logFunc(`[DISCONNECT] Error liberando reader lock: ${e.message}`);
+                }
                 this.reader = null;
             }
+            
+            // 2. Cerrar y liberar writer
             if (this.writer) {
-                await this.writer.close().catch(() => {});
+                try {
+                    this.writer.releaseLock();
+                    this.logFunc('[DISCONNECT] Writer lock liberado');
+                } catch (e) {
+                    this.logFunc(`[DISCONNECT] Error liberando writer lock: ${e.message}`);
+                }
                 this.writer = null;
             }
-            if (this.port && (this.port.readable || this.port.writable)) {
-                await this.port.close().catch(() => {});
+            
+            // 3. Cerrar puerto
+            if (this.port) {
+                try {
+                    if (this.port.readable || this.port.writable) {
+                        await this.port.close();
+                        this.logFunc('[DISCONNECT] Puerto cerrado');
+                    }
+                } catch (e) {
+                    this.logFunc(`[DISCONNECT] Error cerrando puerto: ${e.message}`);
+                }
             }
+            
+            // Limpiar referencias
+            this.readable = null;
+            this.writable = null;
+            
+            this.logFunc('[DISCONNECT] ✓ Limpieza completada');
+            
         } catch (e) {
-            console.error('Error cerrando puerto:', e);
+            this.logFunc(`[DISCONNECT] ✗ Error crítico durante limpieza: ${e.message}`);
+            // Forzar limpieza de referencias aunque haya error
+            this.reader = null;
+            this.writer = null;
+            this.readable = null;
+            this.writable = null;
         }
     }
 
@@ -124,28 +325,27 @@ class ArduinoUploader {
     }
 
     async sync() {
-        console.log('[SYNC] Iniciando sincronización con bootloader...');
+        this.logFunc('[SYNC] Iniciando sincronización con bootloader...');
         
-        // Reset Arduino usando DTR y RTS (mejor compatibilidad con clones CH340)
-        // Primero ponemos ambas señales en LOW
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise(r => setTimeout(r, 100));
+        // Nota: El reset robusto ya se hizo en connect() via forceBootloaderReset()
+        // Aquí solo hacemos un toggle adicional de DTR por si acaso
         
-        // Pulso de reset con RTS (algunos clones lo necesitan)
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-        await new Promise(r => setTimeout(r, 100));
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise(r => setTimeout(r, 100));
-        
-        // Reset con DTR (método estándar)
-        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        await new Promise(r => setTimeout(r, 50));
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        
-        // Esperar más tiempo a que el bootloader inicie (clones son más lentos)
-        await new Promise(r => setTimeout(r, 200));
+        if (this.port.setSignals) {
+            try {
+                // Toggle rápido de DTR para reforzar el reset
+                await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                await new Promise(r => setTimeout(r, 50));
+                await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                await new Promise(r => setTimeout(r, 100));
+                this.logFunc('[SYNC] Toggle DTR adicional completado');
+            } catch (e) {
+                this.logFunc(`[SYNC] Advertencia: no se pudo toggle DTR: ${e.message}`);
+            }
+        }
 
         // Limpiar buffer de entrada
+        this.logFunc('[SYNC] Limpiando buffer de entrada...');
+        let bytesCleared = 0;
         try {
             while (true) {
                 const { value, done } = await Promise.race([
@@ -153,12 +353,18 @@ class ArduinoUploader {
                     new Promise(r => setTimeout(() => r({ done: true }), 50))
                 ]);
                 if (done || !value || value.length === 0) break;
+                bytesCleared += value.length;
+            }
+            if (bytesCleared > 0) {
+                this.logFunc(`[SYNC] ${bytesCleared} bytes descartados del buffer`);
             }
         } catch (e) {
             // Ignorar errores de limpieza
         }
 
         // Intentar sincronizar con más intentos y variando el timing
+        this.logFunc('[SYNC] Enviando comandos GET_SYNC...');
+        
         for (let attempt = 0; attempt < 15; attempt++) {
             try {
                 // Enviar comando GET_SYNC
@@ -168,23 +374,36 @@ class ArduinoUploader {
                 const timeout = attempt < 5 ? 200 : 500;
                 const response = await this.receive(2, timeout);
                 
-                console.log(`[SYNC] Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
+                const respHex = Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ');
+                this.logFunc(`[SYNC] Intento ${attempt + 1}/15: Recibido [${respHex}]`);
                 
                 if (response.length >= 2 && 
                     response[0] === ArduinoUploader.STK.INSYNC && 
                     response[1] === ArduinoUploader.STK.OK) {
-                    console.log('[SYNC] ¡Sincronización exitosa!');
+                    this.logFunc('[SYNC] ✓ ¡Sincronización exitosa!');
                     return true;
                 }
+                
+                // Si recibimos algo pero no es correcto, log adicional
+                if (response.length > 0) {
+                    this.logFunc(`[SYNC] Respuesta incorrecta (esperaba 0x14, 0x10)`);
+                }
+                
             } catch (e) {
-                console.log(`[SYNC] Intento ${attempt + 1}: timeout`);
+                if (e.message === 'timeout') {
+                    this.logFunc(`[SYNC] Intento ${attempt + 1}/15: timeout`);
+                } else {
+                    this.logFunc(`[SYNC] Intento ${attempt + 1}/15: error - ${e.message}`);
+                }
             }
             
-            // Esperar un poco más entre intentos para clones
-            await new Promise(r => setTimeout(r, 50 + (attempt * 20)));
+            // Esperar un poco más entre intentos (timing progresivo)
+            const delay = 50 + (attempt * 30);
+            await new Promise(r => setTimeout(r, delay));
         }
         
-        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
+        this.logFunc('[SYNC] ✗ Todos los intentos de sincronización fallaron');
+        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado y prueba presionar el botón RESET.');
     }
 
     async enterProgramMode() {
@@ -1148,6 +1367,12 @@ async function uploadCode() {
     
     const uploader = new ArduinoUploader();
     
+    // Configurar logger para que todos los mensajes del uploader vayan a la consola
+    uploader.setLogger((msg) => {
+        logToConsole(msg, 'info');
+        console.log(msg);
+    });
+    
     try {
         // 1. Compilar en el servidor y obtener HEX
         logToConsole('[UPLOAD] Llamando API /compile-download/...', 'info');
@@ -1184,8 +1409,8 @@ async function uploadCode() {
         const hexContent = atob(compileData.hex_file);
         
         // 3. Subir directamente usando Web Serial API
-        btn.innerHTML = '<span class="loading"></span> Subiendo...';
-        logToConsole('[UPLOAD] Conectando al Arduino...', 'info');
+        btn.innerHTML = '<span class="loading"></span> Conectando...';
+        logToConsole('[UPLOAD] Preparando conexión al Arduino...', 'info');
         
         // Determinar baudrate según la placa
         let uploadBaud = 115200;
@@ -1202,15 +1427,16 @@ async function uploadCode() {
             return;
         }
         
-        logToConsole(`[UPLOAD] Abriendo puerto a ${uploadBaud} baud...`, 'info');
+        logToConsole(`[UPLOAD] Conectando a ${uploadBaud} baud con reset robusto...`, 'info');
+        btn.innerHTML = '<span class="loading"></span> Reset...';
+        
         await uploader.connect(selectedPort, uploadBaud);
         
+        btn.innerHTML = '<span class="loading"></span> Subiendo...';
         await uploader.upload(hexContent, (msg, progress) => {
             logToConsole(`[UPLOAD] ${msg}`, 'info');
             btn.innerHTML = `<span class="loading"></span> ${progress}%`;
         });
-        
-        await uploader.disconnect();
         
         logToConsole('[UPLOAD] ✓ ¡Código subido exitosamente!', 'success');
         showToast('¡Código subido exitosamente!', 'success');
@@ -1218,14 +1444,21 @@ async function uploadCode() {
     } catch (error) {
         logToConsole('[UPLOAD] ✗ Error: ' + error.message, 'error');
         showToast('Error: ' + error.message, 'error');
+    } finally {
+        // ========================================
+        // CLEANUP ROBUSTO (siempre se ejecuta)
+        // ========================================
+        logToConsole('[UPLOAD] Ejecutando limpieza...', 'info');
         try {
             await uploader.disconnect();
-        } catch (e) {}
+        } catch (e) {
+            logToConsole(`[UPLOAD] Error durante limpieza: ${e.message}`, 'warning');
+        }
+        
+        isUploading = false;
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀</span><span>Subir</span>';
     }
-    
-    isUploading = false;
-    btn.disabled = false;
-    btn.innerHTML = '<span>🚀</span><span>Subir</span>';
 }
 
 // ============================================
