@@ -74,6 +74,73 @@ def get_port_lock(port):
             port_locks[port] = threading.Lock()
         return port_locks[port]
 
+def detect_device_type(port_info):
+    """
+    Detecta el tipo de dispositivo basado en VID/PID y metadata.
+    
+    Returns:
+        dict con: device_type, is_arduino, is_ch340, suggested_board, warning
+    """
+    vid = port_info.get('vid')
+    pid = port_info.get('pid')
+    description = (port_info.get('description') or '').lower()
+    product = (port_info.get('product') or '').lower()
+    manufacturer = (port_info.get('manufacturer') or '').lower()
+    
+    # VID/PID conocidos
+    ARDUINO_VIDS = [0x2341, 0x2A03, 0x239A]  # Arduino LLC, Arduino.org, Adafruit
+    CH340_VID = 0x1A86
+    FTDI_VID = 0x0403
+    CP210X_VID = 0x10C4
+    
+    is_arduino = vid in ARDUINO_VIDS
+    is_ch340 = vid == CH340_VID
+    is_ftdi = vid == FTDI_VID
+    is_cp210x = vid == CP210X_VID
+    
+    device_type = 'unknown'
+    suggested_board = None
+    warning = None
+    
+    if is_arduino:
+        device_type = 'arduino_official'
+        # Detectar placa específica por descripción
+        if 'uno' in description or 'uno' in product:
+            suggested_board = 'arduino:avr:uno'
+        elif 'nano' in description or 'nano' in product:
+            suggested_board = 'arduino:avr:nano'
+        elif 'mega' in description or 'mega' in product:
+            suggested_board = 'arduino:avr:mega'
+        elif 'leonardo' in description or 'leonardo' in product:
+            suggested_board = 'arduino:avr:leonardo'
+    elif is_ch340:
+        device_type = 'ch340'
+        # CH340 típicamente se usa en clones de Nano/UNO
+        if 'nano' in description or 'nano' in product:
+            suggested_board = 'arduino:avr:nano'
+            warning = 'Dispositivo CH340 detectado. Si es un Nano clon, prueba con "Arduino Nano (Old Bootloader)" si el upload falla.'
+        else:
+            suggested_board = 'arduino:avr:nano'  # Por defecto, muchos clones CH340 son Nano
+            warning = 'Dispositivo CH340 detectado (típicamente Nano clon). Considera usar "Arduino Nano (Old Bootloader)".'
+    elif is_ftdi:
+        device_type = 'ftdi'
+    elif is_cp210x:
+        device_type = 'cp210x'
+    else:
+        device_type = 'unknown'
+        warning = 'Dispositivo USB serial no reconocido. Verifica que sea un Arduino o placa compatible.'
+    
+    return {
+        'device_type': device_type,
+        'is_arduino': is_arduino,
+        'is_ch340': is_ch340,
+        'is_ftdi': is_ftdi,
+        'is_cp210x': is_cp210x,
+        'suggested_board': suggested_board,
+        'warning': warning
+    }
+
+
 def validate_port_exists(port):
     """Valida que el puerto existe y es accesible."""
     import os
@@ -104,6 +171,26 @@ def validate_port_exists(port):
             return False, f"Error verificando puerto: {str(e)}"
     
     return False, f"Puerto {port} no existe"
+
+
+def get_port_info(port):
+    """Obtiene información completa de un puerto."""
+    try:
+        for p in serial.tools.list_ports.comports():
+            if p.device == port:
+                return {
+                    'device': p.device,
+                    'description': p.description,
+                    'vid': p.vid,
+                    'pid': p.pid,
+                    'serial_number': p.serial_number,
+                    'manufacturer': p.manufacturer,
+                    'product': p.product,
+                    'hwid': p.hwid
+                }
+    except Exception:
+        pass
+    return None
 
 def close_serial_connection():
     """Cierra la conexión serial global si está abierta."""
@@ -314,19 +401,42 @@ def list_ports(request):
         print(f"Error arduino-cli: {e}")
     
     # Fallback: usar pyserial si arduino-cli no encontró puertos
-    if not ports:
-        try:
-            for port in serial.tools.list_ports.comports():
+    # También usar pyserial para obtener metadata completa (vid, pid, serial)
+    try:
+        pyserial_ports = {p.device: p for p in serial.tools.list_ports.comports()}
+        
+        # Enriquecer puertos existentes con metadata de pyserial
+        for port in ports:
+            device = port.get('device', '')
+            if device in pyserial_ports:
+                p = pyserial_ports[device]
+                port['vid'] = p.vid
+                port['pid'] = p.pid
+                port['serial_number'] = p.serial_number
+                port['manufacturer'] = p.manufacturer
+                port['product'] = p.product
+                # Mejorar description si está vacía
+                if not port.get('description') or port['description'] == 'Puerto Serial':
+                    port['description'] = p.description or 'Puerto Serial'
+        
+        # Si no hay puertos de arduino-cli, agregar todos los de pyserial
+        if not ports:
+            for port in pyserial_ports.values():
                 ports.append({
                     'device': port.device,
                     'description': port.description or 'Puerto Serial',
                     'protocol': 'serial',
                     'board_name': '',
                     'board_fqbn': '',
-                    'hwid': port.hwid or ''
+                    'hwid': port.hwid or '',
+                    'vid': port.vid,
+                    'pid': port.pid,
+                    'serial_number': port.serial_number,
+                    'manufacturer': port.manufacturer,
+                    'product': port.product
                 })
-        except Exception:
-            pass
+    except Exception as e:
+        print(f"Error obteniendo metadata de puertos: {e}")
     
     return JsonResponse({'ports': ports})
 
@@ -572,6 +682,45 @@ def upload_code(request):
             log(f"Puerto {port} validado correctamente")
             
             # ========================================
+            # 3.1 DETECTAR TIPO DE DISPOSITIVO Y VALIDAR
+            # ========================================
+            port_info = get_port_info(port)
+            device_detection = None
+            warning_message = None
+            suggested_board_change = None
+            
+            if port_info:
+                device_detection = detect_device_type(port_info)
+                log(f"Dispositivo detectado: {device_detection['device_type']}")
+                
+                # Validar que sea un dispositivo Arduino/USB serial típico
+                if not device_detection['is_arduino'] and not device_detection['is_ch340'] and \
+                   not device_detection['is_ftdi'] and not device_detection['is_cp210x']:
+                    warning_message = device_detection.get('warning', 'Dispositivo USB serial no reconocido. Verifica que sea un Arduino o placa compatible.')
+                    log(f"Advertencia: {warning_message}")
+                    # No abortamos, solo advertimos
+                
+                # Detectar incompatibilidad: UNO seleccionado pero dispositivo parece Nano (CH340)
+                if board == 'arduino:avr:uno' and device_detection['is_ch340']:
+                    if 'nano' in (port_info.get('description') or '').lower() or \
+                       'nano' in (port_info.get('product') or '').lower():
+                        warning_message = 'Dispositivo CH340 detectado que parece ser un Nano, pero tienes seleccionado Arduino UNO. Considera cambiar a "Arduino Nano (Old Bootloader)".'
+                        suggested_board_change = 'arduino:avr:nano'
+                        log(f"Advertencia: {warning_message}")
+                    else:
+                        warning_message = 'Dispositivo CH340 detectado. Si el upload falla, prueba con "Arduino Nano (Old Bootloader)".'
+                        suggested_board_change = 'arduino:avr:nano'
+                        log(f"Advertencia: {warning_message}")
+                
+                # Si el dispositivo sugiere una placa diferente
+                if device_detection.get('suggested_board') and \
+                   device_detection['suggested_board'] != board:
+                    if not warning_message:  # Solo si no hay otra advertencia
+                        warning_message = device_detection.get('warning', 
+                            f'El dispositivo sugiere usar "{device_detection["suggested_board"]}" pero tienes seleccionado "{board}".')
+                        suggested_board_change = device_detection['suggested_board']
+            
+            # ========================================
             # 4. CREAR SKETCH Y COMPILAR
             # ========================================
             sketch_id = str(uuid.uuid4())[:8]
@@ -641,14 +790,22 @@ def upload_code(request):
                     
                     if result.returncode == 0:
                         log("Upload exitoso!")
-                        return JsonResponse({
+                        response_data = {
                             'ok': True,
                             'success': True,  # Compatibilidad con código existente
                             'message': 'Código subido exitosamente',
                             'details': {'port': port, 'fqbn': board},
                             'logs': logs,
                             'output': result.stdout
-                        })
+                        }
+                        # Incluir advertencias y sugerencias si existen
+                        if warning_message:
+                            response_data['warning'] = warning_message
+                        if suggested_board_change:
+                            response_data['suggested_board'] = suggested_board_change
+                        if device_detection:
+                            response_data['device_info'] = device_detection
+                        return JsonResponse(response_data)
                     
                     # Analizar el error
                     error_output = result.stderr + result.stdout

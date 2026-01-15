@@ -615,14 +615,41 @@ function initEventListeners() {
         currentPort = e.target.value;
         updateConnectionStatus();
         if (currentPort !== '' && availablePorts[parseInt(currentPort)]) {
-            const info = availablePorts[parseInt(currentPort)].getInfo();
-            let label = `Puerto ${parseInt(currentPort) + 1}`;
+            const port = availablePorts[parseInt(currentPort)];
+            const info = port.getInfo();
+            let deviceType = 'Desconocido';
+            let details = [];
+            
+            // Identificar tipo de dispositivo
             if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                label = 'Arduino';
+                deviceType = 'Arduino Oficial';
             } else if (info.usbVendorId === 0x1A86) {
-                label = 'CH340';
+                deviceType = 'CH340 (clon típico)';
+            } else if (info.usbVendorId === 0x0403) {
+                deviceType = 'FTDI';
+            } else if (info.usbVendorId === 0x10C4) {
+                deviceType = 'CP210x';
             }
-            logToConsole(`Puerto seleccionado: ${label}`, 'info');
+            
+            if (info.usbVendorId) {
+                details.push(`VID: 0x${info.usbVendorId.toString(16).toUpperCase()}`);
+            }
+            if (info.usbProductId) {
+                details.push(`PID: 0x${info.usbProductId.toString(16).toUpperCase()}`);
+            }
+            if (info.serialNumber) {
+                details.push(`S/N: ${info.serialNumber}`);
+            }
+            
+            logToConsole(`Puerto seleccionado: ${deviceType}`, 'info');
+            if (details.length > 0) {
+                logToConsole(`  ${details.join(' | ')}`, 'info');
+            }
+            
+            // Advertencia si es CH340 y está seleccionado UNO
+            if (info.usbVendorId === 0x1A86 && currentBoard === 'arduino:avr:uno') {
+                showBoardSuggestion('CH340 detectado. Si el upload falla, prueba con "Arduino Nano (Old Bootloader)".', 'arduino:avr:nano');
+            }
         }
     });
     
@@ -838,20 +865,35 @@ async function refreshPorts() {
             const optionsHtml = '<option value="">Seleccionar puerto...</option>' +
                 availablePorts.map((port, index) => {
                     const info = port.getInfo();
-                    let label = `Puerto ${index + 1}`;
-                    if (info.usbVendorId) {
-                        // Identificar Arduino por VID
-                        if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                            label = `Arduino (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x1A86) {
-                            label = `CH340 (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x0403) {
-                            label = `FTDI (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x10C4) {
-                            label = `CP210x (Puerto ${index + 1})`;
-                        }
+                    let deviceType = 'Desconocido';
+                    let metadata = [];
+                    
+                    // Identificar tipo de dispositivo por VID
+                    if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
+                        deviceType = 'Arduino Oficial';
+                    } else if (info.usbVendorId === 0x1A86) {
+                        deviceType = 'CH340 (clon típico)';
+                    } else if (info.usbVendorId === 0x0403) {
+                        deviceType = 'FTDI';
+                    } else if (info.usbVendorId === 0x10C4) {
+                        deviceType = 'CP210x';
                     }
-                    return `<option value="${index}">${label}</option>`;
+                    
+                    // Agregar metadata
+                    if (info.usbVendorId) {
+                        metadata.push(`VID:0x${info.usbVendorId.toString(16).toUpperCase()}`);
+                    }
+                    if (info.usbProductId) {
+                        metadata.push(`PID:0x${info.usbProductId.toString(16).toUpperCase()}`);
+                    }
+                    if (info.serialNumber) {
+                        metadata.push(`S/N:${info.serialNumber.substring(0, 8)}`);
+                    }
+                    
+                    const metadataStr = metadata.length > 0 ? ` [${metadata.join(', ')}]` : '';
+                    const label = `${deviceType}${metadataStr}`;
+                    
+                    return `<option value="${index}" title="${info.serialNumber || 'Sin S/N'}">${label}</option>`;
                 }).join('');
             
             select.innerHTML = optionsHtml;
@@ -1554,6 +1596,71 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
+
+function showBoardSuggestion(message, suggestedBoard) {
+    /**
+     * Muestra una sugerencia de cambio de placa con botón rápido.
+     */
+    const container = document.getElementById('toastContainer');
+    
+    // Remover sugerencias anteriores
+    const existing = container.querySelector('.toast.suggestion');
+    if (existing) existing.remove();
+    
+    const boardNames = {
+        'arduino:avr:uno': 'Arduino UNO',
+        'arduino:avr:nano': 'Arduino Nano',
+        'arduino:avr:mega': 'Arduino Mega',
+        'arduino:avr:leonardo': 'Arduino Leonardo'
+    };
+    
+    const suggestedName = boardNames[suggestedBoard] || suggestedBoard;
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast warning suggestion';
+    toast.innerHTML = `
+        <span class="toast-icon">⚠️</span>
+        <div style="flex: 1;">
+            <span class="toast-message">${escapeHtml(message)}</span>
+            <button class="btn btn-sm" style="margin-top: 8px; padding: 4px 12px; font-size: 12px;" 
+                    onclick="changeBoardTo('${suggestedBoard}'); this.closest('.toast').remove();">
+                Cambiar a ${suggestedName}
+            </button>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // No auto-remover, dejar que el usuario decida
+}
+
+function changeBoardTo(fqbn) {
+    /**
+     * Cambia la placa seleccionada al FQBN especificado.
+     */
+    const boardSelect = document.getElementById('boardSelect');
+    const boardNames = {
+        'arduino:avr:uno': 'Arduino UNO',
+        'arduino:avr:nano': 'Arduino Nano',
+        'arduino:avr:mega': 'Arduino Mega',
+        'arduino:avr:leonardo': 'Arduino Leonardo'
+    };
+    
+    if (boardSelect.querySelector(`option[value="${fqbn}"]`)) {
+        boardSelect.value = fqbn;
+        currentBoard = fqbn;
+        const boardName = boardNames[fqbn] || fqbn;
+        document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${boardName}</span>`;
+        logToConsole(`Placa cambiada a: ${boardName}`, 'success');
+        showToast(`Placa cambiada a ${boardName}`, 'success');
+    } else {
+        logToConsole(`Placa ${fqbn} no disponible en el selector`, 'warning');
+    }
+}
+
+// Exponer función globalmente para que funcione desde el onclick
+window.changeBoardTo = changeBoardTo;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
