@@ -10,377 +10,27 @@
 let workspace = null;
 let currentPort = '';
 let currentBoard = 'arduino:avr:uno';
+let serialReadInterval = null;
+let isSerialConnected = false;
 let portCheckInterval = null;
 let lastKnownPorts = [];
 
+// Web Serial API
+let serialPort = null;
+let serialReader = null;
+let serialWriter = null;
+let readBuffer = '';
+
 // Web Serial para Upload
+let uploadPort = null;
 let availablePorts = []; // Puertos Web Serial disponibles
 
 // Proyectos
 let currentProjectId = null;
 
 // ============================================
-// PORT MANAGER - Gestión centralizada del puerto
-// ============================================
-// Evita locks no liberados y fallos intermitentes
-// "funciona una vez y luego no"
-
-const PortManager = {
-    // Estado actual de la sesión del puerto
-    session: {
-        port: null,
-        reader: null,
-        writer: null,
-        isUploading: false,
-        isSerialMonitorOpen: false,
-        lastOperation: null,
-        lockCount: 0
-    },
-    
-    // Buffer para Serial Monitor
-    readBuffer: '',
-    serialReadInterval: null,
-    
-    /**
-     * Verifica si se puede iniciar un upload
-     * @returns {{ canUpload: boolean, reason: string }}
-     */
-    canStartUpload() {
-        if (this.session.isUploading) {
-            console.log('[PORT_MANAGER] UPLOAD_MUTEX_BLOCK: Ya hay un upload en progreso');
-            return { canUpload: false, reason: 'UPLOAD_IN_PROGRESS', message: 'Ya hay una subida en progreso. Espera a que termine.' };
-        }
-        
-        if (this.session.isSerialMonitorOpen) {
-            console.log('[PORT_MANAGER] UPLOAD_BLOCKED: Serial Monitor está abierto');
-            return { canUpload: false, reason: 'SERIAL_MONITOR_OPEN', message: 'Cierra el Monitor Serial para poder subir código.' };
-        }
-        
-        return { canUpload: true, reason: null, message: null };
-    },
-    
-    /**
-     * Marca que inicia un upload
-     */
-    startUpload() {
-        console.log('[PORT_MANAGER] UPLOAD_START: Iniciando upload, adquiriendo mutex...');
-        this.session.isUploading = true;
-        this.session.lastOperation = 'upload';
-        this.session.lockCount++;
-        console.log(`[PORT_MANAGER] Lock count: ${this.session.lockCount}`);
-    },
-    
-    /**
-     * Marca que terminó el upload
-     */
-    endUpload() {
-        console.log('[PORT_MANAGER] UPLOAD_END: Finalizando upload, liberando mutex...');
-        this.session.isUploading = false;
-        this.session.lockCount = Math.max(0, this.session.lockCount - 1);
-        console.log(`[PORT_MANAGER] Lock count: ${this.session.lockCount}`);
-    },
-    
-    /**
-     * Fuerza liberación de todos los recursos del puerto
-     * @param {SerialPort} port - Puerto a limpiar
-     * @param {string} context - Contexto para logs
-     */
-    async forceReleaseAll(port, context = 'UNKNOWN') {
-        console.log(`[PORT_MANAGER] FORCE_RELEASE (${context}): Liberando todos los recursos...`);
-        
-        // Liberar reader si existe
-        if (this.session.reader) {
-            try {
-                await this.session.reader.cancel();
-                console.log(`[PORT_MANAGER] READER_CANCELLED (${context})`);
-            } catch (e) {
-                console.log(`[PORT_MANAGER] Reader cancel error: ${e.message}`);
-            }
-            try {
-                this.session.reader.releaseLock();
-                console.log(`[PORT_MANAGER] READER_LOCK_RELEASED (${context})`);
-            } catch (e) {
-                console.log(`[PORT_MANAGER] Reader releaseLock error: ${e.message}`);
-            }
-            this.session.reader = null;
-        }
-        
-        // Liberar writer si existe
-        if (this.session.writer) {
-            try {
-                this.session.writer.releaseLock();
-                console.log(`[PORT_MANAGER] WRITER_LOCK_RELEASED (${context})`);
-            } catch (e) {
-                console.log(`[PORT_MANAGER] Writer releaseLock error: ${e.message}`);
-            }
-            this.session.writer = null;
-        }
-        
-        // También intentar liberar del puerto directamente
-        if (port) {
-            if (port.readable) {
-                try {
-                    const reader = port.readable.getReader();
-                    await reader.cancel().catch(() => {});
-                    reader.releaseLock();
-                    console.log(`[PORT_MANAGER] PORT_READER_RELEASED (${context})`);
-                } catch (e) {}
-            }
-            if (port.writable) {
-                try {
-                    const writer = port.writable.getWriter();
-                    writer.releaseLock();
-                    console.log(`[PORT_MANAGER] PORT_WRITER_RELEASED (${context})`);
-                } catch (e) {}
-            }
-        }
-        
-        console.log(`[PORT_MANAGER] LOCK_RELEASED (${context}): Todos los recursos liberados`);
-    },
-    
-    /**
-     * Cierra el puerto de forma segura
-     * @param {SerialPort} port - Puerto a cerrar
-     * @param {string} context - Contexto para logs
-     */
-    async safeClosePort(port, context = 'UNKNOWN') {
-        if (!port) return;
-        
-        try {
-            // Primero liberar locks
-            await this.forceReleaseAll(port, context);
-            
-            // Luego cerrar puerto
-            if (port.readable || port.writable) {
-                await port.close();
-                console.log(`[PORT_MANAGER] PORT_CLOSED_OK (${context})`);
-            }
-        } catch (e) {
-            console.log(`[PORT_MANAGER] PORT_CLOSE_ERROR (${context}): ${e.message}`);
-        }
-        
-        this.session.port = null;
-    },
-    
-    /**
-     * Marca que el Serial Monitor está conectado
-     */
-    serialMonitorConnected(port, reader, writer) {
-        console.log('[PORT_MANAGER] SERIAL_MONITOR_CONNECTED');
-        this.session.port = port;
-        this.session.reader = reader;
-        this.session.writer = writer;
-        this.session.isSerialMonitorOpen = true;
-        this.session.lastOperation = 'serial_monitor';
-    },
-    
-    /**
-     * Marca que el Serial Monitor se desconectó
-     */
-    async serialMonitorDisconnected() {
-        console.log('[PORT_MANAGER] SERIAL_MONITOR_DISCONNECTED');
-        await this.forceReleaseAll(this.session.port, 'SERIAL_DISCONNECT');
-        this.session.isSerialMonitorOpen = false;
-        this.session.port = null;
-    },
-    
-    /**
-     * Obtiene el estado actual para debugging
-     */
-    getStatus() {
-        return {
-            isUploading: this.session.isUploading,
-            isSerialMonitorOpen: this.session.isSerialMonitorOpen,
-            hasReader: !!this.session.reader,
-            hasWriter: !!this.session.writer,
-            hasPort: !!this.session.port,
-            lockCount: this.session.lockCount,
-            lastOperation: this.session.lastOperation
-        };
-    },
-    
-    /**
-     * Log del estado actual
-     */
-    logStatus(context = '') {
-        const status = this.getStatus();
-        console.log(`[PORT_MANAGER] STATUS ${context}:`, JSON.stringify(status));
-    }
-};
-
-// Alias para compatibilidad con código existente
-let isSerialConnected = false;
-let serialPort = null;
-let serialReader = null;
-let serialWriter = null;
-let readBuffer = '';
-let serialReadInterval = null;
-let isUploading = false;
-
-// ============================================
 // ARDUINO UPLOADER - Protocolo STK500
 // ============================================
-
-/**
- * Fuerza un reset robusto del bootloader antes del handshake STK500.
- * Soluciona el problema de "Recibido []" cuando el bootloader no responde.
- * 
- * @param {SerialPort} port - Puerto Web Serial
- * @param {number} bootloaderBaud - Baudrate del bootloader (ej: 115200)
- * @param {Function} log - Función de logging opcional
- * @returns {Promise<boolean>} - true si el reset fue exitoso
- */
-async function forceBootloaderReset(port, bootloaderBaud = 115200, log = console.log) {
-    try {
-        log('[RESET] Iniciando reset robusto del bootloader...');
-        
-        // ========================================
-        // 1. CERRAR CUALQUIER READER/WRITER ACTIVO
-        // ========================================
-        if (port.readable) {
-            try {
-                const reader = port.readable.getReader();
-                await reader.cancel().catch(() => {});
-                reader.releaseLock();
-                log('[RESET] Reader cancelado y liberado');
-            } catch (e) {
-                log(`[RESET] No había reader activo o error: ${e.message}`);
-            }
-        }
-        
-        if (port.writable) {
-            try {
-                const writer = port.writable.getWriter();
-                writer.releaseLock();
-                log('[RESET] Writer liberado');
-            } catch (e) {
-                log(`[RESET] No había writer activo o error: ${e.message}`);
-            }
-        }
-        
-        // ========================================
-        // 2. CERRAR PUERTO COMPLETAMENTE
-        // ========================================
-        try {
-            if (port.readable || port.writable) {
-                await port.close();
-                log('[RESET] Puerto cerrado');
-            }
-        } catch (e) {
-            log(`[RESET] Puerto ya cerrado o error: ${e.message}`);
-        }
-        
-        // Pequeña espera después de cerrar
-        await new Promise(r => setTimeout(r, 100));
-        
-        // ========================================
-        // 3. ABRIR A 1200 BAUD (TRIGGER DE RESET)
-        // ========================================
-        // 1200 baud es un trigger especial para algunos bootloaders (Leonardo, etc.)
-        // y también funciona para activar el auto-reset en muchos Arduinos
-        try {
-            log('[RESET] Abriendo puerto a 1200 baud (trigger de reset)...');
-            await port.open({ baudRate: 1200, dataBits: 8, stopBits: 1, parity: 'none' });
-            log('[RESET] Puerto abierto a 1200 baud');
-            
-            // ========================================
-            // 4. TOGGLE DTR/RTS PARA RESET (múltiples pulsos)
-            // ========================================
-            if (port.setSignals) {
-                log('[RESET] Ejecutando secuencia DTR/RTS extendida...');
-                
-                // El Arduino se resetea cuando DTR pasa de HIGH a LOW
-                // El capacitor en el circuito de auto-reset genera un pulso
-                
-                // Secuencia 1: Pulso DTR clásico
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                await new Promise(r => setTimeout(r, 100));
-                await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                await new Promise(r => setTimeout(r, 100));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] Pulso DTR enviado');
-                
-                // Secuencia 2: Pulso RTS (algunos clones CH340 lo necesitan)
-                await new Promise(r => setTimeout(r, 50));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: true });
-                await new Promise(r => setTimeout(r, 100));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] Pulso RTS enviado');
-                
-                // Secuencia 3: Ambos a la vez (máxima compatibilidad)
-                await new Promise(r => setTimeout(r, 50));
-                await port.setSignals({ dataTerminalReady: true, requestToSend: true });
-                await new Promise(r => setTimeout(r, 100));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] Pulso DTR+RTS enviado');
-                
-            } else {
-                log('[RESET] setSignals no disponible, saltando toggle DTR/RTS');
-            }
-            
-            // ========================================
-            // 5. CERRAR PUERTO OTRA VEZ
-            // ========================================
-            await port.close();
-            log('[RESET] Puerto cerrado después del reset');
-            
-        } catch (e) {
-            log(`[RESET] Error durante reset a 1200 baud: ${e.message}`);
-            // Intentar cerrar por si quedó abierto
-            try { await port.close(); } catch (e2) {}
-        }
-        
-        // ========================================
-        // 6. ESPERAR A QUE EL BOOTLOADER INICIE
-        // ========================================
-        // Aumentado a 500ms - algunos bootloaders tardan más en iniciar
-        const bootloaderWait = 500;
-        log(`[RESET] Esperando ${bootloaderWait}ms para que el bootloader inicie...`);
-        await new Promise(r => setTimeout(r, bootloaderWait));
-        
-        // ========================================
-        // 7. REABRIR AL BAUD DEL BOOTLOADER
-        // ========================================
-        log(`[RESET] Reabriendo puerto a ${bootloaderBaud} baud...`);
-        await port.open({ 
-            baudRate: bootloaderBaud, 
-            dataBits: 8, 
-            stopBits: 1, 
-            parity: 'none',
-            flowControl: 'none'
-        });
-        log(`[RESET] Puerto abierto a ${bootloaderBaud} baud`);
-        
-        // ========================================
-        // 8. TOGGLE DTR ADICIONAL A BAUD DEL BOOTLOADER
-        // ========================================
-        // Algunos bootloaders necesitan el toggle después de abrir al baud correcto
-        if (port.setSignals) {
-            try {
-                await port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                await new Promise(r => setTimeout(r, 50));
-                await port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                log('[RESET] Toggle DTR adicional a baud del bootloader');
-            } catch (e) {
-                log(`[RESET] Error en toggle adicional: ${e.message}`);
-            }
-        }
-        
-        // Espera adicional para estabilizar (aumentada a 300ms)
-        const stabilizeWait = 300;
-        log(`[RESET] Esperando ${stabilizeWait}ms para estabilizar...`);
-        await new Promise(r => setTimeout(r, stabilizeWait));
-        
-        log('[RESET] ✓ Reset del bootloader completado');
-        return true;
-        
-    } catch (error) {
-        log(`[RESET] ✗ Error durante reset: ${error.message}`);
-        // Intentar cerrar el puerto por si quedó en mal estado
-        try { await port.close(); } catch (e) {}
-        return false;
-    }
-}
 
 class ArduinoUploader {
     constructor() {
@@ -389,14 +39,6 @@ class ArduinoUploader {
         this.writer = null;
         this.readable = null;
         this.writable = null;
-        this.logFunc = console.log;
-    }
-    
-    /**
-     * Configura la función de logging
-     */
-    setLogger(logFunc) {
-        this.logFunc = logFunc || console.log;
     }
 
     // Constantes del protocolo STK500
@@ -412,251 +54,43 @@ class ArduinoUploader {
         PROG_PAGE: 0x64,
         READ_SIGN: 0x75,
     };
-    
-    // Baudrates a probar para el bootloader (orden de probabilidad)
-    // 115200: Optiboot (Arduino UNO R3, Nano moderno)
-    // 57600: Bootloader antiguo (Nano clones, Duemilanove)
-    // 19200: Algunos clones antiguos
-    // 9600: Bootloaders muy antiguos o configuraciones especiales
-    // 38400: Algunos bootloaders ATmega8
-    static BOOTLOADER_BAUDS = [115200, 57600, 19200, 9600, 38400];
 
-    /**
-     * Conecta al Arduino con auto-fallback de baudrate.
-     * Prueba cada baudrate en orden hasta encontrar uno que funcione.
-     */
-    async connect(port, preferredBaud = 115200) {
+    async connect(port, baudRate = 115200) {
         this.port = port;
         
-        // Lista de baudrates a probar, empezando por el preferido
-        const baudsToTry = [preferredBaud, ...ArduinoUploader.BOOTLOADER_BAUDS.filter(b => b !== preferredBaud)];
-        
-        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
-        this.logFunc('[CONNECT] Iniciando conexión con auto-fallback de baudrate...');
-        this.logFunc(`[CONNECT] Baudrates a probar: ${baudsToTry.join(', ')}`);
-        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
-        
-        let lastError = null;
-        
-        for (const baud of baudsToTry) {
-            this.logFunc(`[CONNECT] ───────────────────────────────────────`);
-            this.logFunc(`[CONNECT] Probando baud ${baud}...`);
-            
-            // Intentar hasta 2 veces por baudrate (a veces el primer reset no funciona)
-            let syncSuccess = false;
-            
-            for (let resetAttempt = 0; resetAttempt < 2 && !syncSuccess; resetAttempt++) {
-                if (resetAttempt > 0) {
-                    this.logFunc(`[CONNECT] Reintentando reset a ${baud} baud (intento ${resetAttempt + 1})...`);
-                    await new Promise(r => setTimeout(r, 200)); // Espera extra antes de reintentar
-                }
-                
-                try {
-                    // ========================================
-                    // 1. RESET ROBUSTO DEL BOOTLOADER
-                    // ========================================
-                    this.logFunc(`[CONNECT] Ejecutando reset a ${baud} baud...`);
-                    const resetOk = await forceBootloaderReset(port, baud, this.logFunc);
-                    
-                    if (!resetOk) {
-                        this.logFunc(`[CONNECT] Reset falló a ${baud} baud`);
-                        continue;
-                    }
-                    
-                    // ========================================
-                    // 2. VERIFICAR QUE EL PUERTO ESTÉ ABIERTO
-                    // ========================================
-                    if (!this.port.readable || !this.port.writable) {
-                        this.logFunc(`[CONNECT] Abriendo puerto a ${baud} baud...`);
-                        await this.port.open({ 
-                            baudRate: baud, 
-                            dataBits: 8, 
-                            stopBits: 1, 
-                            parity: 'none',
-                            flowControl: 'none'
-                        });
-                    }
-                    
-                    // Obtener reader/writer
-                    this.writable = this.port.writable;
-                    this.readable = this.port.readable;
-                    this.writer = this.writable.getWriter();
-                    this.reader = this.readable.getReader();
-                    
-                    // ========================================
-                    // 3. SYNC RÁPIDO (8 intentos, 200ms timeout)
-                    // ========================================
-                    this.logFunc(`[CONNECT] Probando sync STK500 a ${baud} baud...`);
-                    const syncOk = await this.tryQuickSync(8, 200);
-                    
-                    if (syncOk) {
-                        this.baudRate = baud;
-                        this.logFunc(`[CONNECT] ════════════════════════════════════════════════`);
-                        this.logFunc(`[CONNECT] ✓ SYNC OK a ${baud} baud!`);
-                        this.logFunc(`[CONNECT] ✓ Conectado y listo para comunicación STK500`);
-                        this.logFunc(`[CONNECT] ════════════════════════════════════════════════`);
-                        return; // Éxito!
-                    }
-                    
-                    // Sync falló, limpiar para reintentar
-                    this.logFunc(`[CONNECT] Sync falló a ${baud} baud (intento ${resetAttempt + 1})`);
-                    await this.cleanupForRetry();
-                    
-                } catch (error) {
-                    this.logFunc(`[CONNECT] Error a ${baud} baud: ${error.message}`);
-                    lastError = error;
-                    await this.cleanupForRetry();
-                }
-            }
-            
-            // Después de todos los intentos para este baud, pasar al siguiente
-            this.logFunc(`[CONNECT] ✗ No se pudo sincronizar a ${baud} baud`);
-        }
-        
-        // Ningún baudrate funcionó
-        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
-        this.logFunc('[CONNECT] ✗ FALLO: Ningún baudrate funcionó');
-        this.logFunc('[CONNECT] ════════════════════════════════════════════════');
-        throw new Error(`No se pudo conectar al bootloader. Probados: ${baudsToTry.join(', ')}. ¿Está el Arduino conectado? Prueba presionar el botón RESET justo antes de subir.`);
-    }
-    
-    /**
-     * Limpia la conexión para poder reintentar con otro baudrate
-     */
-    async cleanupForRetry() {
-        try {
-            if (this.reader) {
-                try { await this.reader.cancel(); } catch (e) {}
-                try { this.reader.releaseLock(); } catch (e) {}
-                this.reader = null;
-            }
-            if (this.writer) {
-                try { this.writer.releaseLock(); } catch (e) {}
-                this.writer = null;
-            }
-            if (this.port && (this.port.readable || this.port.writable)) {
-                try { await this.port.close(); } catch (e) {}
-            }
-            this.readable = null;
-            this.writable = null;
-        } catch (e) {
-            // Ignorar errores de limpieza
-        }
-        // Pequeña espera antes de reintentar
-        await new Promise(r => setTimeout(r, 100));
-    }
-    
-    /**
-     * Intenta sync rápido con el bootloader
-     * @param {number} maxAttempts - Número máximo de intentos
-     * @param {number} timeout - Timeout por intento en ms
-     * @returns {Promise<boolean>} - true si sync exitoso
-     */
-    async tryQuickSync(maxAttempts = 5, timeout = 150) {
-        // Toggle DTR rápido para reforzar el reset
-        if (this.port.setSignals) {
+        // Si el puerto ya está abierto, cerrarlo primero
+        if (this.port.readable || this.port.writable) {
             try {
-                await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                await new Promise(r => setTimeout(r, 30));
-                await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                await new Promise(r => setTimeout(r, 50));
+                await this.port.close();
             } catch (e) {
-                // Ignorar errores de setSignals
+                // Ignorar errores
             }
         }
         
-        // Limpiar buffer
-        try {
-            while (true) {
-                const { value, done } = await Promise.race([
-                    this.reader.read(),
-                    new Promise(r => setTimeout(() => r({ done: true }), 30))
-                ]);
-                if (done || !value || value.length === 0) break;
-            }
-        } catch (e) {}
+        await this.port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none' });
         
-        // Intentar sync
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            try {
-                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
-                const response = await this.receive(2, timeout);
-                
-                const respHex = Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ');
-                this.logFunc(`[SYNC] Intento ${attempt + 1}/${maxAttempts}: [${respHex}]`);
-                
-                if (response.length >= 2 && 
-                    response[0] === ArduinoUploader.STK.INSYNC && 
-                    response[1] === ArduinoUploader.STK.OK) {
-                    return true;
-                }
-            } catch (e) {
-                this.logFunc(`[SYNC] Intento ${attempt + 1}/${maxAttempts}: timeout`);
-            }
-            
-            await new Promise(r => setTimeout(r, 30));
-        }
-        
-        return false;
+        this.writable = this.port.writable;
+        this.readable = this.port.readable;
+        this.writer = this.writable.getWriter();
+        this.reader = this.readable.getReader();
     }
 
     async disconnect() {
-        this.logFunc('[DISCONNECT] Iniciando limpieza de conexión...');
-        
         try {
-            // 1. Cancelar y liberar reader
             if (this.reader) {
-                try {
-                    await this.reader.cancel();
-                    this.logFunc('[DISCONNECT] Reader cancelado');
-                } catch (e) {
-                    this.logFunc(`[DISCONNECT] Error cancelando reader: ${e.message}`);
-                }
-                try {
-                    this.reader.releaseLock();
-                    this.logFunc('[DISCONNECT] Reader lock liberado');
-                } catch (e) {
-                    this.logFunc(`[DISCONNECT] Error liberando reader lock: ${e.message}`);
-                }
+                await this.reader.cancel().catch(() => {});
+                this.reader.releaseLock();
                 this.reader = null;
             }
-            
-            // 2. Cerrar y liberar writer
             if (this.writer) {
-                try {
-                    this.writer.releaseLock();
-                    this.logFunc('[DISCONNECT] Writer lock liberado');
-                } catch (e) {
-                    this.logFunc(`[DISCONNECT] Error liberando writer lock: ${e.message}`);
-                }
+                await this.writer.close().catch(() => {});
                 this.writer = null;
             }
-            
-            // 3. Cerrar puerto
-            if (this.port) {
-                try {
-                    if (this.port.readable || this.port.writable) {
-                        await this.port.close();
-                        this.logFunc('[DISCONNECT] Puerto cerrado');
-                    }
-                } catch (e) {
-                    this.logFunc(`[DISCONNECT] Error cerrando puerto: ${e.message}`);
-                }
+            if (this.port && (this.port.readable || this.port.writable)) {
+                await this.port.close().catch(() => {});
             }
-            
-            // Limpiar referencias
-            this.readable = null;
-            this.writable = null;
-            
-            this.logFunc('[DISCONNECT] ✓ Limpieza completada');
-            
         } catch (e) {
-            this.logFunc(`[DISCONNECT] ✗ Error crítico durante limpieza: ${e.message}`);
-            // Forzar limpieza de referencias aunque haya error
-            this.reader = null;
-            this.writer = null;
-            this.readable = null;
-            this.writable = null;
+            console.error('Error cerrando puerto:', e);
         }
     }
 
@@ -686,33 +120,41 @@ class ArduinoUploader {
         return new Uint8Array(result.slice(0, length));
     }
 
-    /**
-     * Sincroniza con el bootloader.
-     * Nota: La sincronización principal ya se hace en connect() con fallback de baudrate.
-     * Este método es para verificar/re-sincronizar si es necesario.
-     */
     async sync() {
-        this.logFunc('[SYNC] Verificando sincronización con bootloader...');
+        console.log('Iniciando sincronización con bootloader...');
         
-        // La sincronización ya se hizo en connect(), solo verificamos
-        // Usamos tryQuickSync para verificar rápidamente
-        const syncOk = await this.tryQuickSync(3, 200);
+        // Reset Arduino usando DTR (método estándar)
+        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        await new Promise(r => setTimeout(r, 250));
+        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
         
-        if (syncOk) {
-            this.logFunc('[SYNC] ✓ Sincronización verificada');
-            return true;
+        // Esperar a que el bootloader inicie
+        await new Promise(r => setTimeout(r, 50));
+
+        // Intentar sincronizar varias veces
+        for (let attempt = 0; attempt < 10; attempt++) {
+            try {
+                // Enviar comando GET_SYNC
+                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
+                
+                // Esperar respuesta
+                const response = await this.receive(2, 500);
+                
+                console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
+                
+                if (response.length >= 2 && 
+                    response[0] === ArduinoUploader.STK.INSYNC && 
+                    response[1] === ArduinoUploader.STK.OK) {
+                    console.log('¡Sincronización exitosa!');
+                    return true;
+                }
+            } catch (e) {
+                console.log(`Intento ${attempt + 1}: timeout`);
+            }
+            
+            await new Promise(r => setTimeout(r, 100));
         }
         
-        // Si falló, intentar con más intentos
-        this.logFunc('[SYNC] Reintentando sincronización (10 intentos)...');
-        const retryOk = await this.tryQuickSync(10, 300);
-        
-        if (retryOk) {
-            this.logFunc('[SYNC] ✓ Sincronización recuperada');
-            return true;
-        }
-        
-        this.logFunc('[SYNC] ✗ No se pudo sincronizar');
         throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
     }
 
@@ -1144,41 +586,14 @@ function initEventListeners() {
         currentPort = e.target.value;
         updateConnectionStatus();
         if (currentPort !== '' && availablePorts[parseInt(currentPort)]) {
-            const port = availablePorts[parseInt(currentPort)];
-            const info = port.getInfo();
-            let deviceType = 'Desconocido';
-            let details = [];
-            
-            // Identificar tipo de dispositivo
+            const info = availablePorts[parseInt(currentPort)].getInfo();
+            let label = `Puerto ${parseInt(currentPort) + 1}`;
             if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                deviceType = 'Arduino Oficial';
+                label = 'Arduino';
             } else if (info.usbVendorId === 0x1A86) {
-                deviceType = 'CH340 (clon típico)';
-            } else if (info.usbVendorId === 0x0403) {
-                deviceType = 'FTDI';
-            } else if (info.usbVendorId === 0x10C4) {
-                deviceType = 'CP210x';
+                label = 'CH340';
             }
-            
-            if (info.usbVendorId) {
-                details.push(`VID: 0x${info.usbVendorId.toString(16).toUpperCase()}`);
-            }
-            if (info.usbProductId) {
-                details.push(`PID: 0x${info.usbProductId.toString(16).toUpperCase()}`);
-            }
-            if (info.serialNumber) {
-                details.push(`S/N: ${info.serialNumber}`);
-            }
-            
-            logToConsole(`Puerto seleccionado: ${deviceType}`, 'info');
-            if (details.length > 0) {
-                logToConsole(`  ${details.join(' | ')}`, 'info');
-            }
-            
-            // Advertencia si es CH340 y está seleccionado UNO
-            if (info.usbVendorId === 0x1A86 && currentBoard === 'arduino:avr:uno') {
-                showBoardSuggestion('CH340 detectado. Si el upload falla, prueba con "Arduino Nano (Old Bootloader)".', 'arduino:avr:nano');
-            }
+            logToConsole(`Puerto seleccionado: ${label}`, 'info');
         }
     });
     
@@ -1394,35 +809,20 @@ async function refreshPorts() {
             const optionsHtml = '<option value="">Seleccionar puerto...</option>' +
                 availablePorts.map((port, index) => {
                     const info = port.getInfo();
-                    let deviceType = 'Desconocido';
-                    let metadata = [];
-                    
-                    // Identificar tipo de dispositivo por VID
-                    if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                        deviceType = 'Arduino Oficial';
-                    } else if (info.usbVendorId === 0x1A86) {
-                        deviceType = 'CH340 (clon típico)';
-                    } else if (info.usbVendorId === 0x0403) {
-                        deviceType = 'FTDI';
-                    } else if (info.usbVendorId === 0x10C4) {
-                        deviceType = 'CP210x';
-                    }
-                    
-                    // Agregar metadata
+                    let label = `Puerto ${index + 1}`;
                     if (info.usbVendorId) {
-                        metadata.push(`VID:0x${info.usbVendorId.toString(16).toUpperCase()}`);
+                        // Identificar Arduino por VID
+                        if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
+                            label = `Arduino (Puerto ${index + 1})`;
+                        } else if (info.usbVendorId === 0x1A86) {
+                            label = `CH340 (Puerto ${index + 1})`;
+                        } else if (info.usbVendorId === 0x0403) {
+                            label = `FTDI (Puerto ${index + 1})`;
+                        } else if (info.usbVendorId === 0x10C4) {
+                            label = `CP210x (Puerto ${index + 1})`;
+                        }
                     }
-                    if (info.usbProductId) {
-                        metadata.push(`PID:0x${info.usbProductId.toString(16).toUpperCase()}`);
-                    }
-                    if (info.serialNumber) {
-                        metadata.push(`S/N:${info.serialNumber.substring(0, 8)}`);
-                    }
-                    
-                    const metadataStr = metadata.length > 0 ? ` [${metadata.join(', ')}]` : '';
-                    const label = `${deviceType}${metadataStr}`;
-                    
-                    return `<option value="${index}" title="${info.serialNumber || 'Sin S/N'}">${label}</option>`;
+                    return `<option value="${index}">${label}</option>`;
                 }).join('');
             
             select.innerHTML = optionsHtml;
@@ -1586,25 +986,6 @@ async function uploadCode() {
     const btn = document.getElementById('btnUpload');
     const code = arduinoGenerator.workspaceToCode(workspace);
     
-    // ========================================
-    // 1. VERIFICAR CON PORT MANAGER (anti-doble-click y mutex)
-    // ========================================
-    PortManager.logStatus('UPLOAD_PRE_CHECK');
-    
-    const canUpload = PortManager.canStartUpload();
-    if (!canUpload.canUpload) {
-        console.log(`[UPLOAD] BLOCKED: ${canUpload.reason}`);
-        
-        if (canUpload.reason === 'UPLOAD_IN_PROGRESS') {
-            logToConsole('[UPLOAD] UPLOAD_MUTEX_BLOCK: Ya hay una subida en progreso', 'warning');
-            showToast(canUpload.message, 'warning');
-        } else if (canUpload.reason === 'SERIAL_MONITOR_OPEN') {
-            logToConsole('[UPLOAD] Cierra el Monitor Serial para poder subir', 'warning');
-            showToast(canUpload.message, 'warning');
-        }
-        return;
-    }
-    
     if (!code.trim()) {
         showToast('No hay código para subir', 'warning');
         return;
@@ -1640,40 +1021,19 @@ async function uploadCode() {
         }
     }
     
-    // ========================================
-    // 2. FORZAR LIBERACIÓN DE RECURSOS ANTES DE UPLOAD
-    // ========================================
-    // Esto asegura que no haya reader/writer activos que bloqueen el puerto
-    logToConsole('[UPLOAD] Liberando recursos previos del puerto...', 'info');
-    await PortManager.forceReleaseAll(selectedPort, 'PRE_UPLOAD');
-    
-    // Si el Serial Monitor está conectado (por si acaso), cerrarlo
-    if (isSerialConnected || PortManager.session.isSerialMonitorOpen) {
-        logToConsole('[UPLOAD] Cerrando Monitor Serial antes de subir...', 'info');
-        await disconnectSerial(true);
-        await new Promise(r => setTimeout(r, 300));
+    // Desconectar monitor serial si está conectado
+    if (isSerialConnected) {
+        await disconnectSerial();
     }
     
-    // ========================================
-    // 3. ADQUIRIR MUTEX DE UPLOAD
-    // ========================================
-    PortManager.startUpload();
-    isUploading = true;  // Compatibilidad
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Compilando...';
-    logToConsole('[UPLOAD] Iniciando compilación en servidor...', 'info');
+    logToConsole('Compilando en servidor...', 'info');
     
     const uploader = new ArduinoUploader();
     
-    // Configurar logger para que todos los mensajes del uploader vayan a la consola
-    uploader.setLogger((msg) => {
-        logToConsole(msg, 'info');
-        console.log(msg);
-    });
-    
     try {
         // 1. Compilar en el servidor y obtener HEX
-        logToConsole('[UPLOAD] Llamando API /compile-download/...', 'info');
         const compileResponse = await fetch('/api/compile-download/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1683,32 +1043,30 @@ async function uploadCode() {
         const compileData = await compileResponse.json();
         
         if (!compileData.success) {
-            logToConsole('[UPLOAD] ✗ Error de compilación:', 'error');
+            logToConsole('✗ Error de compilación:', 'error');
             logToConsole(compileData.error || 'Error desconocido', 'error');
             showToast('Error de compilación', 'error');
-            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
         if (!compileData.hex_file) {
-            logToConsole('[UPLOAD] ✗ No se generó archivo HEX', 'error');
+            logToConsole('✗ No se generó archivo HEX', 'error');
             showToast('Error: No se generó archivo HEX', 'error');
-            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
-        logToConsole('[UPLOAD] ✓ Compilación exitosa', 'success');
+        logToConsole('✓ Compilación exitosa', 'success');
         
         // 2. Decodificar el HEX
         const hexContent = atob(compileData.hex_file);
         
         // 3. Subir directamente usando Web Serial API
-        btn.innerHTML = '<span class="loading"></span> Conectando...';
-        logToConsole('[UPLOAD] Preparando conexión al Arduino...', 'info');
+        btn.innerHTML = '<span class="loading"></span> Subiendo...';
+        logToConsole('Conectando al Arduino...', 'info');
         
         // Determinar baudrate según la placa
         let uploadBaud = 115200;
@@ -1719,70 +1077,33 @@ async function uploadCode() {
         } else if (currentBoard.includes('leonardo')) {
             // Leonardo usa CDC, diferente protocolo
             showToast('Arduino Leonardo requiere modo especial (no soportado aún)', 'warning');
-            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
-        logToConsole(`[UPLOAD] Conectando a ${uploadBaud} baud con reset robusto...`, 'info');
-        btn.innerHTML = '<span class="loading"></span> Reset...';
-        
         await uploader.connect(selectedPort, uploadBaud);
         
-        btn.innerHTML = '<span class="loading"></span> Subiendo...';
         await uploader.upload(hexContent, (msg, progress) => {
-            logToConsole(`[UPLOAD] ${msg}`, 'info');
+            logToConsole(msg, 'info');
             btn.innerHTML = `<span class="loading"></span> ${progress}%`;
         });
         
-        logToConsole('[UPLOAD] ✓ ¡Código subido exitosamente!', 'success');
+        await uploader.disconnect();
+        
+        logToConsole('✓ ¡Código subido exitosamente!', 'success');
         showToast('¡Código subido exitosamente!', 'success');
         
     } catch (error) {
-        logToConsole('[UPLOAD] ✗ Error: ' + error.message, 'error');
+        logToConsole('✗ Error: ' + error.message, 'error');
         showToast('Error: ' + error.message, 'error');
-    } finally {
-        // ========================================
-        // CLEANUP ROBUSTO (siempre se ejecuta)
-        // ========================================
-        logToConsole('[UPLOAD] Ejecutando limpieza final...', 'info');
-        
         try {
-            // 1. Desconectar uploader
             await uploader.disconnect();
-            logToConsole('[UPLOAD] UPLOADER_DISCONNECTED', 'info');
-        } catch (e) {
-            logToConsole(`[UPLOAD] Error desconectando uploader: ${e.message}`, 'warning');
-        }
-        
-        try {
-            // 2. Forzar liberación de recursos del puerto
-            await PortManager.forceReleaseAll(selectedPort, 'POST_UPLOAD');
-            logToConsole('[UPLOAD] LOCK_RELEASED: Recursos del puerto liberados', 'info');
-        } catch (e) {
-            logToConsole(`[UPLOAD] Error liberando recursos: ${e.message}`, 'warning');
-        }
-        
-        try {
-            // 3. Intentar cerrar el puerto
-            await PortManager.safeClosePort(selectedPort, 'POST_UPLOAD');
-            logToConsole('[UPLOAD] PORT_CLOSED_OK', 'info');
-        } catch (e) {
-            logToConsole(`[UPLOAD] Error cerrando puerto: ${e.message}`, 'warning');
-        }
-        
-        // 4. Liberar mutex
-        PortManager.endUpload();
-        isUploading = false;  // Compatibilidad
-        
-        // 5. Restaurar UI
-        btn.disabled = false;
-        btn.innerHTML = '<span>🚀</span><span>Subir</span>';
-        
-        PortManager.logStatus('UPLOAD_COMPLETE');
-        logToConsole('[UPLOAD] Limpieza completada', 'success');
+        } catch (e) {}
     }
+    
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀</span><span>Subir</span>';
 }
 
 // ============================================
@@ -1863,10 +1184,6 @@ async function connectSerial() {
         serialWriter = outputStream.getWriter();
         
         isSerialConnected = true;
-        
-        // Registrar con PortManager
-        PortManager.serialMonitorConnected(serialPort, serialReader, serialWriter);
-        
         updateSerialUI(true, 'Puerto Serial', baudrate);
         addSerialLine(`Conectado @ ${baudrate} baud`, 'system');
         updateConnectionStatus();
@@ -1894,89 +1211,42 @@ async function connectSerial() {
     }
 }
 
-async function disconnectSerial(silent = false) {
+async function disconnectSerial() {
     try {
-        if (!silent) {
-            console.log('[SERIAL] Iniciando desconexión del monitor serial...');
-        }
-        
-        // 1. Cancelar y liberar reader
+        // Cerrar reader
         if (serialReader) {
-            try {
-                await serialReader.cancel();
-            } catch (e) {
-                console.warn('[SERIAL] Error cancelando reader:', e.message);
-            }
-            try {
-                serialReader.releaseLock();
-            } catch (e) {
-                console.warn('[SERIAL] Error liberando lock del reader:', e.message);
-            }
+            await serialReader.cancel();
+            await serialReader.releaseLock();
             serialReader = null;
         }
         
-        // 2. Cerrar y liberar writer
+        // Cerrar writer
         if (serialWriter) {
-            try {
-                serialWriter.releaseLock();
-            } catch (e) {
-                console.warn('[SERIAL] Error liberando lock del writer:', e.message);
-            }
+            await serialWriter.close();
             serialWriter = null;
         }
         
-        // 3. Cerrar puerto
+        // Cerrar puerto
         if (serialPort) {
-            try {
-                await serialPort.close();
-            } catch (e) {
-                console.warn('[SERIAL] Error cerrando puerto:', e.message);
-            }
+            await serialPort.close();
             serialPort = null;
         }
         
-        // 4. Limpiar interval si existe
         if (serialReadInterval) {
             clearInterval(serialReadInterval);
             serialReadInterval = null;
         }
         
-        // 5. Actualizar estado
         isSerialConnected = false;
-        
-        // Notificar al PortManager
-        await PortManager.serialMonitorDisconnected();
-        
         updateSerialUI(false);
         updateConnectionStatus();
-        
-        if (!silent) {
-            addSerialLine('Desconectado', 'system');
-            logToConsole('[SERIAL] Monitor serial desconectado correctamente', 'info');
-        }
-        
-        // Pequeña espera para asegurar que el puerto se libere completamente
-        await new Promise(r => setTimeout(r, 100));
-        
-        console.log('[PORT_MANAGER] LOCK_RELEASED (SERIAL_DISCONNECT)');
-        return true;
+        addSerialLine('Desconectado', 'system');
+        logToConsole('Monitor serial desconectado', 'info');
         
     } catch (error) {
-        console.error('[SERIAL] Error crítico al desconectar:', error);
-        // Forzar limpieza de estado aunque haya error
-        serialReader = null;
-        serialWriter = null;
-        serialPort = null;
+        console.error('Error al desconectar:', error);
         isSerialConnected = false;
-        
-        // Notificar al PortManager incluso en error
-        try {
-            await PortManager.serialMonitorDisconnected();
-        } catch (e) {}
-        
         updateSerialUI(false);
-        console.log('[PORT_MANAGER] LOCK_RELEASED (SERIAL_DISCONNECT_ERROR)');
-        return false;
     }
 }
 
@@ -2169,71 +1439,6 @@ function showToast(message, type = 'info') {
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
 }
-
-function showBoardSuggestion(message, suggestedBoard) {
-    /**
-     * Muestra una sugerencia de cambio de placa con botón rápido.
-     */
-    const container = document.getElementById('toastContainer');
-    
-    // Remover sugerencias anteriores
-    const existing = container.querySelector('.toast.suggestion');
-    if (existing) existing.remove();
-    
-    const boardNames = {
-        'arduino:avr:uno': 'Arduino UNO',
-        'arduino:avr:nano': 'Arduino Nano',
-        'arduino:avr:mega': 'Arduino Mega',
-        'arduino:avr:leonardo': 'Arduino Leonardo'
-    };
-    
-    const suggestedName = boardNames[suggestedBoard] || suggestedBoard;
-    
-    const toast = document.createElement('div');
-    toast.className = 'toast warning suggestion';
-    toast.innerHTML = `
-        <span class="toast-icon">⚠️</span>
-        <div style="flex: 1;">
-            <span class="toast-message">${escapeHtml(message)}</span>
-            <button class="btn btn-sm" style="margin-top: 8px; padding: 4px 12px; font-size: 12px;" 
-                    onclick="changeBoardTo('${suggestedBoard}'); this.closest('.toast').remove();">
-                Cambiar a ${suggestedName}
-            </button>
-        </div>
-        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-    `;
-    
-    container.appendChild(toast);
-    
-    // No auto-remover, dejar que el usuario decida
-}
-
-function changeBoardTo(fqbn) {
-    /**
-     * Cambia la placa seleccionada al FQBN especificado.
-     */
-    const boardSelect = document.getElementById('boardSelect');
-    const boardNames = {
-        'arduino:avr:uno': 'Arduino UNO',
-        'arduino:avr:nano': 'Arduino Nano',
-        'arduino:avr:mega': 'Arduino Mega',
-        'arduino:avr:leonardo': 'Arduino Leonardo'
-    };
-    
-    if (boardSelect.querySelector(`option[value="${fqbn}"]`)) {
-        boardSelect.value = fqbn;
-        currentBoard = fqbn;
-        const boardName = boardNames[fqbn] || fqbn;
-        document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${boardName}</span>`;
-        logToConsole(`Placa cambiada a: ${boardName}`, 'success');
-        showToast(`Placa cambiada a ${boardName}`, 'success');
-    } else {
-        logToConsole(`Placa ${fqbn} no disponible en el selector`, 'warning');
-    }
-}
-
-// Exponer función globalmente para que funcione desde el onclick
-window.changeBoardTo = changeBoardTo;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
