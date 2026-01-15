@@ -121,6 +121,94 @@ def close_serial_connection():
     return closed
 
 
+def reset_arduino_dtr(port, log_func=None):
+    """
+    Fuerza un reset del Arduino mediante toggle de DTR/RTS.
+    
+    Esto pone al Arduino en modo bootloader antes de que arduino-cli
+    intente comunicarse con él, mejorando la tasa de éxito en uploads
+    repetidos.
+    
+    Args:
+        port: Puerto serial (ej: /dev/ttyUSB0, COM3)
+        log_func: Función opcional para logging
+        
+    Returns:
+        tuple: (success: bool, message: str)
+    """
+    def log(msg):
+        if log_func:
+            log_func(msg)
+        print(f"[RESET] {msg}")
+    
+    try:
+        log(f"Iniciando reset DTR/RTS en {port}")
+        
+        # Abrir puerto a 1200 baud (trigger especial para algunos bootloaders)
+        # Para UNO/Mega, el baudrate no importa tanto, es el toggle de DTR
+        ser = serial.Serial()
+        ser.port = port
+        ser.baudrate = 1200
+        ser.timeout = 0.1
+        ser.write_timeout = 0.1
+        
+        # Configurar sin abrir aún
+        ser.dtr = False
+        ser.rts = False
+        
+        try:
+            ser.open()
+        except serial.SerialException as e:
+            # Si falla a 1200, intentar a 9600 (más compatible)
+            log(f"No se pudo abrir a 1200 baud, intentando 9600: {e}")
+            ser.baudrate = 9600
+            try:
+                ser.open()
+            except serial.SerialException as e2:
+                log(f"Error abriendo puerto: {e2}")
+                return False, str(e2)
+        
+        log("Puerto abierto, ejecutando secuencia de reset...")
+        
+        # Secuencia de reset para Arduino UNO/Mega/Nano (ATmega328/2560)
+        # El bootloader se activa cuando DTR hace una transición LOW->HIGH
+        
+        # 1. DTR y RTS a LOW
+        ser.dtr = False
+        ser.rts = False
+        time.sleep(0.05)
+        
+        # 2. DTR a HIGH (esto genera el pulso de reset via capacitor en el Arduino)
+        ser.dtr = True
+        time.sleep(0.05)
+        
+        # 3. DTR a LOW de nuevo
+        ser.dtr = False
+        time.sleep(0.05)
+        
+        # 4. Alternativamente, algunos clones necesitan RTS
+        ser.rts = True
+        time.sleep(0.05)
+        ser.rts = False
+        
+        # Cerrar el puerto
+        ser.close()
+        log("Puerto cerrado después del reset")
+        
+        # Esperar a que el bootloader inicie (típicamente 200-500ms)
+        # El bootloader del Arduino espera ~1 segundo antes de ejecutar el sketch
+        wait_time = 0.5  # 500ms
+        log(f"Esperando {int(wait_time*1000)}ms para que el bootloader inicie...")
+        time.sleep(wait_time)
+        
+        log("Reset completado exitosamente")
+        return True, "Reset DTR/RTS completado"
+        
+    except Exception as e:
+        log(f"Error durante reset: {str(e)}")
+        return False, str(e)
+
+
 def index(request):
     """Vista principal del IDE."""
     # Permitir acceso directo al editor si viene con parámetro 'editor=true' o desde un enlace explícito
@@ -508,6 +596,17 @@ def upload_code(request):
                     delay_ms = retry_delays[attempt]
                     log(f"Reintento {attempt + 1}/{max_retries} después de {delay_ms}ms...")
                     time.sleep(delay_ms / 1000.0)
+                
+                # ========================================
+                # 5.1 RESET DTR/RTS ANTES DE UPLOAD
+                # ========================================
+                # Forzar reset del Arduino para que entre en modo bootloader
+                # Esto mejora la tasa de éxito en uploads repetidos
+                log(f"Ejecutando reset DTR/RTS antes del upload (intento {attempt + 1})")
+                reset_ok, reset_msg = reset_arduino_dtr(port, log)
+                if not reset_ok:
+                    log(f"Advertencia: reset DTR falló: {reset_msg} (continuando de todos modos)")
+                    # No abortamos, algunos sistemas funcionan sin el reset previo
                 
                 log(f"Ejecutando arduino-cli compile --upload (intento {attempt + 1})")
                 
