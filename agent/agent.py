@@ -351,8 +351,13 @@ def compile_code():
         log(f"Iniciando compilación para {fqbn}")
         log(f"arduino-cli: {ARDUINO_CLI}")
         
-        # Crear directorio temporal en home del usuario (snap no puede acceder a /tmp)
-        home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
+        # Crear directorio temporal
+        # Si arduino-cli es snap, usar ~/snap/arduino-cli/common/ que snap puede acceder
+        # Si no, usar ~/.maxide-agent/tmp/
+        if ARDUINO_CLI and 'snap' in ARDUINO_CLI:
+            home_tmp = os.path.join(os.path.expanduser('~'), 'snap', 'arduino-cli', 'common', 'maxide-tmp')
+        else:
+            home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
         os.makedirs(home_tmp, exist_ok=True)
         temp_dir = tempfile.mkdtemp(prefix='compile_', dir=home_tmp)
         
@@ -536,8 +541,12 @@ def upload():
         
         log(f"Iniciando upload a {port} con {fqbn}")
         
-        # Crear directorio temporal en home del usuario (snap no puede acceder a /tmp)
-        home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
+        # Crear directorio temporal
+        # Si arduino-cli es snap, usar ~/snap/arduino-cli/common/ que snap puede acceder
+        if ARDUINO_CLI and 'snap' in ARDUINO_CLI:
+            home_tmp = os.path.join(os.path.expanduser('~'), 'snap', 'arduino-cli', 'common', 'maxide-tmp')
+        else:
+            home_tmp = os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
         os.makedirs(home_tmp, exist_ok=True)
         temp_dir = tempfile.mkdtemp(prefix='upload_', dir=home_tmp)
         log(f"Directorio temporal: {temp_dir}")
