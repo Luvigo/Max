@@ -111,10 +111,21 @@ def add_security_headers(response):
     response.headers['X-Agent-Version'] = VERSION
     # CORS headers explícitos para máxima compatibilidad
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-MAX-IDE-Client, X-Requested-With'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-MAX-IDE-Client, X-Requested-With, Accept, Origin'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Max-Age'] = '86400'  # Cache preflight por 24h
     return response
+
+@app.before_request
+def handle_preflight():
+    """Maneja todas las peticiones OPTIONS (preflight) de forma centralizada."""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-MAX-IDE-Client, X-Requested-With, Accept, Origin'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response, 200
 
 # ============================================
 # ENDPOINT: GET /health
@@ -135,8 +146,7 @@ def health():
             "arduino_cli_version": "0.35.0"
         }
     """
-    if request.method == 'OPTIONS':
-        return '', 204
+    # OPTIONS se maneja en before_request
     
     # Obtener versión de arduino-cli
     cli_version = None
@@ -195,8 +205,7 @@ def list_ports():
             ]
         }
     """
-    if request.method == 'OPTIONS':
-        return '', 204
+    # OPTIONS se maneja en before_request
     
     ports = []
     all_ports = []  # Para debug
@@ -298,8 +307,7 @@ def compile_code():
             "message": "..."
         }
     """
-    if request.method == 'OPTIONS':
-        return '', 204
+    # OPTIONS se maneja en before_request
     
     logs = []
     temp_dir = None
@@ -473,8 +481,7 @@ def upload():
             "hint": "..."
         }
     """
-    if request.method == 'OPTIONS':
-        return '', 204
+    # OPTIONS se maneja en before_request
     
     logs = []
     temp_dir = None
