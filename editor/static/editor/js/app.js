@@ -35,7 +35,9 @@ let currentProjectId = null;
 
 const AgentConfig = {
     // URL base del Agent local (puerto 8765 por defecto)
-    baseUrl: 'http://127.0.0.1:8765',
+    // Usamos 'localhost' en vez de '127.0.0.1' porque los navegadores
+    // lo tratan como origen seguro y permiten peticiones desde HTTPS
+    baseUrl: 'http://localhost:8765',
     
     // Estado del Agent
     available: false,
@@ -167,23 +169,8 @@ async function checkAgentLocal(manual = false) {
         
         // Detectar problemas comunes
         if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
-            // Verificar si es problema de mixed content (HTTPS -> HTTP)
-            if (window.location.protocol === 'https:' && AgentConfig.baseUrl.startsWith('http://')) {
-                errorMsg = 'Bloqueado por seguridad del navegador';
-                hint = 'El navegador bloquea conexiones HTTP desde HTTPS. ';
-                
-                // Chrome y algunos navegadores permiten localhost como excepción
-                // pero puede requerir configuración
-                if (navigator.userAgent.includes('Chrome')) {
-                    hint += 'En Chrome, ve a chrome://flags/#unsafely-treat-insecure-origin-as-secure y agrega http://127.0.0.1:8765';
-                } else if (navigator.userAgent.includes('Firefox')) {
-                    hint += 'En Firefox, puede funcionar automáticamente. Verifica que el Agent esté corriendo.';
-                } else {
-                    hint += 'Verifica que el Agent esté corriendo en http://127.0.0.1:8765';
-                }
-            } else {
-                hint = 'Verifica que el Agent esté corriendo: bash start_agent.sh';
-            }
+            errorMsg = 'No se pudo conectar con el Agent';
+            hint = '¿El Agent está corriendo? Ejecuta start_agent.sh (Linux/Mac) o start_agent.bat (Windows)';
         }
         
         AgentConfig.available = false;

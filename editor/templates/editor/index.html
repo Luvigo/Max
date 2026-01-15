@@ -277,8 +277,11 @@ void loop() {
             </div>
             <div class="modal-body">
                 <div class="agent-install-intro">
-                    <p>El <strong>MAX-IDE Agent</strong> es una pequeña aplicación que se ejecuta en tu computadora para permitir la comunicación con tu Arduino.</p>
-                    <p>Solo necesitas instalarlo una vez y se iniciará automáticamente.</p>
+                    <div style="text-align: center; padding: 10px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">🔌</div>
+                        <p style="font-size: 1.1rem; margin: 0;">El <strong style="color: var(--accent-cyan);">MAX-IDE Agent</strong> conecta tu Arduino con el navegador.</p>
+                        <p style="color: var(--text-muted); margin-top: 8px;">¡Solo necesitas instalarlo una vez!</p>
+                    </div>
                 </div>
                 
                 <div class="agent-install-tabs">
@@ -289,118 +292,159 @@ void loop() {
                 
                 <!-- Windows Instructions -->
                 <div class="agent-instructions" id="instructions-windows">
-                    <h4>Instalación en Windows:</h4>
-                    <ol>
-                        <li>
-                            <strong>Descarga Python</strong> (si no lo tienes):<br>
-                            <a href="https://www.python.org/downloads/" target="_blank" class="btn btn-sm btn-ghost" style="margin: 8px 0;">
-                                🐍 Descargar Python
-                            </a>
-                            <br><small>Durante la instalación, marca "Add Python to PATH"</small>
-                        </li>
-                        <li>
-                            <strong>Descarga el Agent:</strong><br>
-                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
-                                📥 Descargar MAX-IDE Agent
-                            </a>
-                        </li>
-                        <li>
-                            <strong>Descomprime</strong> el archivo en una carpeta (ej: <code>C:\MAX-IDE-Agent</code>)
-                        </li>
-                        <li>
-                            <strong>Ejecuta</strong> el archivo <code>start_agent.bat</code> haciendo doble clic
-                        </li>
-                        <li>
-                            <strong>(Opcional)</strong> Para inicio automático, ejecuta <code>install.bat</code>
-                        </li>
-                    </ol>
-                    <div class="agent-terminal">
-                        <code>
-                            # O instala manualmente desde terminal:<br>
-                            pip install flask flask-cors pyserial requests<br>
-                            python agent.py
-                        </code>
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">¿Tienes Python instalado?</div>
+                                <div class="step-desc">Si no estás seguro, descárgalo primero:</div>
+                                <a href="https://www.python.org/downloads/" target="_blank" class="btn btn-sm btn-ghost" style="margin-top: 8px;">
+                                    🐍 Descargar Python
+                                </a>
+                                <div class="step-note">⚠️ Marca "Add Python to PATH" durante la instalación</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Descomprime el archivo</div>
+                                <div class="step-desc">Haz clic derecho → "Extraer aquí" o "Extraer todo"</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Ejecuta el Agent</div>
+                                <div class="step-desc">Abre la carpeta y haz <strong>doble clic</strong> en:</div>
+                                <div class="step-file">📄 start_agent.bat</div>
+                                <div class="step-note">✓ Se abrirá una ventana negra - ¡no la cierres!</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="install-success-box">
+                        <div style="font-size: 24px;">✅</div>
+                        <div>
+                            <strong>¡Listo!</strong> Cuando veas "Listening on http://localhost:8765", 
+                            haz clic en "Verificar conexión" abajo.
+                        </div>
                     </div>
                 </div>
                 
                 <!-- macOS Instructions -->
                 <div class="agent-instructions" id="instructions-mac" style="display: none;">
-                    <h4>Instalación en macOS:</h4>
-                    <ol>
-                        <li>
-                            <strong>Abre Terminal</strong> (Cmd + Space, escribe "Terminal")
-                        </li>
-                        <li>
-                            <strong>Descarga el Agent:</strong><br>
-                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
-                                📥 Descargar MAX-IDE Agent
-                            </a>
-                        </li>
-                        <li>
-                            <strong>Descomprime</strong> y navega a la carpeta
-                        </li>
-                        <li>
-                            <strong>Ejecuta</strong> en Terminal:
-                        </li>
-                    </ol>
-                    <div class="agent-terminal">
-                        <code>
-                            # Instalar dependencias y ejecutar:<br>
-                            cd ~/Downloads/maxide-agent<br>
-                            pip3 install flask flask-cors pyserial requests<br>
-                            python3 agent.py<br><br>
-                            # O para instalación automática:<br>
-                            python3 install.py
-                        </code>
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Abre Terminal</div>
+                                <div class="step-desc">Presiona <kbd>Cmd</kbd> + <kbd>Espacio</kbd>, escribe "Terminal" y presiona Enter</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Ejecuta estos comandos</div>
+                                <div class="step-desc">Copia y pega en Terminal:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>cd ~/Downloads/maxide-agent && bash start_agent.sh</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="install-success-box">
+                        <div style="font-size: 24px;">✅</div>
+                        <div>
+                            <strong>¡Listo!</strong> Cuando veas "Listening on http://localhost:8765", 
+                            haz clic en "Verificar conexión" abajo.
+                        </div>
                     </div>
                 </div>
                 
                 <!-- Linux Instructions -->
                 <div class="agent-instructions" id="instructions-linux" style="display: none;">
-                    <h4>Instalación en Linux:</h4>
-                    <ol>
-                        <li>
-                            <strong>Abre una terminal</strong>
-                        </li>
-                        <li>
-                            <strong>Descarga el Agent:</strong><br>
-                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
-                                📥 Descargar MAX-IDE Agent
-                            </a>
-                        </li>
-                        <li>
-                            <strong>Ejecuta</strong> los siguientes comandos:
-                        </li>
-                    </ol>
-                    <div class="agent-terminal">
-                        <code>
-                            # 1. Descomprime el archivo descargado:<br>
-                            unzip maxide-agent.zip<br>
-                            cd maxide-agent<br><br>
-                            # 2. Crea un entorno virtual (recomendado):<br>
-                            python3 -m venv venv-agent<br><br>
-                            # 3. Activa el entorno virtual:<br>
-                            source venv-agent/bin/activate<br><br>
-                            # 4. Instala las dependencias:<br>
-                            pip install flask flask-cors pyserial requests<br><br>
-                            # 5. Agrega tu usuario al grupo dialout (para puertos serial):<br>
-                            sudo usermod -a -G dialout $USER<br>
-                            # (Luego cierra sesión y vuelve a entrar)<br><br>
-                            # 6. Ejecuta el Agent:<br>
-                            python agent.py --port 8765<br><br>
-                            # O para instalación automática con autostart:<br>
-                            python install.py
-                        </code>
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Abre una Terminal</div>
+                                <div class="step-desc">Presiona <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>T</kbd></div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Ejecuta estos comandos</div>
+                                <div class="step-desc">Copia y pega en Terminal (uno por uno):</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>
+                                        cd ~/Descargas<br>
+                                        unzip maxide-agent.zip<br>
+                                        cd maxide-agent<br>
+                                        bash start_agent.sh
+                                    </code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Permisos para Arduino (solo la primera vez)</div>
+                                <div class="step-desc">Si no detecta tu Arduino, ejecuta y reinicia sesión:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>sudo usermod -a -G dialout $USER</code>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div style="margin-top: 12px; padding: 10px; background: rgba(0, 217, 255, 0.1); border-radius: 6px; font-size: 0.85rem; color: #9ca3af;">
-                        <strong>💡 Nota:</strong> Si prefieres no usar entorno virtual, puedes usar:<br>
-                        <code style="font-size: 0.8rem;">pip3 install flask flask-cors pyserial requests --user</code>
+                    
+                    <div class="install-success-box">
+                        <div style="font-size: 24px;">✅</div>
+                        <div>
+                            <strong>¡Listo!</strong> Cuando veas "Listening on http://localhost:8765", 
+                            haz clic en "Verificar conexión" abajo.
+                        </div>
                     </div>
                 </div>
                 
                 <div class="agent-install-footer">
-                    <p><strong>¿Ya tienes el Agent instalado?</strong></p>
-                    <button class="btn btn-primary" id="btnVerifyAgentInstall">
+                    <button class="btn btn-primary btn-lg" id="btnVerifyAgentInstall" style="padding: 14px 28px; font-size: 1rem;">
                         🔄 Verificar conexión del Agent
                     </button>
                     <span class="agent-verify-status" id="agentVerifyStatus"></span>

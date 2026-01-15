@@ -1004,6 +1004,108 @@ body {
     white-space: pre-wrap;
 }
 
+/* Installation Steps - New Design */
+.install-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.install-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 16px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+}
+
+.install-step:hover {
+    border-color: var(--accent-cyan);
+    background: var(--bg-hover);
+}
+
+.step-number {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+    color: #000;
+    font-weight: 700;
+    font-size: 1.1rem;
+    border-radius: 50%;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-title {
+    font-weight: 600;
+    color: var(--text-bright);
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.step-desc {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.step-note {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 217, 255, 0.08);
+    border-left: 3px solid var(--accent-cyan);
+    border-radius: 0 6px 6px 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.step-file {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 10px 16px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--accent-cyan);
+}
+
+.install-success-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
+    padding: 16px 20px;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 12px;
+    color: var(--accent-green);
+    font-size: 0.95rem;
+}
+
+/* Keyboard keys */
+kbd {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-bright);
+    box-shadow: 0 2px 0 var(--border-color);
+}
+
 .agent-install-footer {
     padding: 20px 24px;
     background: var(--bg-tertiary);
