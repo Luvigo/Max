@@ -34,16 +34,25 @@ let currentProjectId = null;
 // ============================================
 
 const AgentConfig = {
-    // URL base del Agent local (puede ser configurado)
-    baseUrl: 'http://localhost:5000',
+    // URL base del Agent local (puerto 8765 por defecto)
+    baseUrl: 'http://127.0.0.1:8765',
     
     // Estado del Agent
     available: false,
     lastCheck: null,
+    lastError: null,
     version: null,
+    platform: null,
+    arduinoCli: null,
+    
+    // Control de reintentos (evitar spam)
+    checkInterval: 15000,  // 15 segundos entre reintentos automáticos
+    lastAutoCheck: 0,
+    isChecking: false,
     
     // Timeout para requests al Agent
-    timeout: 30000,
+    timeout: 60000,  // 60s para uploads
+    healthTimeout: 5000,  // 5s para health check
     
     // Endpoints del Agent
     endpoints: {
@@ -53,17 +62,67 @@ const AgentConfig = {
     }
 };
 
+// Diagnóstico del sistema
+const DiagnosticInfo = {
+    origin: '',
+    isSecureContext: false,
+    agentUrl: '',
+    lastHealthStatus: null,
+    lastError: null,
+    browserInfo: '',
+    timestamp: null
+};
+
+/**
+ * Actualiza la información de diagnóstico
+ */
+function updateDiagnostics(healthResult = null) {
+    DiagnosticInfo.origin = window.location.origin;
+    DiagnosticInfo.isSecureContext = window.isSecureContext;
+    DiagnosticInfo.agentUrl = AgentConfig.baseUrl;
+    DiagnosticInfo.browserInfo = navigator.userAgent.split(' ').slice(-2).join(' ');
+    DiagnosticInfo.timestamp = new Date().toISOString();
+    
+    if (healthResult !== null) {
+        DiagnosticInfo.lastHealthStatus = healthResult.available ? 'connected' : 'disconnected';
+        DiagnosticInfo.lastError = healthResult.error || null;
+    }
+}
+
 /**
  * Verifica si el Agent local está disponible
+ * NO hace spam de logs - solo loguea en cambios de estado o verificación manual
+ * 
+ * @param {boolean} manual - Si es una verificación manual (muestra logs siempre)
  * @returns {Promise<{available: boolean, version?: string, error?: string}>}
  */
-async function checkAgentHealth() {
+async function checkAgentLocal(manual = false) {
     const url = AgentConfig.baseUrl + AgentConfig.endpoints.health;
-    logToConsole('[AGENT] Verificando conexión con Agent local...', 'info');
+    const now = Date.now();
+    
+    // Evitar múltiples checks simultáneos
+    if (AgentConfig.isChecking) {
+        return { available: AgentConfig.available, version: AgentConfig.version };
+    }
+    
+    // Control de rate limiting para checks automáticos
+    if (!manual && (now - AgentConfig.lastAutoCheck) < AgentConfig.checkInterval) {
+        return { available: AgentConfig.available, version: AgentConfig.version };
+    }
+    
+    AgentConfig.isChecking = true;
+    AgentConfig.lastAutoCheck = now;
+    
+    // Solo loguear si es manual
+    if (manual) {
+        logToConsole('[AGENT] Verificando conexión con Agent local...', 'info');
+    }
+    
+    const previousState = AgentConfig.available;
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), AgentConfig.healthTimeout);
         
         const response = await fetch(url, {
             method: 'GET',
@@ -74,26 +133,56 @@ async function checkAgentHealth() {
         
         if (response.ok) {
             const data = await response.json();
-            AgentConfig.available = true;
-            AgentConfig.lastCheck = Date.now();
-            AgentConfig.version = data.version || 'unknown';
             
-            logToConsole(`[AGENT] ✓ Agent conectado (v${AgentConfig.version})`, 'success');
+            AgentConfig.available = true;
+            AgentConfig.lastCheck = now;
+            AgentConfig.lastError = null;
+            AgentConfig.version = data.version || 'unknown';
+            AgentConfig.platform = data.platform || 'unknown';
+            AgentConfig.arduinoCli = data.arduino_cli || null;
+            
+            // Solo loguear si cambió el estado o es manual
+            if (!previousState || manual) {
+                logToConsole(`[AGENT] ✓ Agent conectado v${AgentConfig.version}`, 'success');
+                if (data.arduino_cli) {
+                    logToConsole(`[AGENT] arduino-cli: ${data.arduino_cli_version || 'detectado'}`, 'info');
+                }
+            }
+            
             updateAgentUI(true);
-            return { available: true, version: AgentConfig.version };
+            updateDiagnostics({ available: true });
+            
+            AgentConfig.isChecking = false;
+            return { 
+                available: true, 
+                version: AgentConfig.version,
+                platform: AgentConfig.platform
+            };
         } else {
             throw new Error(`HTTP ${response.status}`);
         }
     } catch (error) {
-        AgentConfig.available = false;
-        AgentConfig.lastCheck = Date.now();
-        
         const errorMsg = error.name === 'AbortError' ? 'Timeout' : error.message;
-        logToConsole(`[AGENT] ✗ Agent no disponible: ${errorMsg}`, 'warning');
+        
+        AgentConfig.available = false;
+        AgentConfig.lastCheck = now;
+        AgentConfig.lastError = errorMsg;
+        
+        // Solo loguear si cambió el estado o es manual
+        if (previousState || manual) {
+            logToConsole(`[AGENT] ✗ Agent no disponible: ${errorMsg}`, 'warning');
+        }
+        
         updateAgentUI(false);
+        updateDiagnostics({ available: false, error: errorMsg });
+        
+        AgentConfig.isChecking = false;
         return { available: false, error: errorMsg };
     }
 }
+
+// Alias para compatibilidad
+const checkAgentHealth = checkAgentLocal;
 
 /**
  * Obtiene la lista de puertos del Agent local
@@ -129,7 +218,58 @@ async function getAgentPorts() {
 }
 
 /**
+ * Compila el código en el servidor y obtiene un token para el HEX
+ * @param {string} code - Código Arduino
+ * @param {string} fqbn - Board FQBN (ej: arduino:avr:uno)
+ * @param {Function} onLog - Callback para logs
+ * @returns {Promise<{success: boolean, token?: string, hex_url?: string, error?: string}>}
+ */
+async function compileOnServer(code, fqbn, onLog = () => {}) {
+    onLog('[COMPILE] Enviando código al servidor para compilación...');
+    
+    try {
+        const response = await fetch('/api/compile/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, fqbn })
+        });
+        
+        const data = await response.json();
+        
+        // Mostrar logs de compilación
+        if (data.logs && Array.isArray(data.logs)) {
+            data.logs.forEach(log => onLog(`[COMPILE] ${log}`));
+        }
+        
+        if (data.ok && data.token) {
+            onLog(`[COMPILE] ✓ Compilación exitosa (${data.size} bytes)`);
+            return {
+                success: true,
+                token: data.token,
+                hex_url: data.hex_url,
+                size: data.size
+            };
+        } else {
+            onLog(`[COMPILE] ✗ Error: ${data.error || 'Error desconocido'}`);
+            return {
+                success: false,
+                error: data.error || 'Error de compilación',
+                errorCode: data.error_code
+            };
+        }
+    } catch (error) {
+        onLog(`[COMPILE] ✗ Error de conexión: ${error.message}`);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
  * Sube código al Arduino via Agent local
+ * Flujo: Servidor compila -> genera token -> Agent descarga HEX -> sube al Arduino
+ * 
  * @param {string} code - Código Arduino
  * @param {string} port - Puerto serial (ej: /dev/ttyUSB0, COM3)
  * @param {string} fqbn - Board FQBN (ej: arduino:avr:uno)
@@ -137,23 +277,47 @@ async function getAgentPorts() {
  * @returns {Promise<{success: boolean, message?: string, error?: string, logs?: Array}>}
  */
 async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
-    const url = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
+    onLog('[UPLOAD-AGENT] Iniciando proceso de upload...');
     
-    onLog('[UPLOAD-AGENT] Enviando código al Agent local...');
+    // ========================================
+    // PASO 1: Compilar en el servidor
+    // ========================================
+    const compileResult = await compileOnServer(code, fqbn, onLog);
+    
+    if (!compileResult.success) {
+        return {
+            success: false,
+            error: compileResult.error,
+            errorCode: compileResult.errorCode
+        };
+    }
+    
+    // ========================================
+    // PASO 2: Construir URL absoluta del HEX
+    // ========================================
+    // El Agent necesita una URL completa para descargar el HEX
+    const hexUrl = window.location.origin + compileResult.hex_url;
+    onLog(`[UPLOAD-AGENT] URL del HEX: ${hexUrl}`);
+    
+    // ========================================
+    // PASO 3: Enviar al Agent para upload
+    // ========================================
+    const agentUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
+    onLog('[UPLOAD-AGENT] Enviando HEX al Agent local para upload...');
     
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), AgentConfig.timeout);
         
-        const response = await fetch(url, {
+        const response = await fetch(agentUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                code: code,
                 port: port,
-                fqbn: fqbn
+                fqbn: fqbn,
+                hex_url: hexUrl
             }),
             signal: controller.signal
         });
@@ -177,10 +341,17 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
         } else {
             const errorMsg = data.error || `HTTP ${response.status}`;
             onLog(`[UPLOAD-AGENT] ✗ Error: ${errorMsg}`);
+            
+            // Mostrar hint si existe
+            if (data.hint) {
+                onLog(`[UPLOAD-AGENT] 💡 Sugerencia: ${data.hint}`);
+            }
+            
             return {
                 success: false,
                 error: errorMsg,
                 errorCode: data.error_code,
+                hint: data.hint,
                 logs: data.logs
             };
         }
@@ -202,20 +373,180 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 function updateAgentUI(available) {
     const btnUpload = document.getElementById('btnUpload');
     const agentBanner = document.getElementById('agentBanner');
+    const agentStatusDot = document.getElementById('agentStatusDot');
+    const agentStatusText = document.getElementById('agentStatusText');
+    const agentStatusContainer = document.getElementById('agentStatus');
     
     if (btnUpload) {
         if (available) {
             btnUpload.disabled = false;
             btnUpload.title = 'Subir código al Arduino';
+            btnUpload.classList.remove('btn-disabled');
         } else {
             btnUpload.disabled = true;
-            btnUpload.title = 'Requiere Agent local - Haz clic para más información';
+            btnUpload.title = 'Requiere Agent local - Haz clic en "Cómo instalar"';
+            btnUpload.classList.add('btn-disabled');
         }
     }
     
     // Mostrar/ocultar banner de Agent
     if (agentBanner) {
         agentBanner.style.display = available ? 'none' : 'flex';
+    }
+    
+    // Actualizar indicador en status bar
+    if (agentStatusDot) {
+        if (available) {
+            agentStatusDot.classList.remove('disconnected');
+            agentStatusDot.classList.add('connected');
+        } else {
+            agentStatusDot.classList.add('disconnected');
+            agentStatusDot.classList.remove('connected');
+        }
+    }
+    
+    if (agentStatusText) {
+        if (available) {
+            agentStatusText.textContent = `Agent: v${AgentConfig.version || '?'}`;
+            agentStatusText.title = `Plataforma: ${AgentConfig.platform || 'N/A'}\narduino-cli: ${AgentConfig.arduinoCli || 'N/A'}`;
+        } else {
+            agentStatusText.textContent = 'Agent: Desconectado';
+            agentStatusText.title = `Último error: ${AgentConfig.lastError || 'N/A'}\nURL: ${AgentConfig.baseUrl}`;
+        }
+    }
+    
+    // Hacer clickeable el status para diagnóstico
+    if (agentStatusContainer && !agentStatusContainer._hasClickHandler) {
+        agentStatusContainer.style.cursor = 'pointer';
+        agentStatusContainer.addEventListener('click', showDiagnosticPanel);
+        agentStatusContainer._hasClickHandler = true;
+    }
+}
+
+/**
+ * Muestra el panel de diagnóstico
+ */
+function showDiagnosticPanel() {
+    updateDiagnostics();
+    
+    const info = `
+╔═══════════════════════════════════════════════════╗
+║           DIAGNÓSTICO MAX-IDE AGENT               ║
+╠═══════════════════════════════════════════════════╣
+║ Origin:          ${DiagnosticInfo.origin}
+║ Secure Context:  ${DiagnosticInfo.isSecureContext ? 'Sí (HTTPS)' : 'No (HTTP)'}
+║ Agent URL:       ${DiagnosticInfo.agentUrl}
+║ Estado:          ${DiagnosticInfo.lastHealthStatus || 'No verificado'}
+║ Último error:    ${DiagnosticInfo.lastError || 'Ninguno'}
+║ Versión Agent:   ${AgentConfig.version || 'N/A'}
+║ Plataforma:      ${AgentConfig.platform || 'N/A'}
+║ arduino-cli:     ${AgentConfig.arduinoCli || 'No detectado'}
+║ Timestamp:       ${DiagnosticInfo.timestamp}
+╚═══════════════════════════════════════════════════╝
+
+${!AgentConfig.available ? `
+⚠️ SOLUCIÓN:
+1. Descarga el Agent desde el botón "Cómo instalar"
+2. Descomprime y ejecuta start_agent (Windows: .bat, Linux/Mac: .sh)
+3. El Agent debe estar corriendo en ${AgentConfig.baseUrl}
+4. Haz clic en "Verificar conexión" para reintentar
+` : '✓ Agent funcionando correctamente'}
+    `.trim();
+    
+    // Loguear en consola del IDE
+    logToConsole('=== DIAGNÓSTICO ===', 'info');
+    logToConsole(`Origin: ${DiagnosticInfo.origin}`, 'info');
+    logToConsole(`Secure: ${DiagnosticInfo.isSecureContext}`, 'info');
+    logToConsole(`Agent URL: ${DiagnosticInfo.agentUrl}`, 'info');
+    logToConsole(`Estado: ${DiagnosticInfo.lastHealthStatus || 'No verificado'}`, 
+                 DiagnosticInfo.lastHealthStatus === 'connected' ? 'success' : 'warning');
+    if (DiagnosticInfo.lastError) {
+        logToConsole(`Error: ${DiagnosticInfo.lastError}`, 'error');
+    }
+    
+    // También mostrar en consola del navegador
+    console.log(info);
+    
+    // Mostrar toast con resumen
+    if (AgentConfig.available) {
+        showToast(`Agent v${AgentConfig.version} conectado`, 'success');
+    } else {
+        showToast(`Agent desconectado - ${AgentConfig.lastError || 'No disponible'}`, 'warning');
+    }
+}
+
+/**
+ * Muestra el modal de instalación del Agent
+ */
+function showAgentInstallModal() {
+    const modal = document.getElementById('agentInstallModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.add('active');
+    }
+}
+
+/**
+ * Cierra el modal de instalación del Agent
+ */
+function closeAgentInstallModal() {
+    const modal = document.getElementById('agentInstallModal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.remove('active');
+    }
+}
+
+/**
+ * Cambia la pestaña de instrucciones del Agent (Windows/Mac/Linux)
+ */
+function switchAgentTab(os) {
+    // Actualizar tabs
+    document.querySelectorAll('.agent-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-os') === os) {
+            tab.classList.add('active');
+        }
+    });
+    
+    // Mostrar instrucciones correspondientes
+    document.querySelectorAll('.agent-instructions').forEach(instr => {
+        instr.style.display = 'none';
+    });
+    
+    const targetInstr = document.getElementById(`instructions-${os}`);
+    if (targetInstr) {
+        targetInstr.style.display = 'block';
+    }
+}
+
+/**
+ * Verifica la conexión del Agent desde el modal
+ */
+async function verifyAgentFromModal() {
+    const statusEl = document.getElementById('agentVerifyStatus');
+    if (statusEl) {
+        statusEl.className = 'agent-verify-status checking';
+        statusEl.textContent = 'Verificando...';
+    }
+    
+    // Verificación manual - siempre muestra logs
+    const result = await checkAgentLocal(true);
+    
+    if (statusEl) {
+        if (result.available) {
+            statusEl.className = 'agent-verify-status success';
+            statusEl.textContent = `✓ Conectado v${result.version}`;
+            setTimeout(() => {
+                closeAgentInstallModal();
+                showToast('¡Agent conectado correctamente!', 'success');
+                // Refrescar puertos después de conectar
+                refreshPorts();
+            }, 1500);
+        } else {
+            statusEl.className = 'agent-verify-status error';
+            statusEl.textContent = `✗ ${result.error || 'No disponible'}`;
+        }
     }
 }
 
@@ -269,25 +600,28 @@ document.addEventListener('DOMContentLoaded', function() {
     initBlockly();
     initEventListeners();
     
-    // Verificar Agent local primero
-    checkAgentHealth().then(result => {
+    // Inicializar diagnósticos
+    updateDiagnostics();
+    
+    // Log inicial (una sola vez)
+    logToConsole('MAX-IDE v2.0 inicializado', 'info');
+    logToConsole(`Agent URL: ${AgentConfig.baseUrl}`, 'info');
+    
+    // Verificar Agent local (verificación manual = muestra logs)
+    checkAgentLocal(true).then(result => {
         if (!result.available) {
-            showAgentBanner();
+            // El banner ya se muestra via updateAgentUI
+            logToConsole('💡 Instala el Agent local para subir código al Arduino', 'warning');
         }
+        // Cargar puertos después de verificar Agent
+        refreshPorts();
     });
     
-    // Cargar puertos del Agent (si está disponible)
-    refreshPorts();
-    
-    // Monitoreo periódico del Agent
+    // Monitoreo periódico del Agent (silencioso, no spamea logs)
+    // Solo reintenta cada 15 segundos y solo loguea si hay cambio de estado
     setInterval(() => {
-        if (!AgentConfig.available || Date.now() - AgentConfig.lastCheck > 30000) {
-            checkAgentHealth();
-        }
-    }, 30000);
-    
-    logToConsole('MAX-IDE v2.0 - Modo Agent Local', 'info');
-    logToConsole('Verificar: Servidor | Subir: Agent local', 'info');
+        checkAgentLocal(false);  // false = automático, no loguea si no hay cambio
+    }, AgentConfig.checkInterval);
 });
 
 /**
@@ -730,23 +1064,28 @@ async function verifyCode() {
         const response = await fetch('/api/compile/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, board: currentBoard })
+            body: JSON.stringify({ code, fqbn: currentBoard })
         });
         
         const data = await response.json();
         
-        if (data.success) {
-            logToConsole('[VERIFY] ✓ Verificación exitosa', 'success');
-            if (data.output) {
-                // Mostrar info de compilación resumida
-                const lines = data.output.split('\n').filter(l => l.trim());
-                const summary = lines.slice(-5); // Últimas 5 líneas
-                summary.forEach(line => logToConsole(`[COMPILE] ${line}`, 'info'));
-            }
-            showToast('Verificación exitosa', 'success');
+        // Mostrar logs de compilación
+        if (data.logs && Array.isArray(data.logs)) {
+            data.logs.slice(-8).forEach(log => logToConsole(`[COMPILE] ${log}`, 'info'));
+        }
+        
+        if (data.ok || data.success) {
+            logToConsole(`[VERIFY] ✓ Verificación exitosa (${data.size || '?'} bytes)`, 'success');
+            showToast(`Verificación exitosa (${data.size || '?'} bytes)`, 'success');
         } else {
             logToConsole('[VERIFY] ✗ Error de verificación', 'error');
-            logToConsole(`[COMPILE] ${data.error || 'Error desconocido'}`, 'error');
+            
+            // Mostrar errores detallados
+            if (data.error) {
+                const errorLines = data.error.split('\n').filter(l => l.trim()).slice(-5);
+                errorLines.forEach(line => logToConsole(`[ERROR] ${line}`, 'error'));
+            }
+            
             showToast('Error de verificación', 'error');
         }
     } catch (error) {
@@ -1347,3 +1686,67 @@ window.loadProjectFromTemplate = function(xmlContent, projectId) {
 
 // Exponer funciones globalmente para botones HTML
 window.checkAgentHealth = checkAgentHealth;
+window.checkAgentLocal = checkAgentLocal;
+window.showAgentInstallModal = showAgentInstallModal;
+window.closeAgentInstallModal = closeAgentInstallModal;
+window.switchAgentTab = switchAgentTab;
+window.verifyAgentFromModal = verifyAgentFromModal;
+window.showDiagnosticPanel = showDiagnosticPanel;
+
+// Inicializar event listeners para Agent UI cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    // Botones del banner del Agent
+    const btnCheckAgent = document.getElementById('btnCheckAgent');
+    const btnInstallAgent = document.getElementById('btnInstallAgent');
+    
+    if (btnCheckAgent) {
+        btnCheckAgent.addEventListener('click', () => {
+            // Verificación manual - siempre muestra logs
+            checkAgentLocal(true);
+        });
+    }
+    
+    if (btnInstallAgent) {
+        btnInstallAgent.addEventListener('click', showAgentInstallModal);
+    }
+    
+    // Botón cerrar modal del Agent
+    const btnCloseAgentModal = document.getElementById('btnCloseAgentModal');
+    if (btnCloseAgentModal) {
+        btnCloseAgentModal.addEventListener('click', closeAgentInstallModal);
+    }
+    
+    // Tabs de instrucciones
+    document.querySelectorAll('.agent-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const os = this.getAttribute('data-os');
+            switchAgentTab(os);
+        });
+    });
+    
+    // Botón verificar desde modal
+    const btnVerifyAgentInstall = document.getElementById('btnVerifyAgentInstall');
+    if (btnVerifyAgentInstall) {
+        btnVerifyAgentInstall.addEventListener('click', verifyAgentFromModal);
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    const agentInstallModal = document.getElementById('agentInstallModal');
+    if (agentInstallModal) {
+        agentInstallModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAgentInstallModal();
+            }
+        });
+    }
+    
+    // Detectar SO del usuario y mostrar tab correspondiente
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('win')) {
+        switchAgentTab('windows');
+    } else if (userAgent.includes('mac')) {
+        switchAgentTab('mac');
+    } else {
+        switchAgentTab('linux');
+    }
+});

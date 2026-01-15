@@ -19,6 +19,8 @@ urlpatterns = [
     path('api/compile/', views.compile_code, name='compile'),
     path('api/compile-download/', views.compile_and_download, name='compile_download'),
     path('api/upload/', views.upload_code, name='upload'),
+    path('api/hex/<str:token>', views.serve_hex_file, name='serve_hex'),
+    path('api/hex/<str:token>.hex', views.serve_hex_file, name='serve_hex_file'),
     
     # API Monitor Serial
     path('api/serial/connect/', views.serial_connect, name='serial_connect'),

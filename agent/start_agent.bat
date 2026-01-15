@@ -1,30 +1,50 @@
 @echo off
-REM MAX-IDE Agent - Script de inicio (Windows)
+REM =============================================
+REM MAX-IDE Agent - Windows Starter
+REM =============================================
 
-cd /d "%~dp0"
+echo.
+echo =============================================
+echo       MAX-IDE Agent - Windows
+echo =============================================
+echo.
 
-REM Verificar Python
-where python >nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo ERROR: Python no encontrado
+REM Check Python
+python --version >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Python no encontrado.
+    echo.
+    echo Por favor, instala Python desde:
+    echo   https://www.python.org/downloads/
+    echo.
+    echo IMPORTANTE: Marca "Add Python to PATH" durante la instalacion.
+    echo.
     pause
     exit /b 1
 )
 
-REM Verificar/crear venv
-if not exist "venv" (
-    echo Creando entorno virtual...
-    python -m venv venv
+echo Python encontrado.
+echo.
+
+REM Install dependencies
+echo Instalando dependencias...
+pip install flask flask-cors pyserial requests --quiet
+if errorlevel 1 (
+    echo Error instalando dependencias.
+    pause
+    exit /b 1
 )
 
-REM Activar venv
-call venv\Scripts\activate.bat
-
-REM Instalar dependencias
-echo Verificando dependencias...
-pip install -q -r requirements.txt
-
-REM Ejecutar agent
 echo.
-python agent.py %*
+echo Dependencias instaladas.
+echo.
+echo Iniciando MAX-IDE Agent en http://localhost:8765
+echo.
+echo Presiona Ctrl+C para detener el Agent.
+echo =============================================
+echo.
 
+REM Start agent
+python "%~dp0agent.py" --port 8765
+
+pause

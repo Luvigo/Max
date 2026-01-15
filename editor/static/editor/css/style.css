@@ -837,6 +837,211 @@ body {
 }
 
 /* ============================================
+   AGENT BANNER
+   ============================================ */
+
+.agent-banner {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
+    border-bottom: 1px solid var(--accent-yellow);
+    padding: 10px 20px;
+    flex-shrink: 0;
+}
+
+.agent-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.agent-banner-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    background: rgba(234, 179, 8, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.agent-banner-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.agent-banner-text strong {
+    color: var(--accent-yellow);
+    font-size: 0.9rem;
+}
+
+.agent-banner-text span {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.agent-banner-actions {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   AGENT INSTALL MODAL
+   ============================================ */
+
+.agent-install-intro {
+    padding: 20px 24px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-install-intro p {
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+
+.agent-install-intro p:last-child {
+    margin-bottom: 0;
+}
+
+.agent-install-tabs {
+    display: flex;
+    padding: 16px 24px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.agent-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.agent-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-bright);
+}
+
+.agent-tab.active {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+}
+
+.agent-instructions {
+    padding: 24px;
+    overflow-y: auto;
+    max-height: 350px;
+}
+
+.agent-instructions h4 {
+    color: var(--accent-cyan);
+    margin-bottom: 16px;
+    font-size: 1rem;
+}
+
+.agent-instructions ol {
+    margin: 0;
+    padding-left: 24px;
+}
+
+.agent-instructions ol li {
+    margin-bottom: 16px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.agent-instructions ol li strong {
+    color: var(--text-bright);
+}
+
+.agent-instructions small {
+    display: block;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.agent-instructions code {
+    background: var(--bg-tertiary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-cyan);
+}
+
+.agent-terminal {
+    background: var(--bg-deep);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.agent-terminal code {
+    display: block;
+    background: transparent;
+    padding: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent-green);
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+
+.agent-install-footer {
+    padding: 20px 24px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.agent-install-footer p {
+    margin: 0 0 12px 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.agent-verify-status {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.agent-verify-status.checking {
+    background: rgba(0, 217, 255, 0.15);
+    color: var(--accent-cyan);
+}
+
+.agent-verify-status.success {
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--accent-green);
+}
+
+.agent-verify-status.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red);
+}
+
+/* ============================================
    UTILITIES
    ============================================ */
 

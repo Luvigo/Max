@@ -50,8 +50,8 @@ except ImportError:
 # CONFIGURACIÓN
 # ============================================
 
-VERSION = "1.0.0"
-DEFAULT_PORT = 5000
+VERSION = "1.1.0"
+DEFAULT_PORT = 8765
 
 # Dominios permitidos para CORS
 ALLOWED_ORIGINS = [
@@ -179,6 +179,7 @@ def health():
 def list_ports():
     """
     Lista los puertos seriales disponibles.
+    Filtra solo puertos USB reales (no virtuales del sistema).
     
     Response:
         {
@@ -201,13 +202,35 @@ def list_ports():
         return '', 204
     
     ports = []
+    all_ports = []  # Para debug
     
     try:
         for port in serial.tools.list_ports.comports():
+            # Filtrar solo puertos USB reales (excluir ttyS* virtuales)
+            is_usb_port = (
+                port.vid is not None or  # Tiene VID = dispositivo USB
+                'USB' in (port.hwid or '') or
+                'usb' in (port.device or '').lower() or
+                'ACM' in (port.device or '')  # Arduino con CDC
+            )
+            
+            # En Windows, incluir todos los COM
+            if platform.system() == 'Windows':
+                is_usb_port = True
+            
+            all_ports.append({
+                'device': port.device,
+                'vid': port.vid,
+                'is_usb': is_usb_port
+            })
+            
+            if not is_usb_port:
+                continue
+            
             port_info = {
                 'device': port.device,
                 'name': port.name,
-                'description': port.description or 'Unknown',
+                'description': port.description or 'USB Serial',
                 'vid': port.vid,
                 'pid': port.pid,
                 'serial_number': port.serial_number,
@@ -216,17 +239,28 @@ def list_ports():
                 'hwid': port.hwid
             }
             
-            # Identificar tipo de dispositivo
+            # Identificar tipo de dispositivo y nombre amigable
             if port.vid == 0x2341 or port.vid == 0x2A03:
                 port_info['type'] = 'arduino_official'
+                port_info['friendly_name'] = 'Arduino Original'
             elif port.vid == 0x1A86:
                 port_info['type'] = 'ch340'
+                port_info['friendly_name'] = 'Arduino (CH340)'
             elif port.vid == 0x0403:
                 port_info['type'] = 'ftdi'
+                port_info['friendly_name'] = 'Arduino (FTDI)'
             elif port.vid == 0x10C4:
                 port_info['type'] = 'cp210x'
+                port_info['friendly_name'] = 'Arduino (CP2102)'
+            elif port.vid == 0x239A:
+                port_info['type'] = 'adafruit'
+                port_info['friendly_name'] = 'Adafruit'
+            elif port.vid == 0x1B4F:
+                port_info['type'] = 'sparkfun'
+                port_info['friendly_name'] = 'SparkFun'
             else:
-                port_info['type'] = 'unknown'
+                port_info['type'] = 'generic'
+                port_info['friendly_name'] = port.description or 'USB Serial'
             
             ports.append(port_info)
     except Exception as e:
@@ -239,7 +273,8 @@ def list_ports():
     return jsonify({
         'ok': True,
         'ports': ports,
-        'count': len(ports)
+        'count': len(ports),
+        'total_scanned': len(all_ports)
     })
 
 # ============================================

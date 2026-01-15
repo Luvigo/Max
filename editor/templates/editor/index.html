@@ -155,6 +155,25 @@ void loop() {
             </div>
         </main>
         
+        <!-- Agent Install Banner -->
+        <div class="agent-banner" id="agentBanner" style="display: none;">
+            <div class="agent-banner-content">
+                <div class="agent-banner-icon">🔧</div>
+                <div class="agent-banner-text">
+                    <strong>Agent local requerido para subir código</strong>
+                    <span>Instala el MAX-IDE Agent en tu PC para poder subir código al Arduino</span>
+                </div>
+                <div class="agent-banner-actions">
+                    <button class="btn btn-sm btn-ghost" id="btnCheckAgent">
+                        🔄 Verificar conexión
+                    </button>
+                    <button class="btn btn-sm btn-primary" id="btnInstallAgent">
+                        📥 Instrucciones de instalación
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Status Bar -->
         <footer class="status-bar">
             <div class="status-left">
@@ -168,6 +187,10 @@ void loop() {
                 </div>
             </div>
             <div class="status-right">
+                <div class="status-item" id="agentStatus">
+                    <span class="status-dot disconnected" id="agentStatusDot"></span>
+                    <span id="agentStatusText">Agent: Verificando...</span>
+                </div>
                 <div class="status-item" id="boardInfo">
                     <span>🎯</span>
                     <span>Arduino UNO</span>
@@ -241,6 +264,138 @@ void loop() {
     
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Modal Instalar Agent -->
+    <div class="modal-overlay" id="agentInstallModal" style="display: none;">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="icon">🔧</span>
+                    Instalar MAX-IDE Agent
+                </h2>
+                <button class="modal-close" id="btnCloseAgentModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="agent-install-intro">
+                    <p>El <strong>MAX-IDE Agent</strong> es una pequeña aplicación que se ejecuta en tu computadora para permitir la comunicación con tu Arduino.</p>
+                    <p>Solo necesitas instalarlo una vez y se iniciará automáticamente.</p>
+                </div>
+                
+                <div class="agent-install-tabs">
+                    <button class="agent-tab active" data-os="windows">🪟 Windows</button>
+                    <button class="agent-tab" data-os="mac">🍎 macOS</button>
+                    <button class="agent-tab" data-os="linux">🐧 Linux</button>
+                </div>
+                
+                <!-- Windows Instructions -->
+                <div class="agent-instructions" id="instructions-windows">
+                    <h4>Instalación en Windows:</h4>
+                    <ol>
+                        <li>
+                            <strong>Descarga Python</strong> (si no lo tienes):<br>
+                            <a href="https://www.python.org/downloads/" target="_blank" class="btn btn-sm btn-ghost" style="margin: 8px 0;">
+                                🐍 Descargar Python
+                            </a>
+                            <br><small>Durante la instalación, marca "Add Python to PATH"</small>
+                        </li>
+                        <li>
+                            <strong>Descarga el Agent:</strong><br>
+                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
+                                📥 Descargar MAX-IDE Agent
+                            </a>
+                        </li>
+                        <li>
+                            <strong>Descomprime</strong> el archivo en una carpeta (ej: <code>C:\MAX-IDE-Agent</code>)
+                        </li>
+                        <li>
+                            <strong>Ejecuta</strong> el archivo <code>start_agent.bat</code> haciendo doble clic
+                        </li>
+                        <li>
+                            <strong>(Opcional)</strong> Para inicio automático, ejecuta <code>install.bat</code>
+                        </li>
+                    </ol>
+                    <div class="agent-terminal">
+                        <code>
+                            # O instala manualmente desde terminal:<br>
+                            pip install flask flask-cors pyserial requests<br>
+                            python agent.py
+                        </code>
+                    </div>
+                </div>
+                
+                <!-- macOS Instructions -->
+                <div class="agent-instructions" id="instructions-mac" style="display: none;">
+                    <h4>Instalación en macOS:</h4>
+                    <ol>
+                        <li>
+                            <strong>Abre Terminal</strong> (Cmd + Space, escribe "Terminal")
+                        </li>
+                        <li>
+                            <strong>Descarga el Agent:</strong><br>
+                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
+                                📥 Descargar MAX-IDE Agent
+                            </a>
+                        </li>
+                        <li>
+                            <strong>Descomprime</strong> y navega a la carpeta
+                        </li>
+                        <li>
+                            <strong>Ejecuta</strong> en Terminal:
+                        </li>
+                    </ol>
+                    <div class="agent-terminal">
+                        <code>
+                            # Instalar dependencias y ejecutar:<br>
+                            cd ~/Downloads/maxide-agent<br>
+                            pip3 install flask flask-cors pyserial requests<br>
+                            python3 agent.py<br><br>
+                            # O para instalación automática:<br>
+                            python3 install.py
+                        </code>
+                    </div>
+                </div>
+                
+                <!-- Linux Instructions -->
+                <div class="agent-instructions" id="instructions-linux" style="display: none;">
+                    <h4>Instalación en Linux:</h4>
+                    <ol>
+                        <li>
+                            <strong>Abre una terminal</strong>
+                        </li>
+                        <li>
+                            <strong>Descarga el Agent:</strong><br>
+                            <a href="/static/agent/maxide-agent.zip" download class="btn btn-sm btn-primary" style="margin: 8px 0;">
+                                📥 Descargar MAX-IDE Agent
+                            </a>
+                        </li>
+                        <li>
+                            <strong>Ejecuta</strong> los siguientes comandos:
+                        </li>
+                    </ol>
+                    <div class="agent-terminal">
+                        <code>
+                            # Instalar dependencias:<br>
+                            pip install flask flask-cors pyserial requests<br><br>
+                            # Agregar usuario al grupo dialout (puertos serial):<br>
+                            sudo usermod -a -G dialout $USER<br><br>
+                            # Ejecutar el agent:<br>
+                            python3 agent.py<br><br>
+                            # O para instalación automática con autostart:<br>
+                            python3 install.py
+                        </code>
+                    </div>
+                </div>
+                
+                <div class="agent-install-footer">
+                    <p><strong>¿Ya tienes el Agent instalado?</strong></p>
+                    <button class="btn btn-primary" id="btnVerifyAgentInstall">
+                        🔄 Verificar conexión del Agent
+                    </button>
+                    <span class="agent-verify-status" id="agentVerifyStatus"></span>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Hidden file input -->
     <input type="file" id="fileInput" accept=".xml,.maxide" style="display: none;">

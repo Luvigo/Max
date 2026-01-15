@@ -7,9 +7,11 @@ import threading
 import re
 import base64
 import time
+import secrets
 from pathlib import Path
+from datetime import datetime, timedelta
 
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -22,6 +24,18 @@ import serial.tools.list_ports
 BASE_DIR = Path(settings.BASE_DIR)
 SKETCH_DIR = BASE_DIR / 'sketches'
 SKETCH_DIR.mkdir(exist_ok=True)
+
+# Directorio para HEX temporales
+HEX_TEMP_DIR = BASE_DIR / 'hex_temp'
+HEX_TEMP_DIR.mkdir(exist_ok=True)
+
+# Almacenamiento de tokens HEX (token -> {path, expires, fqbn, size})
+# En producción, considera usar Redis o base de datos
+hex_tokens = {}
+hex_tokens_lock = threading.Lock()
+
+# Tiempo de expiración de tokens HEX (en segundos)
+HEX_TOKEN_EXPIRY = 600  # 10 minutos
 
 # Directorio de datos de Arduino (para que persista en Render)
 ARDUINO_DATA_DIR = BASE_DIR / 'arduino-data'
@@ -50,6 +64,105 @@ def find_arduino_cli():
     return str(BASE_DIR / 'bin' / 'arduino-cli')
 
 ARDUINO_CLI = find_arduino_cli()
+
+# ============================================
+# GESTIÓN DE TOKENS HEX
+# ============================================
+
+def generate_hex_token():
+    """Genera un token único y seguro para un archivo HEX."""
+    return secrets.token_urlsafe(32)
+
+
+def cleanup_expired_tokens():
+    """Elimina tokens expirados y sus archivos."""
+    now = datetime.now()
+    expired = []
+    
+    with hex_tokens_lock:
+        for token, data in list(hex_tokens.items()):
+            if data['expires'] < now:
+                expired.append(token)
+                # Eliminar archivo HEX
+                try:
+                    hex_path = Path(data['path'])
+                    if hex_path.exists():
+                        hex_path.unlink()
+                except Exception as e:
+                    print(f"[HEX-CLEANUP] Error eliminando {data['path']}: {e}")
+        
+        # Eliminar tokens del diccionario
+        for token in expired:
+            del hex_tokens[token]
+    
+    if expired:
+        print(f"[HEX-CLEANUP] Eliminados {len(expired)} tokens expirados")
+
+
+def store_hex_token(hex_path, fqbn, size):
+    """
+    Almacena un token para un archivo HEX.
+    
+    Returns:
+        str: Token generado
+    """
+    # Limpiar tokens expirados ocasionalmente
+    if len(hex_tokens) > 50:  # Cada 50 compilaciones
+        cleanup_expired_tokens()
+    
+    token = generate_hex_token()
+    expires = datetime.now() + timedelta(seconds=HEX_TOKEN_EXPIRY)
+    
+    with hex_tokens_lock:
+        hex_tokens[token] = {
+            'path': str(hex_path),
+            'expires': expires,
+            'fqbn': fqbn,
+            'size': size,
+            'created': datetime.now()
+        }
+    
+    return token
+
+
+def get_hex_by_token(token):
+    """
+    Obtiene la información de un HEX por su token.
+    
+    Returns:
+        dict o None: Datos del HEX si es válido, None si no existe o expiró
+    """
+    cleanup_expired_tokens()  # Limpiar expirados
+    
+    with hex_tokens_lock:
+        data = hex_tokens.get(token)
+        
+        if not data:
+            return None
+        
+        # Verificar expiración
+        if data['expires'] < datetime.now():
+            # Eliminar token expirado
+            del hex_tokens[token]
+            try:
+                Path(data['path']).unlink()
+            except:
+                pass
+            return None
+        
+        return data
+
+
+def invalidate_hex_token(token):
+    """Invalida un token y elimina su archivo."""
+    with hex_tokens_lock:
+        data = hex_tokens.pop(token, None)
+        if data:
+            try:
+                Path(data['path']).unlink()
+            except:
+                pass
+
 
 # Variables de entorno para arduino-cli (usar directorio del proyecto)
 ARDUINO_ENV = os.environ.copy()
@@ -444,15 +557,48 @@ def list_ports(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def compile_code(request):
-    """Compila el código Arduino."""
+    """
+    Compila el código Arduino y genera un token para descargar el HEX.
+    
+    Input JSON:
+        {
+            "code": "void setup() {} void loop() {}",
+            "fqbn": "arduino:avr:uno"  // o "board" para compatibilidad
+        }
+    
+    Output JSON:
+        {
+            "ok": true,
+            "token": "abc123...",
+            "hex_url": "/api/hex/abc123.hex",
+            "logs": ["Compilando...", "Éxito"],
+            "size": 1234,
+            "fqbn": "arduino:avr:uno"
+        }
+    """
     sketch_path = None
+    logs = []
+    
+    def log(msg):
+        timestamp = time.strftime('%H:%M:%S')
+        logs.append(f"[{timestamp}] {msg}")
+        print(f"[COMPILE] {msg}")
+    
     try:
         data = json.loads(request.body)
-        code = data.get('code', '')
-        board = data.get('board', 'arduino:avr:uno')
+        code = data.get('code', '') or data.get('sketch_ino_text', '')
+        fqbn = data.get('fqbn', '') or data.get('board', 'arduino:avr:uno')
         
         if not code:
-            return JsonResponse({'success': False, 'error': 'No code provided'}, status=400)
+            return JsonResponse({
+                'ok': False,
+                'error': 'No se proporcionó código',
+                'error_code': 'NO_CODE',
+                'logs': logs
+            }, status=400)
+        
+        log(f"Iniciando compilación para {fqbn}")
+        log(f"Código recibido: {len(code)} caracteres")
         
         # Crear directorio único para el sketch
         sketch_id = str(uuid.uuid4())[:8]
@@ -463,47 +609,206 @@ def compile_code(request):
         
         # Escribir el código
         sketch_file.write_text(code)
+        log(f"Sketch creado: {sketch_name}")
         
-        # Compilar usando arduino-cli nativo
+        # Directorio de build para obtener el .hex
+        build_path = sketch_path / 'build'
+        
+        # Compilar usando arduino-cli
+        log("Ejecutando arduino-cli compile...")
         result = subprocess.run(
-            [ARDUINO_CLI, 'compile', '--fqbn', board, str(sketch_path)],
+            [
+                ARDUINO_CLI, 'compile',
+                '--fqbn', fqbn,
+                '--output-dir', str(build_path),
+                '--verbose',
+                str(sketch_path)
+            ],
             capture_output=True,
             text=True,
             timeout=120,
             env=ARDUINO_ENV
         )
         
+        # Capturar logs de compilación
+        if result.stdout:
+            for line in result.stdout.strip().split('\n')[-15:]:
+                if line.strip():
+                    logs.append(f"[arduino-cli] {line.strip()}")
+        
         if result.returncode == 0:
+            log("Compilación exitosa")
+            
+            # Buscar el archivo .hex generado
+            hex_file = None
+            for f in build_path.iterdir():
+                if f.suffix == '.hex':
+                    hex_file = f
+                    break
+            
+            if not hex_file or not hex_file.exists():
+                log("ERROR: No se encontró archivo .hex")
+                return JsonResponse({
+                    'ok': False,
+                    'error': 'Compilación exitosa pero no se generó archivo .hex',
+                    'error_code': 'NO_HEX_GENERATED',
+                    'logs': logs
+                }, status=500)
+            
+            # Obtener tamaño del HEX
+            hex_size = hex_file.stat().st_size
+            log(f"Archivo HEX generado: {hex_size} bytes")
+            
+            # Mover el HEX al directorio temporal con nombre único
+            hex_token = generate_hex_token()
+            permanent_hex_path = HEX_TEMP_DIR / f"{hex_token}.hex"
+            shutil.copy2(hex_file, permanent_hex_path)
+            
+            # Almacenar token
+            store_hex_token(permanent_hex_path, fqbn, hex_size)
+            
+            log(f"Token generado: {hex_token[:16]}...")
+            
             return JsonResponse({
-                'success': True,
-                'message': 'Compilación exitosa',
-                'output': result.stdout
+                'ok': True,
+                'success': True,  # Compatibilidad
+                'token': hex_token,
+                'hex_url': f'/api/hex/{hex_token}.hex',
+                'logs': logs,
+                'size': hex_size,
+                'fqbn': fqbn,
+                'message': 'Compilación exitosa'
             })
         else:
+            # Error de compilación
             error_msg = result.stderr or result.stdout
+            log(f"Error de compilación: {error_msg[:500]}")
+            
+            # Agregar errores al log
+            if result.stderr:
+                for line in result.stderr.strip().split('\n')[-20:]:
+                    if line.strip():
+                        logs.append(f"[error] {line.strip()}")
+            
             return JsonResponse({
+                'ok': False,
                 'success': False,
                 'error': error_msg,
-                'output': result.stdout
-            })
+                'error_code': 'COMPILE_ERROR',
+                'logs': logs
+            }, status=400)
             
     except subprocess.TimeoutExpired:
-        return JsonResponse({'success': False, 'error': 'Timeout de compilación'}, status=408)
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
-    except FileNotFoundError:
+        log("Timeout de compilación (120s)")
         return JsonResponse({
-            'success': False, 
-            'error': 'arduino-cli no encontrado. Verifica la instalación.'
+            'ok': False,
+            'error': 'Timeout de compilación',
+            'error_code': 'TIMEOUT',
+            'logs': logs
+        }, status=408)
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'ok': False,
+            'error': 'JSON inválido',
+            'error_code': 'INVALID_JSON',
+            'logs': logs
+        }, status=400)
+    except FileNotFoundError:
+        log("arduino-cli no encontrado")
+        return JsonResponse({
+            'ok': False,
+            'error': 'arduino-cli no encontrado. Verifica la instalación.',
+            'error_code': 'CLI_NOT_FOUND',
+            'logs': logs
         }, status=500)
     except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+        log(f"Error inesperado: {str(e)}")
+        return JsonResponse({
+            'ok': False,
+            'error': str(e),
+            'error_code': 'UNEXPECTED_ERROR',
+            'logs': logs
+        }, status=500)
     finally:
+        # Limpiar sketch temporal (pero NO el HEX, que está en hex_temp)
         if sketch_path and sketch_path.exists():
             try:
                 shutil.rmtree(sketch_path)
             except:
                 pass
+
+
+# ============================================
+# ENDPOINT: GET /api/hex/<token>.hex
+# ============================================
+
+@require_http_methods(["GET"])
+def serve_hex_file(request, token):
+    """
+    Sirve un archivo HEX por su token.
+    
+    URL: GET /api/hex/<token>.hex
+    
+    Response:
+        - 200: Archivo HEX con Content-Type: application/octet-stream
+        - 404: Token no encontrado o expirado
+        - 410: Token expirado (Gone)
+    
+    Headers de respuesta:
+        - Content-Type: application/octet-stream
+        - Content-Disposition: attachment; filename="firmware.hex"
+        - Cache-Control: no-store, no-cache, must-revalidate
+        - X-HEX-Size: <tamaño en bytes>
+        - X-HEX-FQBN: <fqbn usado en compilación>
+    """
+    # Limpiar extensión .hex si viene en el token
+    if token.endswith('.hex'):
+        token = token[:-4]
+    
+    # Obtener datos del token
+    hex_data = get_hex_by_token(token)
+    
+    if not hex_data:
+        return JsonResponse({
+            'ok': False,
+            'error': 'Token no encontrado o expirado',
+            'error_code': 'TOKEN_INVALID'
+        }, status=404)
+    
+    hex_path = Path(hex_data['path'])
+    
+    if not hex_path.exists():
+        # El archivo fue eliminado pero el token existe
+        invalidate_hex_token(token)
+        return JsonResponse({
+            'ok': False,
+            'error': 'Archivo HEX no disponible',
+            'error_code': 'HEX_NOT_FOUND'
+        }, status=410)
+    
+    # Servir el archivo
+    try:
+        response = FileResponse(
+            open(hex_path, 'rb'),
+            content_type='application/octet-stream'
+        )
+        
+        # Headers
+        response['Content-Disposition'] = 'attachment; filename="firmware.hex"'
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['X-HEX-Size'] = str(hex_data['size'])
+        response['X-HEX-FQBN'] = hex_data['fqbn']
+        response['X-HEX-Token'] = token[:16] + '...'
+        
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'ok': False,
+            'error': f'Error leyendo archivo HEX: {str(e)}',
+            'error_code': 'READ_ERROR'
+        }, status=500)
 
 
 @csrf_exempt
