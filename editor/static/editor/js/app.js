@@ -21,6 +21,9 @@ let serialReader = null;
 let serialWriter = null;
 let readBuffer = '';
 
+// Estado de upload (anti-doble-click)
+let isUploading = false;
+
 // Web Serial para Upload
 let uploadPort = null;
 let availablePorts = []; // Puertos Web Serial disponibles
@@ -121,38 +124,64 @@ class ArduinoUploader {
     }
 
     async sync() {
-        console.log('Iniciando sincronización con bootloader...');
+        console.log('[SYNC] Iniciando sincronización con bootloader...');
         
-        // Reset Arduino usando DTR (método estándar)
+        // Reset Arduino usando DTR y RTS (mejor compatibilidad con clones CH340)
+        // Primero ponemos ambas señales en LOW
         await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise(r => setTimeout(r, 250));
-        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
+        await new Promise(r => setTimeout(r, 100));
         
-        // Esperar a que el bootloader inicie
+        // Pulso de reset con RTS (algunos clones lo necesitan)
+        await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
+        await new Promise(r => setTimeout(r, 100));
+        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        await new Promise(r => setTimeout(r, 100));
+        
+        // Reset con DTR (método estándar)
+        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
         await new Promise(r => setTimeout(r, 50));
+        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        
+        // Esperar más tiempo a que el bootloader inicie (clones son más lentos)
+        await new Promise(r => setTimeout(r, 200));
 
-        // Intentar sincronizar varias veces
-        for (let attempt = 0; attempt < 10; attempt++) {
+        // Limpiar buffer de entrada
+        try {
+            while (true) {
+                const { value, done } = await Promise.race([
+                    this.reader.read(),
+                    new Promise(r => setTimeout(() => r({ done: true }), 50))
+                ]);
+                if (done || !value || value.length === 0) break;
+            }
+        } catch (e) {
+            // Ignorar errores de limpieza
+        }
+
+        // Intentar sincronizar con más intentos y variando el timing
+        for (let attempt = 0; attempt < 15; attempt++) {
             try {
                 // Enviar comando GET_SYNC
                 await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
                 
-                // Esperar respuesta
-                const response = await this.receive(2, 500);
+                // Esperar respuesta con timeout variable
+                const timeout = attempt < 5 ? 200 : 500;
+                const response = await this.receive(2, timeout);
                 
-                console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
+                console.log(`[SYNC] Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
                 
                 if (response.length >= 2 && 
                     response[0] === ArduinoUploader.STK.INSYNC && 
                     response[1] === ArduinoUploader.STK.OK) {
-                    console.log('¡Sincronización exitosa!');
+                    console.log('[SYNC] ¡Sincronización exitosa!');
                     return true;
                 }
             } catch (e) {
-                console.log(`Intento ${attempt + 1}: timeout`);
+                console.log(`[SYNC] Intento ${attempt + 1}: timeout`);
             }
             
-            await new Promise(r => setTimeout(r, 100));
+            // Esperar un poco más entre intentos para clones
+            await new Promise(r => setTimeout(r, 50 + (attempt * 20)));
         }
         
         throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
@@ -986,6 +1015,12 @@ async function uploadCode() {
     const btn = document.getElementById('btnUpload');
     const code = arduinoGenerator.workspaceToCode(workspace);
     
+    // Anti-doble-click: si ya estamos subiendo, ignorar
+    if (isUploading) {
+        console.log('[UPLOAD] Ya hay una subida en progreso, ignorando click');
+        return;
+    }
+    
     if (!code.trim()) {
         showToast('No hay código para subir', 'warning');
         return;
@@ -1021,19 +1056,59 @@ async function uploadCode() {
         }
     }
     
-    // Desconectar monitor serial si está conectado
+    // ========================================
+    // VERIFICAR Y CERRAR MONITOR SERIAL
+    // ========================================
     if (isSerialConnected) {
-        await disconnectSerial();
+        logToConsole('[UPLOAD] Monitor serial conectado -> solicitando cierre...', 'warning');
+        
+        // Mostrar confirmación al usuario
+        const confirmClose = confirm(
+            '⚠️ Para subir código debo cerrar el Monitor Serial.\n\n' +
+            'El puerto está siendo usado por el monitor y no puede compartirse.\n\n' +
+            '¿Cerrar el Monitor Serial y continuar con la subida?'
+        );
+        
+        if (!confirmClose) {
+            logToConsole('[UPLOAD] Subida cancelada por el usuario', 'info');
+            showToast('Subida cancelada', 'info');
+            return;
+        }
+        
+        // Cerrar el monitor serial
+        logToConsole('[UPLOAD] Cerrando monitor serial...', 'info');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span> Cerrando serial...';
+        
+        const disconnected = await disconnectSerial(false);
+        
+        if (!disconnected) {
+            logToConsole('[UPLOAD] ✗ Error al cerrar monitor serial', 'error');
+            showToast('Error al cerrar el monitor serial', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<span>🚀</span><span>Subir</span>';
+            return;
+        }
+        
+        logToConsole('[UPLOAD] ✓ Monitor serial cerrado OK', 'success');
+        
+        // Espera adicional para asegurar que el puerto esté libre
+        await new Promise(r => setTimeout(r, 500));
     }
     
+    // ========================================
+    // INICIAR PROCESO DE SUBIDA
+    // ========================================
+    isUploading = true;
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Compilando...';
-    logToConsole('Compilando en servidor...', 'info');
+    logToConsole('[UPLOAD] Iniciando compilación en servidor...', 'info');
     
     const uploader = new ArduinoUploader();
     
     try {
         // 1. Compilar en el servidor y obtener HEX
+        logToConsole('[UPLOAD] Llamando API /compile-download/...', 'info');
         const compileResponse = await fetch('/api/compile-download/', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1043,30 +1118,32 @@ async function uploadCode() {
         const compileData = await compileResponse.json();
         
         if (!compileData.success) {
-            logToConsole('✗ Error de compilación:', 'error');
+            logToConsole('[UPLOAD] ✗ Error de compilación:', 'error');
             logToConsole(compileData.error || 'Error desconocido', 'error');
             showToast('Error de compilación', 'error');
+            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
         if (!compileData.hex_file) {
-            logToConsole('✗ No se generó archivo HEX', 'error');
+            logToConsole('[UPLOAD] ✗ No se generó archivo HEX', 'error');
             showToast('Error: No se generó archivo HEX', 'error');
+            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
-        logToConsole('✓ Compilación exitosa', 'success');
+        logToConsole('[UPLOAD] ✓ Compilación exitosa', 'success');
         
         // 2. Decodificar el HEX
         const hexContent = atob(compileData.hex_file);
         
         // 3. Subir directamente usando Web Serial API
         btn.innerHTML = '<span class="loading"></span> Subiendo...';
-        logToConsole('Conectando al Arduino...', 'info');
+        logToConsole('[UPLOAD] Conectando al Arduino...', 'info');
         
         // Determinar baudrate según la placa
         let uploadBaud = 115200;
@@ -1077,31 +1154,34 @@ async function uploadCode() {
         } else if (currentBoard.includes('leonardo')) {
             // Leonardo usa CDC, diferente protocolo
             showToast('Arduino Leonardo requiere modo especial (no soportado aún)', 'warning');
+            isUploading = false;
             btn.disabled = false;
             btn.innerHTML = '<span>🚀</span><span>Subir</span>';
             return;
         }
         
+        logToConsole(`[UPLOAD] Abriendo puerto a ${uploadBaud} baud...`, 'info');
         await uploader.connect(selectedPort, uploadBaud);
         
         await uploader.upload(hexContent, (msg, progress) => {
-            logToConsole(msg, 'info');
+            logToConsole(`[UPLOAD] ${msg}`, 'info');
             btn.innerHTML = `<span class="loading"></span> ${progress}%`;
         });
         
         await uploader.disconnect();
         
-        logToConsole('✓ ¡Código subido exitosamente!', 'success');
+        logToConsole('[UPLOAD] ✓ ¡Código subido exitosamente!', 'success');
         showToast('¡Código subido exitosamente!', 'success');
         
     } catch (error) {
-        logToConsole('✗ Error: ' + error.message, 'error');
+        logToConsole('[UPLOAD] ✗ Error: ' + error.message, 'error');
         showToast('Error: ' + error.message, 'error');
         try {
             await uploader.disconnect();
         } catch (e) {}
     }
     
+    isUploading = false;
     btn.disabled = false;
     btn.innerHTML = '<span>🚀</span><span>Subir</span>';
 }
@@ -1211,42 +1291,77 @@ async function connectSerial() {
     }
 }
 
-async function disconnectSerial() {
+async function disconnectSerial(silent = false) {
     try {
-        // Cerrar reader
+        if (!silent) {
+            console.log('[SERIAL] Iniciando desconexión del monitor serial...');
+        }
+        
+        // 1. Cancelar y liberar reader
         if (serialReader) {
-            await serialReader.cancel();
-            await serialReader.releaseLock();
+            try {
+                await serialReader.cancel();
+            } catch (e) {
+                console.warn('[SERIAL] Error cancelando reader:', e.message);
+            }
+            try {
+                serialReader.releaseLock();
+            } catch (e) {
+                console.warn('[SERIAL] Error liberando lock del reader:', e.message);
+            }
             serialReader = null;
         }
         
-        // Cerrar writer
+        // 2. Cerrar y liberar writer
         if (serialWriter) {
-            await serialWriter.close();
+            try {
+                serialWriter.releaseLock();
+            } catch (e) {
+                console.warn('[SERIAL] Error liberando lock del writer:', e.message);
+            }
             serialWriter = null;
         }
         
-        // Cerrar puerto
+        // 3. Cerrar puerto
         if (serialPort) {
-            await serialPort.close();
+            try {
+                await serialPort.close();
+            } catch (e) {
+                console.warn('[SERIAL] Error cerrando puerto:', e.message);
+            }
             serialPort = null;
         }
         
+        // 4. Limpiar interval si existe
         if (serialReadInterval) {
             clearInterval(serialReadInterval);
             serialReadInterval = null;
         }
         
+        // 5. Actualizar estado
         isSerialConnected = false;
         updateSerialUI(false);
         updateConnectionStatus();
-        addSerialLine('Desconectado', 'system');
-        logToConsole('Monitor serial desconectado', 'info');
+        
+        if (!silent) {
+            addSerialLine('Desconectado', 'system');
+            logToConsole('[SERIAL] Monitor serial desconectado correctamente', 'info');
+        }
+        
+        // Pequeña espera para asegurar que el puerto se libere completamente
+        await new Promise(r => setTimeout(r, 100));
+        
+        return true;
         
     } catch (error) {
-        console.error('Error al desconectar:', error);
+        console.error('[SERIAL] Error crítico al desconectar:', error);
+        // Forzar limpieza de estado aunque haya error
+        serialReader = null;
+        serialWriter = null;
+        serialPort = null;
         isSerialConnected = false;
         updateSerialUI(false);
+        return false;
     }
 }
 
