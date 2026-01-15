@@ -374,15 +374,27 @@ void loop() {
                     </ol>
                     <div class="agent-terminal">
                         <code>
-                            # Instalar dependencias:<br>
+                            # 1. Descomprime el archivo descargado:<br>
+                            unzip maxide-agent.zip<br>
+                            cd maxide-agent<br><br>
+                            # 2. Crea un entorno virtual (recomendado):<br>
+                            python3 -m venv venv-agent<br><br>
+                            # 3. Activa el entorno virtual:<br>
+                            source venv-agent/bin/activate<br><br>
+                            # 4. Instala las dependencias:<br>
                             pip install flask flask-cors pyserial requests<br><br>
-                            # Agregar usuario al grupo dialout (puertos serial):<br>
-                            sudo usermod -a -G dialout $USER<br><br>
-                            # Ejecutar el agent:<br>
-                            python3 agent.py<br><br>
+                            # 5. Agrega tu usuario al grupo dialout (para puertos serial):<br>
+                            sudo usermod -a -G dialout $USER<br>
+                            # (Luego cierra sesión y vuelve a entrar)<br><br>
+                            # 6. Ejecuta el Agent:<br>
+                            python agent.py --port 8765<br><br>
                             # O para instalación automática con autostart:<br>
-                            python3 install.py
+                            python install.py
                         </code>
+                    </div>
+                    <div style="margin-top: 12px; padding: 10px; background: rgba(0, 217, 255, 0.1); border-radius: 6px; font-size: 0.85rem; color: #9ca3af;">
+                        <strong>💡 Nota:</strong> Si prefieres no usar entorno virtual, puedes usar:<br>
+                        <code style="font-size: 0.8rem;">pip3 install flask flask-cors pyserial requests --user</code>
                     </div>
                 </div>
                 

@@ -31,17 +31,50 @@ fi
 echo "Python encontrado: $($PYTHON --version)"
 echo ""
 
-# Install dependencies
-echo "Instalando dependencias..."
-$PYTHON -m pip install flask flask-cors pyserial requests --quiet --user
+# Get script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+VENV_DIR="$SCRIPT_DIR/venv-agent"
 
-if [ $? -ne 0 ]; then
-    echo "Error instalando dependencias."
-    exit 1
+# Check if virtual environment exists
+if [ -d "$VENV_DIR" ]; then
+    echo "✓ Entorno virtual encontrado, activando..."
+    source "$VENV_DIR/bin/activate"
+    PYTHON="python"  # Use venv python
+elif [ -f "$VENV_DIR/bin/activate" ]; then
+    echo "✓ Entorno virtual encontrado, activando..."
+    source "$VENV_DIR/bin/activate"
+    PYTHON="python"  # Use venv python
+else
+    echo "Creando entorno virtual (recomendado)..."
+    $PYTHON -m venv "$VENV_DIR"
+    
+    if [ $? -ne 0 ]; then
+        echo ""
+        echo "⚠ No se pudo crear entorno virtual."
+        echo "Instalando dependencias con --user (alternativa)..."
+        $PYTHON -m pip install flask flask-cors pyserial requests --quiet --user
+        
+        if [ $? -ne 0 ]; then
+            echo "Error instalando dependencias."
+            exit 1
+        fi
+        echo "Dependencias instaladas con --user."
+    else
+        echo "✓ Entorno virtual creado."
+        source "$VENV_DIR/bin/activate"
+        PYTHON="python"  # Use venv python
+        
+        echo "Instalando dependencias en el entorno virtual..."
+        pip install flask flask-cors pyserial requests --quiet
+        
+        if [ $? -ne 0 ]; then
+            echo "Error instalando dependencias."
+            exit 1
+        fi
+        echo "✓ Dependencias instaladas."
+    fi
 fi
 
-echo ""
-echo "Dependencias instaladas."
 echo ""
 
 # Check serial port permissions (Linux only)
@@ -55,9 +88,6 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
         echo ""
     fi
 fi
-
-# Get script directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "Iniciando MAX-IDE Agent en http://localhost:8765"
 echo ""
