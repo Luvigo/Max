@@ -10,26 +10,212 @@
 let workspace = null;
 let currentPort = '';
 let currentBoard = 'arduino:avr:uno';
-let serialReadInterval = null;
-let isSerialConnected = false;
 let portCheckInterval = null;
 let lastKnownPorts = [];
 
-// Web Serial API
-let serialPort = null;
-let serialReader = null;
-let serialWriter = null;
-let readBuffer = '';
-
-// Estado de upload (anti-doble-click)
-let isUploading = false;
-
 // Web Serial para Upload
-let uploadPort = null;
 let availablePorts = []; // Puertos Web Serial disponibles
 
 // Proyectos
 let currentProjectId = null;
+
+// ============================================
+// PORT MANAGER - Gestión centralizada del puerto
+// ============================================
+// Evita locks no liberados y fallos intermitentes
+// "funciona una vez y luego no"
+
+const PortManager = {
+    // Estado actual de la sesión del puerto
+    session: {
+        port: null,
+        reader: null,
+        writer: null,
+        isUploading: false,
+        isSerialMonitorOpen: false,
+        lastOperation: null,
+        lockCount: 0
+    },
+    
+    // Buffer para Serial Monitor
+    readBuffer: '',
+    serialReadInterval: null,
+    
+    /**
+     * Verifica si se puede iniciar un upload
+     * @returns {{ canUpload: boolean, reason: string }}
+     */
+    canStartUpload() {
+        if (this.session.isUploading) {
+            console.log('[PORT_MANAGER] UPLOAD_MUTEX_BLOCK: Ya hay un upload en progreso');
+            return { canUpload: false, reason: 'UPLOAD_IN_PROGRESS', message: 'Ya hay una subida en progreso. Espera a que termine.' };
+        }
+        
+        if (this.session.isSerialMonitorOpen) {
+            console.log('[PORT_MANAGER] UPLOAD_BLOCKED: Serial Monitor está abierto');
+            return { canUpload: false, reason: 'SERIAL_MONITOR_OPEN', message: 'Cierra el Monitor Serial para poder subir código.' };
+        }
+        
+        return { canUpload: true, reason: null, message: null };
+    },
+    
+    /**
+     * Marca que inicia un upload
+     */
+    startUpload() {
+        console.log('[PORT_MANAGER] UPLOAD_START: Iniciando upload, adquiriendo mutex...');
+        this.session.isUploading = true;
+        this.session.lastOperation = 'upload';
+        this.session.lockCount++;
+        console.log(`[PORT_MANAGER] Lock count: ${this.session.lockCount}`);
+    },
+    
+    /**
+     * Marca que terminó el upload
+     */
+    endUpload() {
+        console.log('[PORT_MANAGER] UPLOAD_END: Finalizando upload, liberando mutex...');
+        this.session.isUploading = false;
+        this.session.lockCount = Math.max(0, this.session.lockCount - 1);
+        console.log(`[PORT_MANAGER] Lock count: ${this.session.lockCount}`);
+    },
+    
+    /**
+     * Fuerza liberación de todos los recursos del puerto
+     * @param {SerialPort} port - Puerto a limpiar
+     * @param {string} context - Contexto para logs
+     */
+    async forceReleaseAll(port, context = 'UNKNOWN') {
+        console.log(`[PORT_MANAGER] FORCE_RELEASE (${context}): Liberando todos los recursos...`);
+        
+        // Liberar reader si existe
+        if (this.session.reader) {
+            try {
+                await this.session.reader.cancel();
+                console.log(`[PORT_MANAGER] READER_CANCELLED (${context})`);
+            } catch (e) {
+                console.log(`[PORT_MANAGER] Reader cancel error: ${e.message}`);
+            }
+            try {
+                this.session.reader.releaseLock();
+                console.log(`[PORT_MANAGER] READER_LOCK_RELEASED (${context})`);
+            } catch (e) {
+                console.log(`[PORT_MANAGER] Reader releaseLock error: ${e.message}`);
+            }
+            this.session.reader = null;
+        }
+        
+        // Liberar writer si existe
+        if (this.session.writer) {
+            try {
+                this.session.writer.releaseLock();
+                console.log(`[PORT_MANAGER] WRITER_LOCK_RELEASED (${context})`);
+            } catch (e) {
+                console.log(`[PORT_MANAGER] Writer releaseLock error: ${e.message}`);
+            }
+            this.session.writer = null;
+        }
+        
+        // También intentar liberar del puerto directamente
+        if (port) {
+            if (port.readable) {
+                try {
+                    const reader = port.readable.getReader();
+                    await reader.cancel().catch(() => {});
+                    reader.releaseLock();
+                    console.log(`[PORT_MANAGER] PORT_READER_RELEASED (${context})`);
+                } catch (e) {}
+            }
+            if (port.writable) {
+                try {
+                    const writer = port.writable.getWriter();
+                    writer.releaseLock();
+                    console.log(`[PORT_MANAGER] PORT_WRITER_RELEASED (${context})`);
+                } catch (e) {}
+            }
+        }
+        
+        console.log(`[PORT_MANAGER] LOCK_RELEASED (${context}): Todos los recursos liberados`);
+    },
+    
+    /**
+     * Cierra el puerto de forma segura
+     * @param {SerialPort} port - Puerto a cerrar
+     * @param {string} context - Contexto para logs
+     */
+    async safeClosePort(port, context = 'UNKNOWN') {
+        if (!port) return;
+        
+        try {
+            // Primero liberar locks
+            await this.forceReleaseAll(port, context);
+            
+            // Luego cerrar puerto
+            if (port.readable || port.writable) {
+                await port.close();
+                console.log(`[PORT_MANAGER] PORT_CLOSED_OK (${context})`);
+            }
+        } catch (e) {
+            console.log(`[PORT_MANAGER] PORT_CLOSE_ERROR (${context}): ${e.message}`);
+        }
+        
+        this.session.port = null;
+    },
+    
+    /**
+     * Marca que el Serial Monitor está conectado
+     */
+    serialMonitorConnected(port, reader, writer) {
+        console.log('[PORT_MANAGER] SERIAL_MONITOR_CONNECTED');
+        this.session.port = port;
+        this.session.reader = reader;
+        this.session.writer = writer;
+        this.session.isSerialMonitorOpen = true;
+        this.session.lastOperation = 'serial_monitor';
+    },
+    
+    /**
+     * Marca que el Serial Monitor se desconectó
+     */
+    async serialMonitorDisconnected() {
+        console.log('[PORT_MANAGER] SERIAL_MONITOR_DISCONNECTED');
+        await this.forceReleaseAll(this.session.port, 'SERIAL_DISCONNECT');
+        this.session.isSerialMonitorOpen = false;
+        this.session.port = null;
+    },
+    
+    /**
+     * Obtiene el estado actual para debugging
+     */
+    getStatus() {
+        return {
+            isUploading: this.session.isUploading,
+            isSerialMonitorOpen: this.session.isSerialMonitorOpen,
+            hasReader: !!this.session.reader,
+            hasWriter: !!this.session.writer,
+            hasPort: !!this.session.port,
+            lockCount: this.session.lockCount,
+            lastOperation: this.session.lastOperation
+        };
+    },
+    
+    /**
+     * Log del estado actual
+     */
+    logStatus(context = '') {
+        const status = this.getStatus();
+        console.log(`[PORT_MANAGER] STATUS ${context}:`, JSON.stringify(status));
+    }
+};
+
+// Alias para compatibilidad con código existente
+let isSerialConnected = false;
+let serialPort = null;
+let serialReader = null;
+let serialWriter = null;
+let readBuffer = '';
+let serialReadInterval = null;
+let isUploading = false;
 
 // ============================================
 // ARDUINO UPLOADER - Protocolo STK500
@@ -1400,9 +1586,22 @@ async function uploadCode() {
     const btn = document.getElementById('btnUpload');
     const code = arduinoGenerator.workspaceToCode(workspace);
     
-    // Anti-doble-click: si ya estamos subiendo, ignorar
-    if (isUploading) {
-        console.log('[UPLOAD] Ya hay una subida en progreso, ignorando click');
+    // ========================================
+    // 1. VERIFICAR CON PORT MANAGER (anti-doble-click y mutex)
+    // ========================================
+    PortManager.logStatus('UPLOAD_PRE_CHECK');
+    
+    const canUpload = PortManager.canStartUpload();
+    if (!canUpload.canUpload) {
+        console.log(`[UPLOAD] BLOCKED: ${canUpload.reason}`);
+        
+        if (canUpload.reason === 'UPLOAD_IN_PROGRESS') {
+            logToConsole('[UPLOAD] UPLOAD_MUTEX_BLOCK: Ya hay una subida en progreso', 'warning');
+            showToast(canUpload.message, 'warning');
+        } else if (canUpload.reason === 'SERIAL_MONITOR_OPEN') {
+            logToConsole('[UPLOAD] Cierra el Monitor Serial para poder subir', 'warning');
+            showToast(canUpload.message, 'warning');
+        }
         return;
     }
     
@@ -1442,49 +1641,24 @@ async function uploadCode() {
     }
     
     // ========================================
-    // VERIFICAR Y CERRAR MONITOR SERIAL
+    // 2. FORZAR LIBERACIÓN DE RECURSOS ANTES DE UPLOAD
     // ========================================
-    if (isSerialConnected) {
-        logToConsole('[UPLOAD] Monitor serial conectado -> solicitando cierre...', 'warning');
-        
-        // Mostrar confirmación al usuario
-        const confirmClose = confirm(
-            '⚠️ Para subir código debo cerrar el Monitor Serial.\n\n' +
-            'El puerto está siendo usado por el monitor y no puede compartirse.\n\n' +
-            '¿Cerrar el Monitor Serial y continuar con la subida?'
-        );
-        
-        if (!confirmClose) {
-            logToConsole('[UPLOAD] Subida cancelada por el usuario', 'info');
-            showToast('Subida cancelada', 'info');
-            return;
-        }
-        
-        // Cerrar el monitor serial
-        logToConsole('[UPLOAD] Cerrando monitor serial...', 'info');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading"></span> Cerrando serial...';
-        
-        const disconnected = await disconnectSerial(false);
-        
-        if (!disconnected) {
-            logToConsole('[UPLOAD] ✗ Error al cerrar monitor serial', 'error');
-            showToast('Error al cerrar el monitor serial', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span><span>Subir</span>';
-            return;
-        }
-        
-        logToConsole('[UPLOAD] ✓ Monitor serial cerrado OK', 'success');
-        
-        // Espera adicional para asegurar que el puerto esté libre
-        await new Promise(r => setTimeout(r, 500));
+    // Esto asegura que no haya reader/writer activos que bloqueen el puerto
+    logToConsole('[UPLOAD] Liberando recursos previos del puerto...', 'info');
+    await PortManager.forceReleaseAll(selectedPort, 'PRE_UPLOAD');
+    
+    // Si el Serial Monitor está conectado (por si acaso), cerrarlo
+    if (isSerialConnected || PortManager.session.isSerialMonitorOpen) {
+        logToConsole('[UPLOAD] Cerrando Monitor Serial antes de subir...', 'info');
+        await disconnectSerial(true);
+        await new Promise(r => setTimeout(r, 300));
     }
     
     // ========================================
-    // INICIAR PROCESO DE SUBIDA
+    // 3. ADQUIRIR MUTEX DE UPLOAD
     // ========================================
-    isUploading = true;
+    PortManager.startUpload();
+    isUploading = true;  // Compatibilidad
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Compilando...';
     logToConsole('[UPLOAD] Iniciando compilación en servidor...', 'info');
@@ -1572,16 +1746,42 @@ async function uploadCode() {
         // ========================================
         // CLEANUP ROBUSTO (siempre se ejecuta)
         // ========================================
-        logToConsole('[UPLOAD] Ejecutando limpieza...', 'info');
+        logToConsole('[UPLOAD] Ejecutando limpieza final...', 'info');
+        
         try {
+            // 1. Desconectar uploader
             await uploader.disconnect();
+            logToConsole('[UPLOAD] UPLOADER_DISCONNECTED', 'info');
         } catch (e) {
-            logToConsole(`[UPLOAD] Error durante limpieza: ${e.message}`, 'warning');
+            logToConsole(`[UPLOAD] Error desconectando uploader: ${e.message}`, 'warning');
         }
         
-        isUploading = false;
+        try {
+            // 2. Forzar liberación de recursos del puerto
+            await PortManager.forceReleaseAll(selectedPort, 'POST_UPLOAD');
+            logToConsole('[UPLOAD] LOCK_RELEASED: Recursos del puerto liberados', 'info');
+        } catch (e) {
+            logToConsole(`[UPLOAD] Error liberando recursos: ${e.message}`, 'warning');
+        }
+        
+        try {
+            // 3. Intentar cerrar el puerto
+            await PortManager.safeClosePort(selectedPort, 'POST_UPLOAD');
+            logToConsole('[UPLOAD] PORT_CLOSED_OK', 'info');
+        } catch (e) {
+            logToConsole(`[UPLOAD] Error cerrando puerto: ${e.message}`, 'warning');
+        }
+        
+        // 4. Liberar mutex
+        PortManager.endUpload();
+        isUploading = false;  // Compatibilidad
+        
+        // 5. Restaurar UI
         btn.disabled = false;
         btn.innerHTML = '<span>🚀</span><span>Subir</span>';
+        
+        PortManager.logStatus('UPLOAD_COMPLETE');
+        logToConsole('[UPLOAD] Limpieza completada', 'success');
     }
 }
 
@@ -1663,6 +1863,10 @@ async function connectSerial() {
         serialWriter = outputStream.getWriter();
         
         isSerialConnected = true;
+        
+        // Registrar con PortManager
+        PortManager.serialMonitorConnected(serialPort, serialReader, serialWriter);
+        
         updateSerialUI(true, 'Puerto Serial', baudrate);
         addSerialLine(`Conectado @ ${baudrate} baud`, 'system');
         updateConnectionStatus();
@@ -1739,6 +1943,10 @@ async function disconnectSerial(silent = false) {
         
         // 5. Actualizar estado
         isSerialConnected = false;
+        
+        // Notificar al PortManager
+        await PortManager.serialMonitorDisconnected();
+        
         updateSerialUI(false);
         updateConnectionStatus();
         
@@ -1750,6 +1958,7 @@ async function disconnectSerial(silent = false) {
         // Pequeña espera para asegurar que el puerto se libere completamente
         await new Promise(r => setTimeout(r, 100));
         
+        console.log('[PORT_MANAGER] LOCK_RELEASED (SERIAL_DISCONNECT)');
         return true;
         
     } catch (error) {
@@ -1759,7 +1968,14 @@ async function disconnectSerial(silent = false) {
         serialWriter = null;
         serialPort = null;
         isSerialConnected = false;
+        
+        // Notificar al PortManager incluso en error
+        try {
+            await PortManager.serialMonitorDisconnected();
+        } catch (e) {}
+        
         updateSerialUI(false);
+        console.log('[PORT_MANAGER] LOCK_RELEASED (SERIAL_DISCONNECT_ERROR)');
         return false;
     }
 }
