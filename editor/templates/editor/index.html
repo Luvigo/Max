@@ -296,8 +296,8 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">1</div>
                             <div class="step-content">
-                                <div class="step-title">¿Tienes Python instalado?</div>
-                                <div class="step-desc">Si no estás seguro, descárgalo primero:</div>
+                                <div class="step-title">Instala Python</div>
+                                <div class="step-desc">Si no lo tienes, descárgalo e instálalo:</div>
                                 <a href="https://www.python.org/downloads/" target="_blank" class="btn btn-sm btn-ghost" style="margin-top: 8px;">
                                     🐍 Descargar Python
                                 </a>
@@ -308,6 +308,21 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">2</div>
                             <div class="step-content">
+                                <div class="step-title">Instala Arduino CLI</div>
+                                <div class="step-desc">Descarga e instala Arduino CLI:</div>
+                                <a href="https://arduino.github.io/arduino-cli/latest/installation/#download" target="_blank" class="btn btn-sm btn-ghost" style="margin-top: 8px;">
+                                    ⚡ Descargar Arduino CLI
+                                </a>
+                                <div class="step-desc" style="margin-top: 10px;">Después, abre CMD (Símbolo del sistema) y ejecuta:</div>
+                                <div class="agent-terminal" style="margin-top: 8px;">
+                                    <code>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
                                 <div class="step-title">Descarga el Agent</div>
                                 <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
                                     📥 Descargar MAX-IDE Agent
@@ -316,18 +331,10 @@ void loop() {
                         </div>
                         
                         <div class="install-step">
-                            <div class="step-number">3</div>
-                            <div class="step-content">
-                                <div class="step-title">Descomprime el archivo</div>
-                                <div class="step-desc">Haz clic derecho → "Extraer aquí" o "Extraer todo"</div>
-                            </div>
-                        </div>
-                        
-                        <div class="install-step">
                             <div class="step-number">4</div>
                             <div class="step-content">
-                                <div class="step-title">Ejecuta el Agent</div>
-                                <div class="step-desc">Abre la carpeta y haz <strong>doble clic</strong> en:</div>
+                                <div class="step-title">Descomprime y ejecuta</div>
+                                <div class="step-desc">Haz clic derecho → "Extraer todo", luego abre la carpeta y haz <strong>doble clic</strong> en:</div>
                                 <div class="step-file">📄 start_agent.bat</div>
                                 <div class="step-note">✓ Se abrirá una ventana negra - ¡no la cierres!</div>
                             </div>
@@ -349,6 +356,18 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">1</div>
                             <div class="step-content">
+                                <div class="step-title">Instala Arduino CLI con Homebrew</div>
+                                <div class="step-desc">Abre Terminal (<kbd>Cmd</kbd> + <kbd>Espacio</kbd> → escribe "Terminal") y ejecuta:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>brew install arduino-cli<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                                <div class="step-note">💡 ¿No tienes Homebrew? Instálalo desde <a href="https://brew.sh" target="_blank" style="color: var(--accent-primary);">brew.sh</a></div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
                                 <div class="step-title">Descarga el Agent</div>
                                 <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
                                     📥 Descargar MAX-IDE Agent
@@ -357,20 +376,12 @@ void loop() {
                         </div>
                         
                         <div class="install-step">
-                            <div class="step-number">2</div>
-                            <div class="step-content">
-                                <div class="step-title">Abre Terminal</div>
-                                <div class="step-desc">Presiona <kbd>Cmd</kbd> + <kbd>Espacio</kbd>, escribe "Terminal" y presiona Enter</div>
-                            </div>
-                        </div>
-                        
-                        <div class="install-step">
                             <div class="step-number">3</div>
                             <div class="step-content">
-                                <div class="step-title">Ejecuta estos comandos</div>
-                                <div class="step-desc">Copia y pega en Terminal:</div>
+                                <div class="step-title">Descomprime y ejecuta</div>
+                                <div class="step-desc">Descomprime el ZIP (doble clic), luego en Terminal:</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>cd ~/Downloads/maxide-agent && bash start_agent.sh</code>
+                                    <code>cd ~/Downloads/maxide-agent<br>bash start_agent.sh</code>
                                 </div>
                             </div>
                         </div>
