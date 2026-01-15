@@ -309,14 +309,11 @@ void loop() {
                             <div class="step-number">2</div>
                             <div class="step-content">
                                 <div class="step-title">Instala Arduino CLI</div>
-                                <div class="step-desc">Descarga e instala Arduino CLI:</div>
-                                <a href="https://arduino.github.io/arduino-cli/latest/installation/#download" target="_blank" class="btn btn-sm btn-ghost" style="margin-top: 8px;">
-                                    ⚡ Descargar Arduino CLI
-                                </a>
-                                <div class="step-desc" style="margin-top: 10px;">Después, abre CMD (Símbolo del sistema) y ejecuta:</div>
+                                <div class="step-desc">Abre CMD o PowerShell y ejecuta estos comandos:</div>
                                 <div class="agent-terminal" style="margin-top: 8px;">
-                                    <code>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                    <code>winget install -e --id ArduinoSA.CLI<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
                                 </div>
+                                <div class="step-note">💡 Cierra y vuelve a abrir la terminal después del primer comando</div>
                             </div>
                         </div>
                         

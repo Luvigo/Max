@@ -68,12 +68,16 @@ def find_arduino_cli():
         "/usr/bin/arduino-cli",
         os.path.expanduser("~/.local/bin/arduino-cli"),
         os.path.expanduser("~/bin/arduino-cli"),
-        # Mismo directorio que el agent
+        # Mismo directorio que el agent (Linux/Mac)
         os.path.join(os.path.dirname(__file__), "arduino-cli"),
         os.path.join(os.path.dirname(__file__), "..", "bin", "arduino-cli"),
-        # Windows
+        # Windows - mismo directorio que el agent
+        os.path.join(os.path.dirname(__file__), "arduino-cli.exe"),
+        # Windows - rutas comunes
         os.path.expanduser("~\\AppData\\Local\\Arduino15\\arduino-cli.exe"),
+        os.path.expanduser("~\\AppData\\Local\\Programs\\arduino-cli\\arduino-cli.exe"),
         "C:\\Program Files\\Arduino CLI\\arduino-cli.exe",
+        "C:\\Program Files (x86)\\Arduino CLI\\arduino-cli.exe",
     ]
     
     # Buscar en PATH

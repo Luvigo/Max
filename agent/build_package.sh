@@ -42,7 +42,12 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
 🪟 WINDOWS
 ──────────
    1. Descarga Python de https://python.org (marca "Add to PATH")
-   2. Descarga arduino-cli de https://arduino.cc/en/software
+   
+   2. Abre CMD o PowerShell y ejecuta:
+      winget install -e --id ArduinoSA.CLI
+      arduino-cli core update-index
+      arduino-cli core install arduino:avr
+   
    3. Haz doble clic en: start_agent.bat
    
    Opcional: Ejecuta install_autostart.bat para inicio automático
