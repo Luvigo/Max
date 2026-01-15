@@ -1,6 +1,11 @@
 /**
  * MAX-IDE - Aplicación principal
  * Arduino Block Editor con Blockly
+ * 
+ * Arquitectura:
+ * - Verificar: Servidor remoto (/api/compile/) - NO requiere Agent
+ * - Subir: Agent local (localhost) con arduino-cli - REQUIERE Agent
+ * - Serial Monitor: Web Serial API (opcional)
  */
 
 // ============================================
@@ -15,311 +20,202 @@ let isSerialConnected = false;
 let portCheckInterval = null;
 let lastKnownPorts = [];
 
-// Web Serial API
+// Web Serial API (solo para Serial Monitor)
 let serialPort = null;
 let serialReader = null;
 let serialWriter = null;
 let readBuffer = '';
 
-// Web Serial para Upload
-let uploadPort = null;
-let availablePorts = []; // Puertos Web Serial disponibles
-
 // Proyectos
 let currentProjectId = null;
 
 // ============================================
-// ARDUINO UPLOADER - Protocolo STK500
+// AGENT LOCAL - Configuración y estado
 // ============================================
 
-class ArduinoUploader {
-    constructor() {
-        this.port = null;
-        this.reader = null;
-        this.writer = null;
-        this.readable = null;
-        this.writable = null;
+const AgentConfig = {
+    // URL base del Agent local (puede ser configurado)
+    baseUrl: 'http://localhost:5000',
+    
+    // Estado del Agent
+    available: false,
+    lastCheck: null,
+    version: null,
+    
+    // Timeout para requests al Agent
+    timeout: 30000,
+    
+    // Endpoints del Agent
+    endpoints: {
+        health: '/health',
+        upload: '/upload',
+        ports: '/ports'
     }
+};
 
-    // Constantes del protocolo STK500
-    static STK = {
-        OK: 0x10,
-        INSYNC: 0x14,
-        CRC_EOP: 0x20,
-        GET_SYNC: 0x30,
-        GET_PARAMETER: 0x41,
-        ENTER_PROGMODE: 0x50,
-        LEAVE_PROGMODE: 0x51,
-        LOAD_ADDRESS: 0x55,
-        PROG_PAGE: 0x64,
-        READ_SIGN: 0x75,
-    };
-
-    async connect(port, baudRate = 115200) {
-        this.port = port;
+/**
+ * Verifica si el Agent local está disponible
+ * @returns {Promise<{available: boolean, version?: string, error?: string}>}
+ */
+async function checkAgentHealth() {
+    const url = AgentConfig.baseUrl + AgentConfig.endpoints.health;
+    logToConsole('[AGENT] Verificando conexión con Agent local...', 'info');
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         
-        // Si el puerto ya está abierto, cerrarlo primero
-        if (this.port.readable || this.port.writable) {
-            try {
-                await this.port.close();
-            } catch (e) {
-                // Ignorar errores
-            }
+        const response = await fetch(url, {
+            method: 'GET',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            AgentConfig.available = true;
+            AgentConfig.lastCheck = Date.now();
+            AgentConfig.version = data.version || 'unknown';
+            
+            logToConsole(`[AGENT] ✓ Agent conectado (v${AgentConfig.version})`, 'success');
+            updateAgentUI(true);
+            return { available: true, version: AgentConfig.version };
+        } else {
+            throw new Error(`HTTP ${response.status}`);
+        }
+    } catch (error) {
+        AgentConfig.available = false;
+        AgentConfig.lastCheck = Date.now();
+        
+        const errorMsg = error.name === 'AbortError' ? 'Timeout' : error.message;
+        logToConsole(`[AGENT] ✗ Agent no disponible: ${errorMsg}`, 'warning');
+        updateAgentUI(false);
+        return { available: false, error: errorMsg };
+    }
+}
+
+/**
+ * Obtiene la lista de puertos del Agent local
+ * @returns {Promise<Array>}
+ */
+async function getAgentPorts() {
+    if (!AgentConfig.available) {
+        return [];
+    }
+    
+    const url = AgentConfig.baseUrl + AgentConfig.endpoints.ports;
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            return data.ports || [];
+        }
+    } catch (error) {
+        console.warn('[AGENT] Error obteniendo puertos:', error.message);
+    }
+    
+    return [];
+}
+
+/**
+ * Sube código al Arduino via Agent local
+ * @param {string} code - Código Arduino
+ * @param {string} port - Puerto serial (ej: /dev/ttyUSB0, COM3)
+ * @param {string} fqbn - Board FQBN (ej: arduino:avr:uno)
+ * @param {Function} onLog - Callback para logs
+ * @returns {Promise<{success: boolean, message?: string, error?: string, logs?: Array}>}
+ */
+async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
+    const url = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
+    
+    onLog('[UPLOAD-AGENT] Enviando código al Agent local...');
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), AgentConfig.timeout);
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                code: code,
+                port: port,
+                fqbn: fqbn
+            }),
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        const data = await response.json();
+        
+        // Log de respuesta del Agent
+        if (data.logs && Array.isArray(data.logs)) {
+            data.logs.forEach(log => onLog(`[AGENT] ${log}`));
         }
         
-        await this.port.open({ baudRate, dataBits: 8, stopBits: 1, parity: 'none' });
-        
-        this.writable = this.port.writable;
-        this.readable = this.port.readable;
-        this.writer = this.writable.getWriter();
-        this.reader = this.readable.getReader();
+        if (response.ok && (data.ok || data.success)) {
+            onLog('[UPLOAD-AGENT] ✓ Upload completado exitosamente');
+            return {
+                success: true,
+                message: data.message || 'Código subido exitosamente',
+                logs: data.logs
+            };
+        } else {
+            const errorMsg = data.error || `HTTP ${response.status}`;
+            onLog(`[UPLOAD-AGENT] ✗ Error: ${errorMsg}`);
+            return {
+                success: false,
+                error: errorMsg,
+                errorCode: data.error_code,
+                logs: data.logs
+            };
+        }
+    } catch (error) {
+        const errorMsg = error.name === 'AbortError' 
+            ? 'Timeout - El Agent no respondió a tiempo'
+            : error.message;
+        onLog(`[UPLOAD-AGENT] ✗ Error de conexión: ${errorMsg}`);
+        return {
+            success: false,
+            error: errorMsg
+        };
     }
+}
 
-    async disconnect() {
-        try {
-            if (this.reader) {
-                await this.reader.cancel().catch(() => {});
-                this.reader.releaseLock();
-                this.reader = null;
-            }
-            if (this.writer) {
-                await this.writer.close().catch(() => {});
-                this.writer = null;
-            }
-            if (this.port && (this.port.readable || this.port.writable)) {
-                await this.port.close().catch(() => {});
-            }
-        } catch (e) {
-            console.error('Error cerrando puerto:', e);
+/**
+ * Actualiza la UI según el estado del Agent
+ */
+function updateAgentUI(available) {
+    const btnUpload = document.getElementById('btnUpload');
+    const agentBanner = document.getElementById('agentBanner');
+    
+    if (btnUpload) {
+        if (available) {
+            btnUpload.disabled = false;
+            btnUpload.title = 'Subir código al Arduino';
+        } else {
+            btnUpload.disabled = true;
+            btnUpload.title = 'Requiere Agent local - Haz clic para más información';
         }
     }
-
-    async send(data) {
-        await this.writer.write(new Uint8Array(data));
-    }
-
-    async receive(length, timeout = 1000) {
-        const result = [];
-        const deadline = Date.now() + timeout;
-        
-        while (result.length < length && Date.now() < deadline) {
-            try {
-                const { value, done } = await Promise.race([
-                    this.reader.read(),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('timeout')), Math.max(100, deadline - Date.now()))
-                    )
-                ]);
-                if (done) break;
-                if (value) result.push(...value);
-            } catch (e) {
-                if (e.message !== 'timeout') throw e;
-                break;
-            }
-        }
-        return new Uint8Array(result.slice(0, length));
-    }
-
-    async sync() {
-        console.log('Iniciando sincronización con bootloader...');
-        
-        // Reset Arduino usando DTR (método estándar)
-        await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-        await new Promise(r => setTimeout(r, 250));
-        await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-        
-        // Esperar a que el bootloader inicie
-        await new Promise(r => setTimeout(r, 50));
-
-        // Intentar sincronizar varias veces
-        for (let attempt = 0; attempt < 10; attempt++) {
-            try {
-                // Enviar comando GET_SYNC
-                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
-                
-                // Esperar respuesta
-                const response = await this.receive(2, 500);
-                
-                console.log(`Intento ${attempt + 1}: Recibido [${Array.from(response).map(b => '0x' + b.toString(16)).join(', ')}]`);
-                
-                if (response.length >= 2 && 
-                    response[0] === ArduinoUploader.STK.INSYNC && 
-                    response[1] === ArduinoUploader.STK.OK) {
-                    console.log('¡Sincronización exitosa!');
-                    return true;
-                }
-            } catch (e) {
-                console.log(`Intento ${attempt + 1}: timeout`);
-            }
-            
-            await new Promise(r => setTimeout(r, 100));
-        }
-        
-        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
-    }
-
-    async enterProgramMode() {
-        await this.send([ArduinoUploader.STK.ENTER_PROGMODE, ArduinoUploader.STK.CRC_EOP]);
-        const response = await this.receive(2);
-        if (response.length < 2 || response[0] !== ArduinoUploader.STK.INSYNC || response[1] !== ArduinoUploader.STK.OK) {
-            throw new Error('Error entrando en modo programación');
-        }
-    }
-
-    async loadAddress(address) {
-        const addr = address >> 1; // Word address
-        await this.send([
-            ArduinoUploader.STK.LOAD_ADDRESS,
-            addr & 0xFF,
-            (addr >> 8) & 0xFF,
-            ArduinoUploader.STK.CRC_EOP
-        ]);
-        const response = await this.receive(2);
-        if (response.length < 2 || response[0] !== ArduinoUploader.STK.INSYNC || response[1] !== ArduinoUploader.STK.OK) {
-            throw new Error('Error cargando dirección');
-        }
-    }
-
-    async programPage(data) {
-        const cmd = [
-            ArduinoUploader.STK.PROG_PAGE,
-            (data.length >> 8) & 0xFF,
-            data.length & 0xFF,
-            0x46, // 'F' for Flash
-            ...data,
-            ArduinoUploader.STK.CRC_EOP
-        ];
-        await this.send(cmd);
-        const response = await this.receive(2, 5000);
-        if (response.length < 2 || response[0] !== ArduinoUploader.STK.INSYNC || response[1] !== ArduinoUploader.STK.OK) {
-            throw new Error('Error programando página');
-        }
-    }
-
-    async leaveProgramMode() {
-        await this.send([ArduinoUploader.STK.LEAVE_PROGMODE, ArduinoUploader.STK.CRC_EOP]);
-        await this.receive(2);
-    }
-
-    /**
-     * Parsea archivo Intel HEX
-     * Retorna solo los bytes reales del programa, sin espacios vacíos
-     */
-    parseHex(hexString) {
-        const segments = []; // Array de {address, data}
-        let baseAddress = 0;
-        let currentSegment = null;
-        
-        for (const line of hexString.split('\n')) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith(':')) continue;
-            
-            const bytes = [];
-            for (let i = 1; i < trimmed.length; i += 2) {
-                const byte = parseInt(trimmed.substr(i, 2), 16);
-                if (!isNaN(byte)) bytes.push(byte);
-            }
-            
-            if (bytes.length < 4) continue;
-            
-            const count = bytes[0];
-            const address = (bytes[1] << 8) | bytes[2];
-            const type = bytes[3];
-            
-            if (type === 0x00) { // Data record
-                const fullAddress = baseAddress + address;
-                const recordData = bytes.slice(4, 4 + count);
-                
-                // Si es continuación del segmento actual
-                if (currentSegment && 
-                    fullAddress === currentSegment.address + currentSegment.data.length) {
-                    currentSegment.data.push(...recordData);
-                } else {
-                    // Nuevo segmento
-                    if (currentSegment) segments.push(currentSegment);
-                    currentSegment = { address: fullAddress, data: [...recordData] };
-                }
-            } else if (type === 0x02) { // Extended Segment Address
-                if (bytes.length >= 6) {
-                    baseAddress = ((bytes[4] << 8) | bytes[5]) << 4;
-                }
-            } else if (type === 0x04) { // Extended Linear Address
-                if (bytes.length >= 6) {
-                    baseAddress = ((bytes[4] << 8) | bytes[5]) << 16;
-                }
-            } else if (type === 0x01) { // EOF
-                break;
-            }
-        }
-        
-        if (currentSegment) segments.push(currentSegment);
-        
-        if (segments.length === 0) {
-            throw new Error('Archivo HEX vacío o inválido');
-        }
-        
-        // Para Arduino, normalmente solo hay un segmento continuo desde 0x0000
-        // Combinar todos los segmentos en uno solo
-        const allData = [];
-        let startAddress = segments[0].address;
-        
-        for (const seg of segments) {
-            // Llenar gaps pequeños (< 256 bytes) con 0xFF
-            const gap = seg.address - (startAddress + allData.length);
-            if (gap > 0 && gap < 256) {
-                for (let i = 0; i < gap; i++) allData.push(0xFF);
-            }
-            allData.push(...seg.data);
-        }
-        
-        console.log(`HEX parseado: ${allData.length} bytes desde 0x${startAddress.toString(16)}`);
-        
-        return { data: new Uint8Array(allData), startAddress };
-    }
-
-    /**
-     * Sube el código al Arduino
-     */
-    async upload(hexContent, onProgress = () => {}) {
-        const pageSize = 128; // Arduino UNO/Nano
-        
-        onProgress('Parseando archivo HEX...', 5);
-        const { data: firmware, startAddress } = this.parseHex(hexContent);
-        
-        onProgress(`Firmware: ${firmware.length} bytes`, 10);
-        
-        try {
-            onProgress('Sincronizando con bootloader...', 15);
-            await this.sync();
-            
-            onProgress('Entrando en modo programación...', 20);
-            await this.enterProgramMode();
-            
-            const totalPages = Math.ceil(firmware.length / pageSize);
-            let pagesWritten = 0;
-            
-            for (let i = 0; i < firmware.length; i += pageSize) {
-                const page = firmware.slice(i, Math.min(i + pageSize, firmware.length));
-                const paddedPage = new Uint8Array(pageSize);
-                paddedPage.fill(0xFF); // Fill with 0xFF (erased flash value)
-                paddedPage.set(page);
-                
-                await this.loadAddress(startAddress + i);
-                await this.programPage(paddedPage);
-                
-                pagesWritten++;
-                const progress = 20 + Math.floor((pagesWritten / totalPages) * 70);
-                onProgress(`Programando... ${Math.floor((i + pageSize) / firmware.length * 100)}%`, progress);
-            }
-            
-            onProgress('Finalizando...', 95);
-            await this.leaveProgramMode();
-            
-            onProgress('¡Completado!', 100);
-            
-        } catch (error) {
-            throw error;
-        }
+    
+    // Mostrar/ocultar banner de Agent
+    if (agentBanner) {
+        agentBanner.style.display = available ? 'none' : 'flex';
     }
 }
 
@@ -373,23 +269,93 @@ document.addEventListener('DOMContentLoaded', function() {
     initBlockly();
     initEventListeners();
     
-    // Verificar Web Serial API
-    if ('serial' in navigator) {
-        logToConsole('✓ Web Serial API disponible - Puertos de tu PC', 'success');
-        refreshPorts();
-        startPortMonitoring();
+    // Verificar Agent local primero
+    checkAgentHealth().then(result => {
+        if (!result.available) {
+            showAgentBanner();
+        }
+    });
+    
+    // Cargar puertos del Agent (si está disponible)
+    refreshPorts();
+    
+    // Monitoreo periódico del Agent
+    setInterval(() => {
+        if (!AgentConfig.available || Date.now() - AgentConfig.lastCheck > 30000) {
+            checkAgentHealth();
+        }
+    }, 30000);
+    
+    logToConsole('MAX-IDE v2.0 - Modo Agent Local', 'info');
+    logToConsole('Verificar: Servidor | Subir: Agent local', 'info');
+});
+
+/**
+ * Muestra el banner de Agent no disponible
+ */
+function showAgentBanner() {
+    // Verificar si ya existe el banner
+    if (document.getElementById('agentBanner')) return;
+    
+    const banner = document.createElement('div');
+    banner.id = 'agentBanner';
+    banner.className = 'agent-banner';
+    banner.innerHTML = `
+        <div class="agent-banner-content">
+            <span class="agent-banner-icon">⚠️</span>
+            <span class="agent-banner-text">
+                <strong>Agent local no detectado.</strong>
+                Para subir código, instala y ejecuta el MAX-IDE Agent en tu PC.
+            </span>
+            <button class="btn btn-sm btn-primary" onclick="checkAgentHealth()">
+                🔄 Verificar conexión
+            </button>
+            <button class="btn btn-sm btn-ghost" onclick="this.parentElement.parentElement.style.display='none'">
+                ✕
+            </button>
+        </div>
+    `;
+    
+    // Insertar al inicio del body o después del header
+    const header = document.querySelector('.header');
+    if (header && header.nextSibling) {
+        header.parentNode.insertBefore(banner, header.nextSibling);
     } else {
-        logToConsole('⚠️ Web Serial API NO disponible', 'error');
-        logToConsole('Requiere: Chrome/Edge/Opera + HTTPS', 'warning');
-        showToast('Web Serial no disponible. Usa HTTPS con Chrome/Edge/Opera.', 'error');
-        
-        // Mostrar mensaje en el selector de puertos
-        const select = document.getElementById('portSelect');
-        select.innerHTML = '<option value="">⚠️ Web Serial no disponible</option>';
+        document.body.insertBefore(banner, document.body.firstChild);
     }
     
-    logToConsole('MAX-IDE v2.0 - Modo Web Serial', 'info');
-});
+    // Agregar estilos si no existen
+    if (!document.getElementById('agentBannerStyles')) {
+        const style = document.createElement('style');
+        style.id = 'agentBannerStyles';
+        style.textContent = `
+            .agent-banner {
+                background: linear-gradient(135deg, #f59e0b22, #ef444422);
+                border-bottom: 1px solid #f59e0b44;
+                padding: 10px 20px;
+                display: flex;
+                justify-content: center;
+            }
+            .agent-banner-content {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                max-width: 1200px;
+            }
+            .agent-banner-icon {
+                font-size: 20px;
+            }
+            .agent-banner-text {
+                color: #e6edf3;
+                font-size: 13px;
+            }
+            .agent-banner-text strong {
+                color: #f59e0b;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
 
 /**
  * Inicializa el workspace de Blockly
@@ -536,10 +502,10 @@ function addInitialBlocks() {
  */
 function initEventListeners() {
     // Botones principales
-    document.getElementById('btnCompile').addEventListener('click', compileCode);
+    document.getElementById('btnCompile').addEventListener('click', verifyCode);
     document.getElementById('btnUpload').addEventListener('click', uploadCode);
     document.getElementById('btnRefreshPorts').addEventListener('click', refreshPorts);
-    document.getElementById('btnAddPort').addEventListener('click', requestNewPort);
+    document.getElementById('btnAddPort').addEventListener('click', refreshPorts); // Refresca desde Agent
     
     // Botones de archivo
     document.getElementById('btnNew').addEventListener('click', newProject);
@@ -561,18 +527,18 @@ function initEventListeners() {
     const projectsModal = document.getElementById('projectsModal');
     const createProjectModal = document.getElementById('createProjectModal');
     if (projectsModal) {
-        document.getElementById('btnCloseProjects').addEventListener('click', () => {
+        document.getElementById('btnCloseProjects')?.addEventListener('click', () => {
             projectsModal.style.display = 'none';
         });
-        document.getElementById('btnCreateNewProject').addEventListener('click', () => {
+        document.getElementById('btnCreateNewProject')?.addEventListener('click', () => {
             projectsModal.style.display = 'none';
             if (createProjectModal) createProjectModal.style.display = 'flex';
         });
-        document.getElementById('btnCancelCreateProject').addEventListener('click', () => {
+        document.getElementById('btnCancelCreateProject')?.addEventListener('click', () => {
             if (createProjectModal) createProjectModal.style.display = 'none';
         });
-        document.getElementById('btnConfirmCreateProject').addEventListener('click', createNewProject);
-        document.getElementById('btnCloseCreateProject').addEventListener('click', () => {
+        document.getElementById('btnConfirmCreateProject')?.addEventListener('click', createNewProject);
+        document.getElementById('btnCloseCreateProject')?.addEventListener('click', () => {
             if (createProjectModal) createProjectModal.style.display = 'none';
         });
     }
@@ -585,15 +551,8 @@ function initEventListeners() {
     document.getElementById('portSelect').addEventListener('change', function(e) {
         currentPort = e.target.value;
         updateConnectionStatus();
-        if (currentPort !== '' && availablePorts[parseInt(currentPort)]) {
-            const info = availablePorts[parseInt(currentPort)].getInfo();
-            let label = `Puerto ${parseInt(currentPort) + 1}`;
-            if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                label = 'Arduino';
-            } else if (info.usbVendorId === 0x1A86) {
-                label = 'CH340';
-            }
-            logToConsole(`Puerto seleccionado: ${label}`, 'info');
+        if (currentPort) {
+            logToConsole(`Puerto seleccionado: ${currentPort}`, 'info');
         }
     });
     
@@ -631,129 +590,10 @@ function initEventListeners() {
             switch(e.key) {
                 case 's': e.preventDefault(); saveProject(); break;
                 case 'u': e.preventDefault(); uploadCode(); break;
-                case 'r': e.preventDefault(); compileCode(); break;
+                case 'r': e.preventDefault(); verifyCode(); break;
             }
         }
     });
-}
-
-// ============================================
-// MONITOREO AUTOMÁTICO DE PUERTOS
-// ============================================
-
-/**
- * Inicia el monitoreo de puertos
- */
-function startPortMonitoring() {
-    // Verificar puertos cada 2 segundos
-    portCheckInterval = setInterval(checkForNewPorts, 2000);
-}
-
-/**
- * Verifica si hay cambios en los puertos conectados (Web Serial API)
- */
-async function checkForNewPorts() {
-    try {
-        if (!('serial' in navigator)) {
-            return; // Web Serial no disponible
-        }
-        
-        const currentPorts = await navigator.serial.getPorts();
-        
-        // Detectar cambios en la cantidad de puertos autorizados
-        if (currentPorts.length !== lastKnownPorts.length) {
-            // Actualizar lista
-            availablePorts = currentPorts;
-            await refreshPorts();
-            
-            if (currentPorts.length > lastKnownPorts.length) {
-                showToast(`Nuevo puerto disponible`, 'success');
-                logToConsole(`🔌 Cambio detectado en puertos`, 'info');
-            } else if (currentPorts.length < lastKnownPorts.length) {
-                // Verificar si el puerto en uso fue desconectado
-                const selectedIndex = parseInt(currentPort);
-                if (!isNaN(selectedIndex) && !currentPorts[selectedIndex]) {
-                    currentPort = '';
-                    updateConnectionStatus();
-                    showToast(`Puerto desconectado`, 'warning');
-                    logToConsole(`⚠️ Puerto desconectado`, 'warning');
-                }
-            }
-        }
-        
-        lastKnownPorts = currentPorts;
-        
-    } catch (error) {
-        // Silenciar errores de polling
-    }
-}
-
-/**
- * Auto-selecciona un puerto (para compatibilidad con servidor)
- */
-function autoSelectPort(port) {
-    const select = document.getElementById('portSelect');
-    const serialSelect = document.getElementById('serialPortSelect');
-    
-    if (port.device) {
-        select.value = port.device;
-        if (serialSelect) serialSelect.value = port.device;
-        currentPort = port.device;
-        updateConnectionStatus();
-    }
-}
-
-/**
- * Detecta el tipo de placa
- */
-function detectBoard(port) {
-    const boardSelect = document.getElementById('boardSelect');
-    
-    // Si arduino-cli detectó la placa automáticamente
-    if (port.board_fqbn) {
-        const fqbn = port.board_fqbn;
-        const boardName = port.board_name || 'Arduino';
-        
-        // Verificar si el FQBN está en nuestras opciones
-        const option = boardSelect.querySelector(`option[value="${fqbn}"]`);
-        if (option) {
-            boardSelect.value = fqbn;
-            currentBoard = fqbn;
-        } else {
-            // Agregar la opción si no existe
-            const newOption = document.createElement('option');
-            newOption.value = fqbn;
-            newOption.textContent = boardName;
-            boardSelect.appendChild(newOption);
-            boardSelect.value = fqbn;
-            currentBoard = fqbn;
-        }
-        
-        document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${boardName}</span>`;
-        logToConsole(`Placa detectada: ${boardName}`, 'success');
-        return;
-    }
-    
-    // Fallback: detectar por descripción
-    const desc = (port.description || '').toLowerCase();
-    
-    if (desc.includes('mega')) {
-        boardSelect.value = 'arduino:avr:mega';
-        currentBoard = 'arduino:avr:mega';
-        document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino Mega</span>';
-    } else if (desc.includes('nano')) {
-        boardSelect.value = 'arduino:avr:nano';
-        currentBoard = 'arduino:avr:nano';
-        document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino Nano</span>';
-    } else if (desc.includes('leonardo')) {
-        boardSelect.value = 'arduino:avr:leonardo';
-        currentBoard = 'arduino:avr:leonardo';
-        document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino Leonardo</span>';
-    } else {
-        boardSelect.value = 'arduino:avr:uno';
-        currentBoard = 'arduino:avr:uno';
-        document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino UNO</span>';
-    }
 }
 
 // ============================================
@@ -782,9 +622,12 @@ void loop() {
 }
 
 // ============================================
-// COMUNICACIÓN CON ARDUINO
+// GESTIÓN DE PUERTOS (Agent local)
 // ============================================
 
+/**
+ * Refresca la lista de puertos desde el Agent local
+ */
 async function refreshPorts() {
     const select = document.getElementById('portSelect');
     const serialSelect = document.getElementById('serialPortSelect');
@@ -793,163 +636,95 @@ async function refreshPorts() {
     btn.innerHTML = '<span class="loading"></span>';
     
     try {
-        // Verificar soporte de Web Serial API
-        if (!('serial' in navigator)) {
-            select.innerHTML = '<option value="">Web Serial no disponible</option>';
-            if (serialSelect) serialSelect.innerHTML = '<option value="">Web Serial no disponible</option>';
-            logToConsole('⚠️ Web Serial API no disponible. Usa Chrome, Edge u Opera.', 'warning');
-            btn.innerHTML = '🔄';
-            return;
+        // Primero verificar si el Agent está disponible
+        if (!AgentConfig.available) {
+            await checkAgentHealth();
         }
         
-        // Obtener puertos ya autorizados (del cliente)
-        availablePorts = await navigator.serial.getPorts();
-        
-        if (availablePorts.length > 0) {
-            const optionsHtml = '<option value="">Seleccionar puerto...</option>' +
-                availablePorts.map((port, index) => {
-                    const info = port.getInfo();
-                    let label = `Puerto ${index + 1}`;
-                    if (info.usbVendorId) {
-                        // Identificar Arduino por VID
-                        if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-                            label = `Arduino (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x1A86) {
-                            label = `CH340 (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x0403) {
-                            label = `FTDI (Puerto ${index + 1})`;
-                        } else if (info.usbVendorId === 0x10C4) {
-                            label = `CP210x (Puerto ${index + 1})`;
-                        }
-                    }
-                    return `<option value="${index}">${label}</option>`;
-                }).join('');
+        if (AgentConfig.available) {
+            // Obtener puertos del Agent local
+            const ports = await getAgentPorts();
             
-            select.innerHTML = optionsHtml;
-            if (serialSelect) serialSelect.innerHTML = optionsHtml;
-            
-            logToConsole(`${availablePorts.length} puerto(s) disponible(s) en tu PC`, 'success');
-            
-            // Auto-seleccionar si solo hay uno
-            if (availablePorts.length === 1) {
-                select.value = '0';
-                if (serialSelect) serialSelect.value = '0';
-                currentPort = '0';
-                updateConnectionStatus();
+            if (ports.length > 0) {
+                const optionsHtml = '<option value="">Seleccionar puerto...</option>' +
+                    ports.map(port => {
+                        const device = port.device || port.address || port;
+                        const desc = port.description || port.board_name || '';
+                        const label = desc ? `${device} - ${desc}` : device;
+                        return `<option value="${device}">${label}</option>`;
+                    }).join('');
+                
+                select.innerHTML = optionsHtml;
+                if (serialSelect) serialSelect.innerHTML = optionsHtml;
+                
+                logToConsole(`[AGENT] ${ports.length} puerto(s) disponible(s)`, 'success');
+                
+                // Auto-seleccionar si solo hay uno
+                if (ports.length === 1) {
+                    const device = ports[0].device || ports[0].address || ports[0];
+                    select.value = device;
+                    if (serialSelect) serialSelect.value = device;
+                    currentPort = device;
+                    updateConnectionStatus();
+                }
+            } else {
+                select.innerHTML = '<option value="">No hay puertos disponibles</option>';
+                if (serialSelect) serialSelect.innerHTML = '<option value="">No hay puertos disponibles</option>';
+                logToConsole('[AGENT] No se encontraron puertos seriales', 'warning');
             }
         } else {
-            select.innerHTML = '<option value="">Haz clic en + para agregar puerto</option>';
-            if (serialSelect) serialSelect.innerHTML = '<option value="">Haz clic en + para agregar puerto</option>';
-            logToConsole('No hay puertos autorizados. Haz clic en el botón + para agregar uno.', 'info');
+            // Agent no disponible - mostrar mensaje
+            select.innerHTML = '<option value="">⚠️ Agent no disponible</option>';
+            if (serialSelect) serialSelect.innerHTML = '<option value="">⚠️ Agent no disponible</option>';
+            logToConsole('[AGENT] Agent local no disponible. Instala el Agent para ver puertos.', 'warning');
         }
     } catch (error) {
-        logToConsole('Error al buscar puertos: ' + error.message, 'error');
+        logToConsole('[AGENT] Error al buscar puertos: ' + error.message, 'error');
+        select.innerHTML = '<option value="">Error obteniendo puertos</option>';
     }
     
     btn.innerHTML = '🔄';
-}
-
-/**
- * Solicita al usuario seleccionar un nuevo puerto serial (del cliente)
- */
-async function requestNewPort() {
-    console.log('requestNewPort() llamado');
-    logToConsole('Solicitando puerto serial...', 'info');
-    
-    if (!('serial' in navigator)) {
-        const msg = 'Web Serial API no disponible. Requiere HTTPS + Chrome/Edge/Opera.';
-        showToast(msg, 'error');
-        logToConsole(msg, 'error');
-        alert(msg);
-        return;
-    }
-    
-    // Verificar contexto seguro
-    if (!window.isSecureContext) {
-        const msg = 'Web Serial requiere HTTPS. Configura SSL en el servidor.';
-        showToast(msg, 'error');
-        logToConsole(msg, 'error');
-        alert(msg);
-        return;
-    }
-    
-    try {
-        // Solicitar nuevo puerto al usuario - esto abre el diálogo del navegador
-        logToConsole('Abriendo selector de puertos del navegador...', 'info');
-        const port = await navigator.serial.requestPort();
-        
-        logToConsole('Puerto seleccionado por el usuario', 'success');
-        
-        // Agregar a la lista si no existe
-        if (!availablePorts.includes(port)) {
-            availablePorts.push(port);
-        }
-        
-        // Actualizar la lista de puertos
-        await refreshPorts();
-        
-        // Seleccionar el nuevo puerto
-        const index = availablePorts.indexOf(port);
-        if (index >= 0) {
-            document.getElementById('portSelect').value = index.toString();
-            currentPort = index.toString();
-            updateConnectionStatus();
-            showToast('✓ Puerto agregado correctamente', 'success');
-            logToConsole('Puerto agregado y seleccionado', 'success');
-        }
-    } catch (error) {
-        console.error('Error en requestNewPort:', error);
-        if (error.name === 'NotFoundError') {
-            logToConsole('Selección de puerto cancelada', 'info');
-        } else if (error.name === 'SecurityError') {
-            const msg = 'Error de seguridad. Verifica que uses HTTPS.';
-            showToast(msg, 'error');
-            logToConsole(msg, 'error');
-        } else {
-            showToast('Error: ' + error.message, 'error');
-            logToConsole('Error: ' + error.message, 'error');
-        }
-    }
 }
 
 function updateConnectionStatus() {
     const dot = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
     
-    // Para el estado de conexión, verificar si hay puerto serial o puerto para subir código
     if (isSerialConnected) {
         dot.classList.remove('disconnected');
         text.textContent = 'Serial: Conectado';
-    } else if (currentPort !== '' && availablePorts[parseInt(currentPort)]) {
+    } else if (currentPort) {
         dot.classList.remove('disconnected');
-        const info = availablePorts[parseInt(currentPort)].getInfo();
-        let label = `Puerto ${parseInt(currentPort) + 1}`;
-        if (info.usbVendorId === 0x2341 || info.usbVendorId === 0x2A03) {
-            label = 'Arduino';
-        } else if (info.usbVendorId === 0x1A86) {
-            label = 'CH340';
-        } else if (info.usbVendorId === 0x0403) {
-            label = 'FTDI';
-        }
-        text.textContent = `Puerto: ${label}`;
+        text.textContent = `Puerto: ${currentPort}`;
+    } else if (AgentConfig.available) {
+        dot.classList.add('disconnected');
+        text.textContent = 'Agent OK - Sin puerto';
     } else {
         dot.classList.add('disconnected');
-        text.textContent = 'Sin conexión';
+        text.textContent = 'Agent no disponible';
     }
 }
 
-async function compileCode() {
+// ============================================
+// VERIFICAR CÓDIGO (Servidor - sin Agent)
+// ============================================
+
+/**
+ * Verifica/compila el código en el servidor
+ * NO requiere Agent local
+ */
+async function verifyCode() {
     const btn = document.getElementById('btnCompile');
     const code = arduinoGenerator.workspaceToCode(workspace);
     
     if (!code.trim()) {
-        showToast('No hay código para compilar', 'warning');
+        showToast('No hay código para verificar', 'warning');
         return;
     }
     
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span> Verificando...';
-    logToConsole('Iniciando verificación...', 'info');
+    logToConsole('[VERIFY] Iniciando verificación en servidor...', 'info');
     
     try {
         const response = await fetch('/api/compile/', {
@@ -961,145 +736,103 @@ async function compileCode() {
         const data = await response.json();
         
         if (data.success) {
-            logToConsole('✓ Verificación exitosa', 'success');
+            logToConsole('[VERIFY] ✓ Verificación exitosa', 'success');
             if (data.output) {
-                data.output.split('\n').filter(l => l.trim()).forEach(line => 
-                    logToConsole(line, 'info')
-                );
+                // Mostrar info de compilación resumida
+                const lines = data.output.split('\n').filter(l => l.trim());
+                const summary = lines.slice(-5); // Últimas 5 líneas
+                summary.forEach(line => logToConsole(`[COMPILE] ${line}`, 'info'));
             }
             showToast('Verificación exitosa', 'success');
         } else {
-            logToConsole('✗ Error de verificación:', 'error');
-            logToConsole(data.error || 'Error desconocido', 'error');
+            logToConsole('[VERIFY] ✗ Error de verificación', 'error');
+            logToConsole(`[COMPILE] ${data.error || 'Error desconocido'}`, 'error');
             showToast('Error de verificación', 'error');
         }
     } catch (error) {
-        logToConsole('Error: ' + error.message, 'error');
-        showToast('Error de conexión', 'error');
+        logToConsole(`[VERIFY] ✗ Error de conexión: ${error.message}`, 'error');
+        showToast('Error de conexión al servidor', 'error');
     }
     
     btn.disabled = false;
     btn.innerHTML = '<span>⚙️</span><span>Verificar</span>';
 }
 
+// ============================================
+// SUBIR CÓDIGO (Agent local - arduino-cli)
+// ============================================
+
+/**
+ * Sube el código al Arduino via Agent local
+ * REQUIERE Agent local ejecutándose
+ */
 async function uploadCode() {
     const btn = document.getElementById('btnUpload');
     const code = arduinoGenerator.workspaceToCode(workspace);
     
+    // Validar código
     if (!code.trim()) {
         showToast('No hay código para subir', 'warning');
         return;
     }
     
-    // Verificar Web Serial API
-    if (!('serial' in navigator)) {
-        showToast('Web Serial API no disponible. Usa Chrome, Edge u Opera.', 'error');
+    // Validar puerto seleccionado
+    if (!currentPort) {
+        showToast('Selecciona un puerto primero', 'warning');
+        logToConsole('[UPLOAD-AGENT] No hay puerto seleccionado', 'warning');
         return;
     }
     
-    // Verificar que hay un puerto seleccionado
-    let selectedPort = null;
-    const portIndex = parseInt(currentPort);
-    
-    if (!isNaN(portIndex) && availablePorts[portIndex]) {
-        selectedPort = availablePorts[portIndex];
-    } else {
-        // Intentar solicitar un puerto
-        try {
-            selectedPort = await navigator.serial.requestPort();
-            if (!availablePorts.includes(selectedPort)) {
-                availablePorts.push(selectedPort);
-            }
-            await refreshPorts();
-        } catch (error) {
-            if (error.name === 'NotFoundError') {
-                showToast('Selecciona un puerto para continuar', 'warning');
-            } else {
-                showToast('Error: ' + error.message, 'error');
-            }
+    // Verificar disponibilidad del Agent
+    if (!AgentConfig.available) {
+        logToConsole('[UPLOAD-AGENT] Agent no disponible, verificando...', 'info');
+        const healthCheck = await checkAgentHealth();
+        
+        if (!healthCheck.available) {
+            showToast('Agent local no disponible. Instala y ejecuta el MAX-IDE Agent.', 'error');
+            logToConsole('[UPLOAD-AGENT] ✗ No se puede subir sin Agent local', 'error');
+            showAgentBanner();
             return;
         }
     }
     
-    // Desconectar monitor serial si está conectado
+    // Desconectar Serial Monitor si está conectado (para liberar el puerto)
     if (isSerialConnected) {
+        logToConsole('[UPLOAD-AGENT] Desconectando Serial Monitor...', 'info');
         await disconnectSerial();
+        await new Promise(r => setTimeout(r, 500));
     }
     
     btn.disabled = true;
-    btn.innerHTML = '<span class="loading"></span> Compilando...';
-    logToConsole('Compilando en servidor...', 'info');
-    
-    const uploader = new ArduinoUploader();
+    btn.innerHTML = '<span class="loading"></span> Subiendo...';
+    logToConsole('[UPLOAD-AGENT] Iniciando upload via Agent local...', 'info');
+    logToConsole(`[UPLOAD-AGENT] Puerto: ${currentPort}, Placa: ${currentBoard}`, 'info');
     
     try {
-        // 1. Compilar en el servidor y obtener HEX
-        const compileResponse = await fetch('/api/compile-download/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, board: currentBoard })
-        });
-        
-        const compileData = await compileResponse.json();
-        
-        if (!compileData.success) {
-            logToConsole('✗ Error de compilación:', 'error');
-            logToConsole(compileData.error || 'Error desconocido', 'error');
-            showToast('Error de compilación', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span><span>Subir</span>';
-            return;
-        }
-        
-        if (!compileData.hex_file) {
-            logToConsole('✗ No se generó archivo HEX', 'error');
-            showToast('Error: No se generó archivo HEX', 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span><span>Subir</span>';
-            return;
-        }
-        
-        logToConsole('✓ Compilación exitosa', 'success');
-        
-        // 2. Decodificar el HEX
-        const hexContent = atob(compileData.hex_file);
-        
-        // 3. Subir directamente usando Web Serial API
-        btn.innerHTML = '<span class="loading"></span> Subiendo...';
-        logToConsole('Conectando al Arduino...', 'info');
-        
-        // Determinar baudrate según la placa
-        let uploadBaud = 115200;
-        if (currentBoard.includes('uno') || currentBoard.includes('nano')) {
-            uploadBaud = 115200;
-        } else if (currentBoard.includes('mega')) {
-            uploadBaud = 115200;
-        } else if (currentBoard.includes('leonardo')) {
-            // Leonardo usa CDC, diferente protocolo
-            showToast('Arduino Leonardo requiere modo especial (no soportado aún)', 'warning');
-            btn.disabled = false;
-            btn.innerHTML = '<span>🚀</span><span>Subir</span>';
-            return;
-        }
-        
-        await uploader.connect(selectedPort, uploadBaud);
-        
-        await uploader.upload(hexContent, (msg, progress) => {
+        const result = await uploadViaAgent(code, currentPort, currentBoard, (msg) => {
             logToConsole(msg, 'info');
-            btn.innerHTML = `<span class="loading"></span> ${progress}%`;
         });
         
-        await uploader.disconnect();
-        
-        logToConsole('✓ ¡Código subido exitosamente!', 'success');
-        showToast('¡Código subido exitosamente!', 'success');
-        
+        if (result.success) {
+            logToConsole('[UPLOAD-AGENT] ✓ ¡Código subido exitosamente!', 'success');
+            showToast('¡Código subido exitosamente!', 'success');
+        } else {
+            logToConsole(`[UPLOAD-AGENT] ✗ Error: ${result.error}`, 'error');
+            
+            // Sugerencias según el tipo de error
+            if (result.errorCode === 'PORT_BUSY' || result.error.includes('busy')) {
+                showToast('Puerto ocupado. Cierra otras aplicaciones que lo usen.', 'error');
+            } else if (result.errorCode === 'PORT_NOT_FOUND' || result.error.includes('not found')) {
+                showToast('Puerto no encontrado. Verifica la conexión del Arduino.', 'error');
+            } else if (result.errorCode === 'UPLOAD_SYNC_FAIL' || result.error.includes('sync')) {
+                showToast('Error de sincronización. Presiona RESET en el Arduino y reintenta.', 'error');
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+        }
     } catch (error) {
-        logToConsole('✗ Error: ' + error.message, 'error');
-        showToast('Error: ' + error.message, 'error');
-        try {
-            await uploader.disconnect();
-        } catch (e) {}
+        logToConsole(`[UPLOAD-AGENT] ✗ Error inesperado: ${error.message}`, 'error');
+        showToast('Error de conexión con Agent', 'error');
     }
     
     btn.disabled = false;
@@ -1107,7 +840,7 @@ async function uploadCode() {
 }
 
 // ============================================
-// MONITOR SERIAL
+// MONITOR SERIAL (Web Serial API)
 // ============================================
 
 function openSerialMonitor() {
@@ -1116,20 +849,12 @@ function openSerialMonitor() {
     // Verificar soporte de Web Serial API
     if (!('serial' in navigator)) {
         addSerialLine('⚠️ Web Serial API no está disponible en este navegador.', 'system');
-        addSerialLine('Por favor, usa Chrome, Edge u Opera para acceder al monitor serial.', 'system');
-        logToConsole('Web Serial API no disponible en este navegador', 'warning');
+        addSerialLine('Usa Chrome, Edge u Opera con HTTPS para el Monitor Serial.', 'system');
+        logToConsole('Web Serial API no disponible', 'warning');
         document.getElementById('btnSerialConnect').disabled = true;
     } else {
         document.getElementById('btnSerialConnect').disabled = false;
-        // Mostrar información sobre puertos previamente seleccionados
-        navigator.serial.getPorts().then(ports => {
-            if (ports.length > 0) {
-                addSerialLine(`ℹ️ ${ports.length} puerto(s) previamente seleccionado(s).`, 'system');
-                addSerialLine('Haz clic en "Conectar" para usar uno existente o seleccionar uno nuevo.', 'system');
-            } else {
-                addSerialLine('ℹ️ Haz clic en "Conectar" para seleccionar un puerto serial.', 'system');
-            }
-        });
+        addSerialLine('ℹ️ Haz clic en "Conectar" para seleccionar un puerto serial.', 'system');
     }
 }
 
@@ -1140,34 +865,21 @@ function closeSerialMonitor() {
 async function connectSerial() {
     const baudrate = parseInt(document.getElementById('serialBaudrate').value);
     
-    // Verificar soporte de Web Serial API
     if (!('serial' in navigator)) {
-        showToast('Web Serial API no está disponible en este navegador. Usa Chrome, Edge o Opera.', 'error');
-        logToConsole('Web Serial API no disponible', 'error');
+        showToast('Web Serial API no disponible', 'error');
         return;
     }
     
     try {
-        // Si ya hay un puerto seleccionado, intentar usarlo primero
-        const existingPorts = await navigator.serial.getPorts();
-        
-        if (existingPorts.length > 0 && !serialPort) {
-            // Usar el primer puerto disponible
-            serialPort = existingPorts[0];
-            addSerialLine(`Reutilizando puerto previamente seleccionado...`, 'system');
-        } else if (!serialPort) {
-            // Solicitar nuevo puerto al usuario
-            serialPort = await navigator.serial.requestPort();
-            addSerialLine(`Puerto seleccionado`, 'system');
-        }
+        // Solicitar puerto al usuario
+        serialPort = await navigator.serial.requestPort();
+        addSerialLine(`Puerto seleccionado`, 'system');
         
         // Si el puerto ya está abierto, cerrarlo primero
         if (serialPort.readable || serialPort.writable) {
             try {
                 await serialPort.close();
-            } catch (e) {
-                // Ignorar errores al cerrar
-            }
+            } catch (e) {}
         }
         
         // Abrir conexión
@@ -1184,57 +896,43 @@ async function connectSerial() {
         serialWriter = outputStream.getWriter();
         
         isSerialConnected = true;
-        updateSerialUI(true, 'Puerto Serial', baudrate);
+        updateSerialUI(true, 'Serial', baudrate);
         addSerialLine(`Conectado @ ${baudrate} baud`, 'system');
         updateConnectionStatus();
         
-        // Iniciar lectura continua en segundo plano
-        readSerialData().catch(error => {
-            console.error('Error en lectura serial:', error);
-        });
+        // Iniciar lectura continua
+        readSerialData().catch(console.error);
         
         showToast('Monitor serial conectado', 'success');
-        logToConsole('Monitor serial conectado (Web Serial API)', 'success');
+        logToConsole('Monitor serial conectado (Web Serial)', 'success');
         
     } catch (error) {
         if (error.name === 'NotFoundError') {
             showToast('No se seleccionó ningún puerto', 'warning');
-        } else if (error.name === 'SecurityError') {
-            showToast('Error de seguridad. Verifica los permisos del navegador.', 'error');
-        } else if (error.name === 'InvalidStateError') {
-            showToast('El puerto ya está en uso. Desconecta primero.', 'warning');
         } else {
             showToast('Error al conectar: ' + error.message, 'error');
         }
-        logToConsole('Error al conectar serial: ' + error.message, 'error');
+        logToConsole('Error serial: ' + error.message, 'error');
         serialPort = null;
     }
 }
 
 async function disconnectSerial() {
     try {
-        // Cerrar reader
         if (serialReader) {
             await serialReader.cancel();
-            await serialReader.releaseLock();
+            serialReader.releaseLock();
             serialReader = null;
         }
         
-        // Cerrar writer
         if (serialWriter) {
             await serialWriter.close();
             serialWriter = null;
         }
         
-        // Cerrar puerto
         if (serialPort) {
             await serialPort.close();
             serialPort = null;
-        }
-        
-        if (serialReadInterval) {
-            clearInterval(serialReadInterval);
-            serialReadInterval = null;
         }
         
         isSerialConnected = false;
@@ -1265,9 +963,8 @@ async function readSerialData() {
             if (value) {
                 readBuffer += value;
                 
-                // Procesar líneas completas
                 const lines = readBuffer.split('\n');
-                readBuffer = lines.pop() || ''; // Mantener línea incompleta
+                readBuffer = lines.pop() || '';
                 
                 lines.forEach(line => {
                     if (line.trim()) {
@@ -1277,12 +974,9 @@ async function readSerialData() {
             }
         }
     } catch (error) {
-        if (error.name !== 'NetworkError') {
-            console.error('Error leyendo serial:', error);
-            if (isSerialConnected) {
-                await disconnectSerial();
-                showToast('Error de lectura serial', 'error');
-            }
+        if (error.name !== 'NetworkError' && isSerialConnected) {
+            await disconnectSerial();
+            showToast('Error de lectura serial', 'error');
         }
     }
 }
@@ -1296,14 +990,10 @@ async function sendSerialData() {
     if (!message) return;
     
     try {
-        // Enviar mensaje con salto de línea
         await serialWriter.write(message + '\n');
-        
         addSerialLine(`> ${message}`, 'sent');
         input.value = '';
-        
     } catch (error) {
-        console.error('Error enviando serial:', error);
         showToast('Error al enviar: ' + error.message, 'error');
         if (isSerialConnected) {
             await disconnectSerial();
@@ -1409,7 +1099,7 @@ function updateBlockCount() {
 
 function logToConsole(message, type = 'info') {
     const consoleEl = document.getElementById('consoleOutput');
-    const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
     const line = document.createElement('div');
     line.className = `console-line ${type}`;
@@ -1417,6 +1107,9 @@ function logToConsole(message, type = 'info') {
     
     consoleEl.appendChild(line);
     consoleEl.scrollTop = consoleEl.scrollHeight;
+    
+    // También log a consola del navegador
+    console.log(`[MAX-IDE] ${message}`);
 }
 
 function clearConsole() {
@@ -1450,9 +1143,6 @@ function escapeHtml(text) {
 // GESTIÓN DE PROYECTOS EN SERVIDOR
 // ============================================
 
-/**
- * Guarda el proyecto en el servidor
- */
 async function saveProjectToServer() {
     if (!workspace) {
         showToast('No hay workspace disponible', 'error');
@@ -1463,7 +1153,6 @@ async function saveProjectToServer() {
     const xmlText = Blockly.Xml.domToText(xml);
     const code = arduinoGenerator.workspaceToCode(workspace);
     
-    // Si no hay proyecto actual, crear uno nuevo
     if (!currentProjectId) {
         const name = prompt('Nombre del proyecto:');
         if (!name) return;
@@ -1491,7 +1180,6 @@ async function saveProjectToServer() {
         }
     }
     
-    // Guardar el proyecto
     try {
         const response = await fetch('/api/projects/save/', {
             method: 'POST',
@@ -1519,9 +1207,6 @@ async function saveProjectToServer() {
     }
 }
 
-/**
- * Abre el modal de proyectos
- */
 async function openProjectsModal() {
     const modal = document.getElementById('projectsModal');
     if (!modal) return;
@@ -1530,9 +1215,6 @@ async function openProjectsModal() {
     await loadProjectsList();
 }
 
-/**
- * Carga la lista de proyectos
- */
 async function loadProjectsList() {
     const listDiv = document.getElementById('projectsList');
     if (!listDiv) return;
@@ -1567,9 +1249,6 @@ async function loadProjectsList() {
     }
 }
 
-/**
- * Carga un proyecto desde el servidor
- */
 async function loadProjectFromServer(projectId) {
     try {
         const response = await fetch(`/api/projects/load/${projectId}/`);
@@ -1578,7 +1257,6 @@ async function loadProjectFromServer(projectId) {
         if (data.success && data.project) {
             currentProjectId = data.project.id;
             
-            // Cargar XML en el workspace
             if (data.project.xml_content) {
                 const xml = Blockly.utils.xml.textToDom(data.project.xml_content);
                 workspace.clear();
@@ -1586,7 +1264,6 @@ async function loadProjectFromServer(projectId) {
                 updateCode();
             }
             
-            // Cerrar modal
             const modal = document.getElementById('projectsModal');
             if (modal) modal.style.display = 'none';
             
@@ -1600,9 +1277,6 @@ async function loadProjectFromServer(projectId) {
     }
 }
 
-/**
- * Crea un nuevo proyecto
- */
 async function createNewProject() {
     const nameInput = document.getElementById('projectName');
     const descInput = document.getElementById('projectDescription');
@@ -1629,11 +1303,9 @@ async function createNewProject() {
         if (data.success) {
             currentProjectId = data.project_id;
             
-            // Cerrar modal de creación
             const createModal = document.getElementById('createProjectModal');
             if (createModal) createModal.style.display = 'none';
             
-            // Limpiar formulario
             nameInput.value = '';
             if (descInput) descInput.value = '';
             
@@ -1647,9 +1319,6 @@ async function createNewProject() {
     }
 }
 
-/**
- * Obtiene el token CSRF
- */
 function getCsrfToken() {
     const cookies = document.cookie.split(';');
     for (let cookie of cookies) {
@@ -1661,7 +1330,7 @@ function getCsrfToken() {
     return '';
 }
 
-// Función para cargar proyecto desde template (llamada desde index.html)
+// Función para cargar proyecto desde template
 window.loadProjectFromTemplate = function(xmlContent, projectId) {
     if (workspace && xmlContent) {
         try {
@@ -1675,3 +1344,6 @@ window.loadProjectFromTemplate = function(xmlContent, projectId) {
         }
     }
 };
+
+// Exponer funciones globalmente para botones HTML
+window.checkAgentHealth = checkAgentHealth;
