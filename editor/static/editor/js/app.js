@@ -199,43 +199,167 @@ class ArduinoUploader {
         PROG_PAGE: 0x64,
         READ_SIGN: 0x75,
     };
+    
+    // Baudrates a probar para el bootloader (Optiboot vs bootloader antiguo)
+    static BOOTLOADER_BAUDS = [115200, 57600];
 
-    async connect(port, baudRate = 115200) {
+    /**
+     * Conecta al Arduino con auto-fallback de baudrate.
+     * Prueba cada baudrate en orden hasta encontrar uno que funcione.
+     */
+    async connect(port, preferredBaud = 115200) {
         this.port = port;
-        this.baudRate = baudRate;
         
-        // ========================================
-        // RESET ROBUSTO DEL BOOTLOADER
-        // ========================================
-        // Esto soluciona el problema de "Recibido []" cuando el bootloader no responde
-        this.logFunc('[CONNECT] Ejecutando reset robusto del bootloader...');
-        const resetOk = await forceBootloaderReset(port, baudRate, this.logFunc);
+        // Lista de baudrates a probar, empezando por el preferido
+        const baudsToTry = [preferredBaud, ...ArduinoUploader.BOOTLOADER_BAUDS.filter(b => b !== preferredBaud)];
         
-        if (!resetOk) {
-            this.logFunc('[CONNECT] Advertencia: reset del bootloader falló, intentando continuar...');
+        this.logFunc('[CONNECT] Iniciando conexión con auto-fallback de baudrate...');
+        this.logFunc(`[CONNECT] Baudrates a probar: ${baudsToTry.join(', ')}`);
+        
+        let lastError = null;
+        
+        for (const baud of baudsToTry) {
+            this.logFunc(`[CONNECT] ═══════════════════════════════════════`);
+            this.logFunc(`[CONNECT] Probando baud ${baud}...`);
+            
+            try {
+                // ========================================
+                // 1. RESET ROBUSTO DEL BOOTLOADER
+                // ========================================
+                this.logFunc(`[CONNECT] Ejecutando reset robusto a ${baud} baud...`);
+                const resetOk = await forceBootloaderReset(port, baud, this.logFunc);
+                
+                if (!resetOk) {
+                    this.logFunc(`[CONNECT] Reset falló a ${baud} baud, probando siguiente...`);
+                    continue;
+                }
+                
+                // ========================================
+                // 2. VERIFICAR QUE EL PUERTO ESTÉ ABIERTO
+                // ========================================
+                if (!this.port.readable || !this.port.writable) {
+                    this.logFunc(`[CONNECT] Abriendo puerto a ${baud} baud...`);
+                    await this.port.open({ 
+                        baudRate: baud, 
+                        dataBits: 8, 
+                        stopBits: 1, 
+                        parity: 'none',
+                        flowControl: 'none'
+                    });
+                }
+                
+                // Obtener reader/writer
+                this.writable = this.port.writable;
+                this.readable = this.port.readable;
+                this.writer = this.writable.getWriter();
+                this.reader = this.readable.getReader();
+                
+                // ========================================
+                // 3. SYNC RÁPIDO (5 intentos, 150ms timeout)
+                // ========================================
+                this.logFunc(`[CONNECT] Probando sync STK500 a ${baud} baud (5 intentos rápidos)...`);
+                const syncOk = await this.tryQuickSync(5, 150);
+                
+                if (syncOk) {
+                    this.baudRate = baud;
+                    this.logFunc(`[CONNECT] ✓ Sync OK a ${baud} baud!`);
+                    this.logFunc(`[CONNECT] ✓ Conectado y listo para comunicación STK500`);
+                    return; // Éxito!
+                }
+                
+                // Sync falló, limpiar y probar siguiente baudrate
+                this.logFunc(`[CONNECT] ✗ Sync falló a ${baud} baud`);
+                await this.cleanupForRetry();
+                
+            } catch (error) {
+                this.logFunc(`[CONNECT] ✗ Error a ${baud} baud: ${error.message}`);
+                lastError = error;
+                await this.cleanupForRetry();
+            }
         }
         
-        // Después del forceBootloaderReset, el puerto ya está abierto al baudRate correcto
-        // Solo necesitamos obtener reader/writer
-        
-        // Verificar que el puerto esté abierto
-        if (!this.port.readable || !this.port.writable) {
-            this.logFunc('[CONNECT] Puerto no está abierto, abriendo...');
-            await this.port.open({ 
-                baudRate, 
-                dataBits: 8, 
-                stopBits: 1, 
-                parity: 'none',
-                flowControl: 'none'
-            });
+        // Ningún baudrate funcionó
+        throw new Error(`No se pudo conectar al bootloader. Probados: ${baudsToTry.join(', ')}. ¿Está el Arduino conectado correctamente?`);
+    }
+    
+    /**
+     * Limpia la conexión para poder reintentar con otro baudrate
+     */
+    async cleanupForRetry() {
+        try {
+            if (this.reader) {
+                try { await this.reader.cancel(); } catch (e) {}
+                try { this.reader.releaseLock(); } catch (e) {}
+                this.reader = null;
+            }
+            if (this.writer) {
+                try { this.writer.releaseLock(); } catch (e) {}
+                this.writer = null;
+            }
+            if (this.port && (this.port.readable || this.port.writable)) {
+                try { await this.port.close(); } catch (e) {}
+            }
+            this.readable = null;
+            this.writable = null;
+        } catch (e) {
+            // Ignorar errores de limpieza
+        }
+        // Pequeña espera antes de reintentar
+        await new Promise(r => setTimeout(r, 100));
+    }
+    
+    /**
+     * Intenta sync rápido con el bootloader
+     * @param {number} maxAttempts - Número máximo de intentos
+     * @param {number} timeout - Timeout por intento en ms
+     * @returns {Promise<boolean>} - true si sync exitoso
+     */
+    async tryQuickSync(maxAttempts = 5, timeout = 150) {
+        // Toggle DTR rápido para reforzar el reset
+        if (this.port.setSignals) {
+            try {
+                await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
+                await new Promise(r => setTimeout(r, 30));
+                await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+                await new Promise(r => setTimeout(r, 50));
+            } catch (e) {
+                // Ignorar errores de setSignals
+            }
         }
         
-        this.writable = this.port.writable;
-        this.readable = this.port.readable;
-        this.writer = this.writable.getWriter();
-        this.reader = this.readable.getReader();
+        // Limpiar buffer
+        try {
+            while (true) {
+                const { value, done } = await Promise.race([
+                    this.reader.read(),
+                    new Promise(r => setTimeout(() => r({ done: true }), 30))
+                ]);
+                if (done || !value || value.length === 0) break;
+            }
+        } catch (e) {}
         
-        this.logFunc('[CONNECT] ✓ Conectado y listo para comunicación STK500');
+        // Intentar sync
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
+                const response = await this.receive(2, timeout);
+                
+                const respHex = Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ');
+                this.logFunc(`[SYNC] Intento ${attempt + 1}/${maxAttempts}: [${respHex}]`);
+                
+                if (response.length >= 2 && 
+                    response[0] === ArduinoUploader.STK.INSYNC && 
+                    response[1] === ArduinoUploader.STK.OK) {
+                    return true;
+                }
+            } catch (e) {
+                this.logFunc(`[SYNC] Intento ${attempt + 1}/${maxAttempts}: timeout`);
+            }
+            
+            await new Promise(r => setTimeout(r, 30));
+        }
+        
+        return false;
     }
 
     async disconnect() {
@@ -324,86 +448,34 @@ class ArduinoUploader {
         return new Uint8Array(result.slice(0, length));
     }
 
+    /**
+     * Sincroniza con el bootloader.
+     * Nota: La sincronización principal ya se hace en connect() con fallback de baudrate.
+     * Este método es para verificar/re-sincronizar si es necesario.
+     */
     async sync() {
-        this.logFunc('[SYNC] Iniciando sincronización con bootloader...');
+        this.logFunc('[SYNC] Verificando sincronización con bootloader...');
         
-        // Nota: El reset robusto ya se hizo en connect() via forceBootloaderReset()
-        // Aquí solo hacemos un toggle adicional de DTR por si acaso
+        // La sincronización ya se hizo en connect(), solo verificamos
+        // Usamos tryQuickSync para verificar rápidamente
+        const syncOk = await this.tryQuickSync(3, 200);
         
-        if (this.port.setSignals) {
-            try {
-                // Toggle rápido de DTR para reforzar el reset
-                await this.port.setSignals({ dataTerminalReady: true, requestToSend: false });
-                await new Promise(r => setTimeout(r, 50));
-                await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-                await new Promise(r => setTimeout(r, 100));
-                this.logFunc('[SYNC] Toggle DTR adicional completado');
-            } catch (e) {
-                this.logFunc(`[SYNC] Advertencia: no se pudo toggle DTR: ${e.message}`);
-            }
-        }
-
-        // Limpiar buffer de entrada
-        this.logFunc('[SYNC] Limpiando buffer de entrada...');
-        let bytesCleared = 0;
-        try {
-            while (true) {
-                const { value, done } = await Promise.race([
-                    this.reader.read(),
-                    new Promise(r => setTimeout(() => r({ done: true }), 50))
-                ]);
-                if (done || !value || value.length === 0) break;
-                bytesCleared += value.length;
-            }
-            if (bytesCleared > 0) {
-                this.logFunc(`[SYNC] ${bytesCleared} bytes descartados del buffer`);
-            }
-        } catch (e) {
-            // Ignorar errores de limpieza
-        }
-
-        // Intentar sincronizar con más intentos y variando el timing
-        this.logFunc('[SYNC] Enviando comandos GET_SYNC...');
-        
-        for (let attempt = 0; attempt < 15; attempt++) {
-            try {
-                // Enviar comando GET_SYNC
-                await this.send([ArduinoUploader.STK.GET_SYNC, ArduinoUploader.STK.CRC_EOP]);
-                
-                // Esperar respuesta con timeout variable
-                const timeout = attempt < 5 ? 200 : 500;
-                const response = await this.receive(2, timeout);
-                
-                const respHex = Array.from(response).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ');
-                this.logFunc(`[SYNC] Intento ${attempt + 1}/15: Recibido [${respHex}]`);
-                
-                if (response.length >= 2 && 
-                    response[0] === ArduinoUploader.STK.INSYNC && 
-                    response[1] === ArduinoUploader.STK.OK) {
-                    this.logFunc('[SYNC] ✓ ¡Sincronización exitosa!');
-                    return true;
-                }
-                
-                // Si recibimos algo pero no es correcto, log adicional
-                if (response.length > 0) {
-                    this.logFunc(`[SYNC] Respuesta incorrecta (esperaba 0x14, 0x10)`);
-                }
-                
-            } catch (e) {
-                if (e.message === 'timeout') {
-                    this.logFunc(`[SYNC] Intento ${attempt + 1}/15: timeout`);
-                } else {
-                    this.logFunc(`[SYNC] Intento ${attempt + 1}/15: error - ${e.message}`);
-                }
-            }
-            
-            // Esperar un poco más entre intentos (timing progresivo)
-            const delay = 50 + (attempt * 30);
-            await new Promise(r => setTimeout(r, delay));
+        if (syncOk) {
+            this.logFunc('[SYNC] ✓ Sincronización verificada');
+            return true;
         }
         
-        this.logFunc('[SYNC] ✗ Todos los intentos de sincronización fallaron');
-        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado y prueba presionar el botón RESET.');
+        // Si falló, intentar con más intentos
+        this.logFunc('[SYNC] Reintentando sincronización (10 intentos)...');
+        const retryOk = await this.tryQuickSync(10, 300);
+        
+        if (retryOk) {
+            this.logFunc('[SYNC] ✓ Sincronización recuperada');
+            return true;
+        }
+        
+        this.logFunc('[SYNC] ✗ No se pudo sincronizar');
+        throw new Error('No se pudo sincronizar con el bootloader. Verifica que el Arduino esté conectado.');
     }
 
     async enterProgramMode() {
