@@ -1,0 +1,48 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}{{ action }} Curso - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>{{ action }} Curso</h1>
+    
+    <form method="post" style="margin-top: 20px;">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="institution">Institución *</label>
+            <select id="institution" name="institution" required>
+                <option value="">Seleccionar...</option>
+                {% for inst in institutions %}
+                <option value="{{ inst.id }}">{{ inst.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="name">Nombre del Curso *</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="code">Código *</label>
+            <input type="text" id="code" name="code" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="academic_year">Año Académico *</label>
+            <input type="text" id="academic_year" name="academic_year" value="2024-2025" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Descripción</label>
+            <textarea id="description" name="description" rows="4"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a href="{% url 'editor:courses_list' %}" class="btn">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

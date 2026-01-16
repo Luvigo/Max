@@ -1,0 +1,63 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}{{ student.user.get_full_name|default:student.user.username }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>👤 Estudiante: {{ student.user.get_full_name|default:student.user.username }}</h1>
+    
+    <div style="margin-top: 20px;">
+        <p><strong>ID Estudiante:</strong> {{ student.student_id }}</p>
+        <p><strong>Usuario:</strong> {{ student.user.username }}</p>
+        <p><strong>Email:</strong> {{ student.user.email }}</p>
+        <p><strong>Curso:</strong> {{ student.course.name|default:"Sin curso" }}</p>
+        <p><strong>Institución:</strong> {{ student.course.institution.name|default:"-" }}</p>
+        <p><strong>Teléfono:</strong> {{ student.phone|default:"-" }}</p>
+        <p><strong>Estado:</strong> 
+            {% if student.is_active %}
+                <span style="color: #3fb950;">● Activo</span>
+            {% else %}
+                <span style="color: #f85149;">● Inactivo</span>
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📦 Proyectos ({{ projects.count }})</h2>
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Creado</th>
+                <th>Última Modificación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in projects %}
+            <tr>
+                <td><strong>{{ project.name }}</strong></td>
+                <td>{{ project.description|truncatewords:10|default:"-" }}</td>
+                <td>{{ project.created_at|date:"d/m/Y" }}</td>
+                <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'admin:editor_project_change' project.id %}" class="btn btn-sm">Ver en Admin</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #8b949e;">No hay proyectos</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="{% url 'editor:students_list' %}" class="btn">← Volver a Estudiantes</a>
+</div>
+{% endblock %}
+
