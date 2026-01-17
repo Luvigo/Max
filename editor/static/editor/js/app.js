@@ -394,7 +394,20 @@ function updateAgentUI(available) {
                 bannerTextEl.innerHTML = `
                     <strong>Agent no está corriendo</strong>
                     <span>${osEmoji} Ejecuta <code style="background:#1e2530;padding:2px 6px;border-radius:4px;">${startCmd}</code> en la carpeta del Agent</span>
+                    <a href="#" id="linkReinstallAgent" style="color:#60a5fa;font-size:12px;margin-left:8px;">¿No lo tienes? Reinstalar</a>
                 `;
+                
+                // Agregar evento al link de reinstalar
+                setTimeout(() => {
+                    const reinstallLink = document.getElementById('linkReinstallAgent');
+                    if (reinstallLink) {
+                        reinstallLink.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            resetAgentInstallStatus();
+                            showAgentInstallModal();
+                        });
+                    }
+                }, 100);
                 
                 if (installBtn) {
                     installBtn.innerHTML = '📂 Ver ubicación';
