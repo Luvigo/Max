@@ -151,6 +151,12 @@ async function checkAgentLocal(manual = false) {
                 }
             }
             
+            // Guardar que el Agent fue instalado/conectado exitosamente
+            try {
+                localStorage.setItem('maxide_agent_installed', 'true');
+                localStorage.setItem('maxide_agent_last_connected', new Date().toISOString());
+            } catch (e) {}
+            
             updateAgentUI(true);
             updateDiagnostics({ available: true });
             
@@ -313,6 +319,39 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 }
 
 /**
+ * Detecta el sistema operativo del usuario
+ */
+function detectUserOS() {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('win')) return 'windows';
+    if (userAgent.includes('mac')) return 'mac';
+    return 'linux';
+}
+
+/**
+ * Verifica si el Agent fue instalado previamente
+ */
+function wasAgentInstalled() {
+    try {
+        return localStorage.getItem('maxide_agent_installed') === 'true';
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Obtiene el comando para iniciar el Agent según el OS
+ */
+function getStartCommand() {
+    const os = detectUserOS();
+    if (os === 'windows') {
+        return 'start_agent.bat';
+    } else {
+        return 'bash start_agent.sh';
+    }
+}
+
+/**
  * Actualiza la UI según el estado del Agent
  */
 function updateAgentUI(available) {
@@ -334,9 +373,44 @@ function updateAgentUI(available) {
         }
     }
     
-    // Mostrar/ocultar banner de Agent
+    // Mostrar/ocultar banner de Agent y actualizar contenido
     if (agentBanner) {
-        agentBanner.style.display = available ? 'none' : 'flex';
+        if (available) {
+            agentBanner.style.display = 'none';
+        } else {
+            agentBanner.style.display = 'flex';
+            
+            // Verificar si el Agent ya fue instalado antes
+            const alreadyInstalled = wasAgentInstalled();
+            const bannerTextEl = agentBanner.querySelector('.agent-banner-text');
+            const installBtn = document.getElementById('btnInstallAgent');
+            
+            if (alreadyInstalled && bannerTextEl) {
+                // Ya instalado - mostrar mensaje simple para ejecutar
+                const startCmd = getStartCommand();
+                const os = detectUserOS();
+                const osEmoji = os === 'windows' ? '🪟' : (os === 'mac' ? '🍎' : '🐧');
+                
+                bannerTextEl.innerHTML = `
+                    <strong>Agent no está corriendo</strong>
+                    <span>${osEmoji} Ejecuta <code style="background:#1e2530;padding:2px 6px;border-radius:4px;">${startCmd}</code> en la carpeta del Agent</span>
+                `;
+                
+                if (installBtn) {
+                    installBtn.innerHTML = '📂 Ver ubicación';
+                }
+            } else if (bannerTextEl) {
+                // Primera vez - mostrar mensaje de instalación
+                bannerTextEl.innerHTML = `
+                    <strong>Agent local requerido para subir código</strong>
+                    <span>Instala el MAX-IDE Agent en tu PC para poder subir código al Arduino</span>
+                `;
+                
+                if (installBtn) {
+                    installBtn.innerHTML = '📥 Instrucciones de instalación';
+                }
+            }
+        }
     }
     
     // Actualizar indicador en status bar
