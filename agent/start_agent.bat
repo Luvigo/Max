@@ -122,12 +122,18 @@ REM ========================================
 REM PASO 5: Instalar dependencias Python
 REM ========================================
 echo [5/5] Verificando dependencias Python...
-python -c "import flask" >nul 2>&1
+python -c "import flask" 2>nul
 if errorlevel 1 (
     echo       Instalando dependencias (flask, pyserial, etc.)...
-    pip install flask flask-cors pyserial requests --quiet --disable-pip-version-check
+    echo.
+    python -m pip install --upgrade pip 2>nul
+    python -m pip install flask flask-cors pyserial requests
     if errorlevel 1 (
+        echo.
         echo       ERROR: No se pudieron instalar las dependencias.
+        echo       Intenta ejecutar manualmente:
+        echo       pip install flask flask-cors pyserial requests
+        echo.
         pause
         exit /b 1
     )
@@ -136,6 +142,22 @@ if errorlevel 1 (
     echo       [OK] Dependencias ya instaladas
 )
 echo.
+
+REM ========================================
+REM VERIFICAR QUE AGENT.PY EXISTE
+REM ========================================
+if not exist "%~dp0agent.py" (
+    echo.
+    echo ========================================================
+    echo   ERROR: No se encontro agent.py
+    echo   
+    echo   Asegurate de que este archivo esta en la misma
+    echo   carpeta que start_agent.bat
+    echo ========================================================
+    echo.
+    pause
+    exit /b 1
+)
 
 REM ========================================
 REM INICIAR AGENT
@@ -157,9 +179,22 @@ echo --------------------------------------------------------
 echo.
 
 python "%~dp0agent.py" --port 8765
+set AGENT_EXIT=%errorlevel%
 
 echo.
 echo ========================================================
-echo   El Agent se ha detenido.
+if %AGENT_EXIT% neq 0 (
+    echo   ERROR: El Agent termino con codigo de error %AGENT_EXIT%
+    echo.
+    echo   Posibles causas:
+    echo   - Puerto 8765 ya esta en uso
+    echo   - Error en agent.py
+    echo.
+    echo   Intenta ejecutar manualmente para ver el error:
+    echo   python agent.py --port 8765
+) else (
+    echo   El Agent se ha detenido correctamente.
+)
 echo ========================================================
+echo.
 pause
