@@ -341,17 +341,40 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">1</div>
                             <div class="step-content">
-                                <div class="step-title">Instala Arduino CLI con Homebrew</div>
+                                <div class="step-title">Instala Homebrew (si no lo tienes)</div>
                                 <div class="step-desc">Abre Terminal (<kbd>Cmd</kbd> + <kbd>Espacio</kbd> → escribe "Terminal") y ejecuta:</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>brew install arduino-cli<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                    <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
                                 </div>
-                                <div class="step-note">💡 ¿No tienes Homebrew? Instálalo desde <a href="https://brew.sh" target="_blank" style="color: var(--accent-primary);">brew.sh</a></div>
+                                <div class="step-note">💡 Sigue las instrucciones en pantalla. Te pedirá tu contraseña.</div>
                             </div>
                         </div>
                         
                         <div class="install-step">
                             <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Agrega Homebrew al PATH</div>
+                                <div class="step-desc">Después de instalar Homebrew, ejecuta estos comandos (copia y pega uno por uno):</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile<br>eval "$(/opt/homebrew/bin/brew shellenv)"</code>
+                                </div>
+                                <div class="step-note">⚠️ Importante: Cierra y vuelve a abrir Terminal después de esto.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Instala Arduino CLI</div>
+                                <div class="step-desc">En una nueva ventana de Terminal, ejecuta:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>brew install arduino-cli<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
                             <div class="step-content">
                                 <div class="step-title">Descarga el Agent</div>
                                 <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
@@ -361,7 +384,7 @@ void loop() {
                         </div>
                         
                         <div class="install-step">
-                            <div class="step-number">3</div>
+                            <div class="step-number">5</div>
                             <div class="step-content">
                                 <div class="step-title">Descomprime y ejecuta</div>
                                 <div class="step-desc">Descomprime el ZIP (doble clic), luego en Terminal:</div>
