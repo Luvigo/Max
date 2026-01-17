@@ -163,15 +163,25 @@ REM ========================================
 REM VERIFICAR QUE AGENT.PY EXISTE
 REM ========================================
 :CHECK_AGENT
-if not exist "%~dp0agent.py" goto NO_AGENT
-goto START_AGENT
+set "SCRIPT_DIR=%~dp0"
+set "AGENT_FILE=%SCRIPT_DIR%agent.py"
 
-:NO_AGENT
+if exist "%AGENT_FILE%" goto START_AGENT
+
+REM Si no lo encuentra, intentar en el directorio actual
+if exist "agent.py" (
+    set "AGENT_FILE=agent.py"
+    goto START_AGENT
+)
+
 echo.
 echo ========================================================
 echo   ERROR: No se encontro agent.py
-echo   
-echo   Asegurate de que este archivo esta en la misma
+echo.
+echo   Buscado en: %AGENT_FILE%
+echo   Directorio actual: %CD%
+echo.
+echo   Asegurate de que agent.py esta en la misma
 echo   carpeta que start_agent.bat
 echo ========================================================
 echo.
@@ -198,7 +208,7 @@ echo   Presiona Ctrl+C para detener el Agent.
 echo --------------------------------------------------------
 echo.
 
-python "%~dp0agent.py" --port 8765
+python "%AGENT_FILE%" --port 8765
 
 echo.
 echo ========================================================
