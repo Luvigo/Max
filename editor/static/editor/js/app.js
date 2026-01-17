@@ -504,7 +504,27 @@ El Agent está en la carpeta donde lo extrajiste del ZIP.
 💡 TIP: Puedes usar: find ~ -name "maxide-agent" -type d`;
     }
     
-    alert(helpText);
+    // Preguntar si quiere ver las instrucciones de instalación
+    const userChoice = confirm(helpText + '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n¿No lo encuentras o lo eliminaste?\n\nPresiona ACEPTAR para ver las instrucciones de instalación completas.\nPresiona CANCELAR para cerrar este mensaje.');
+    
+    if (userChoice) {
+        // Resetear el estado de instalación y mostrar instrucciones
+        resetAgentInstallStatus();
+        showAgentInstallModal();
+    }
+}
+
+/**
+ * Resetea el estado de instalación del Agent en localStorage
+ */
+function resetAgentInstallStatus() {
+    try {
+        localStorage.removeItem('maxide_agent_installed');
+        localStorage.removeItem('maxide_agent_last_connected');
+    } catch (e) {}
+    
+    // Actualizar la UI
+    updateAgentUI(false);
 }
 
 /**
