@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal
 title MAX-IDE Agent - Windows
 
 echo.
@@ -17,151 +17,171 @@ REM PASO 1: Verificar winget
 REM ========================================
 echo [1/5] Verificando winget...
 winget --version >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo ========================================================
-    echo   ERROR: winget no esta disponible
-    echo.
-    echo   Soluciones:
-    echo   1. Actualiza Windows desde Configuracion
-    echo   2. Instala "Instalador de aplicacion" desde
-    echo      Microsoft Store
-    echo ========================================================
-    echo.
-    pause
-    exit /b 1
-)
+if errorlevel 1 goto NO_WINGET
 echo       [OK] winget disponible
 echo.
+goto CHECK_PYTHON
+
+:NO_WINGET
+echo.
+echo ========================================================
+echo   ERROR: winget no esta disponible
+echo.
+echo   Soluciones:
+echo   1. Actualiza Windows desde Configuracion
+echo   2. Instala "Instalador de aplicacion" desde
+echo      Microsoft Store
+echo ========================================================
+echo.
+pause
+exit /b 1
 
 REM ========================================
 REM PASO 2: Verificar/Instalar Python
 REM ========================================
+:CHECK_PYTHON
 echo [2/5] Verificando Python...
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo       Python no encontrado. Instalando con winget...
-    echo.
-    echo       Esto puede tardar unos minutos. Por favor espera...
-    echo.
-    winget install -e --id Python.Python.3.11 --accept-package-agreements --accept-source-agreements
-    if errorlevel 1 (
-        echo       ERROR: No se pudo instalar Python.
-        echo       Intenta instalar Python manualmente desde python.org
-        pause
-        exit /b 1
-    )
-    echo.
-    echo       [OK] Python instalado correctamente
-    echo.
-    echo ========================================================
-    echo   IMPORTANTE: Cierra esta ventana y vuelve a ejecutar
-    echo   este archivo para continuar la instalacion.
-    echo ========================================================
-    echo.
-    pause
-    exit /b 0
-) else (
-    for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYVER=%%i
-    echo       [OK] Python !PYVER! encontrado
-)
+if errorlevel 1 goto INSTALL_PYTHON
+echo       [OK] Python encontrado
 echo.
+goto CHECK_ARDUINO
+
+:INSTALL_PYTHON
+echo       Python no encontrado. Instalando con winget...
+echo.
+echo       Esto puede tardar unos minutos. Por favor espera...
+echo.
+winget install -e --id Python.Python.3.11 --accept-package-agreements --accept-source-agreements
+if errorlevel 1 goto PYTHON_ERROR
+echo.
+echo       [OK] Python instalado correctamente
+echo.
+echo ========================================================
+echo   IMPORTANTE: Cierra esta ventana y vuelve a ejecutar
+echo   este archivo para continuar la instalacion.
+echo ========================================================
+echo.
+pause
+exit /b 0
+
+:PYTHON_ERROR
+echo       ERROR: No se pudo instalar Python.
+echo       Intenta instalar Python manualmente desde python.org
+pause
+exit /b 1
 
 REM ========================================
 REM PASO 3: Verificar/Instalar Arduino CLI
 REM ========================================
+:CHECK_ARDUINO
 echo [3/5] Verificando Arduino CLI...
 arduino-cli version >nul 2>&1
-if errorlevel 1 (
-    echo       Arduino CLI no encontrado. Instalando con winget...
-    echo.
-    winget install -e --id ArduinoSA.CLI --accept-package-agreements --accept-source-agreements
-    if errorlevel 1 (
-        echo       ERROR: No se pudo instalar Arduino CLI.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo       [OK] Arduino CLI instalado correctamente
-    echo.
-    echo ========================================================
-    echo   IMPORTANTE: Cierra esta ventana y vuelve a ejecutar
-    echo   este archivo para continuar la instalacion.
-    echo ========================================================
-    echo.
-    pause
-    exit /b 0
-) else (
-    echo       [OK] Arduino CLI encontrado
-)
+if errorlevel 1 goto INSTALL_ARDUINO
+echo       [OK] Arduino CLI encontrado
 echo.
+goto CHECK_AVR
+
+:INSTALL_ARDUINO
+echo       Arduino CLI no encontrado. Instalando con winget...
+echo.
+winget install -e --id ArduinoSA.CLI --accept-package-agreements --accept-source-agreements
+if errorlevel 1 goto ARDUINO_ERROR
+echo.
+echo       [OK] Arduino CLI instalado correctamente
+echo.
+echo ========================================================
+echo   IMPORTANTE: Cierra esta ventana y vuelve a ejecutar
+echo   este archivo para continuar la instalacion.
+echo ========================================================
+echo.
+pause
+exit /b 0
+
+:ARDUINO_ERROR
+echo       ERROR: No se pudo instalar Arduino CLI.
+pause
+exit /b 1
 
 REM ========================================
 REM PASO 4: Verificar/Instalar Core Arduino AVR
 REM ========================================
+:CHECK_AVR
 echo [4/5] Verificando core arduino:avr...
-arduino-cli core list 2>nul | findstr /C:"arduino:avr" >nul
-if errorlevel 1 (
-    echo       Instalando core arduino:avr...
-    echo       Esto puede tardar unos minutos (descarga ~100MB)...
-    echo.
-    arduino-cli core update-index
-    arduino-cli core install arduino:avr
-    if errorlevel 1 (
-        echo       ERROR: No se pudo instalar el core arduino:avr.
-        pause
-        exit /b 1
-    )
-    echo       [OK] Core arduino:avr instalado
-) else (
-    echo       [OK] Core arduino:avr encontrado
-)
+arduino-cli core list 2>nul | findstr "arduino:avr" >nul
+if errorlevel 1 goto INSTALL_AVR
+echo       [OK] Core arduino:avr encontrado
 echo.
+goto CHECK_DEPS
+
+:INSTALL_AVR
+echo       Instalando core arduino:avr...
+echo       Esto puede tardar unos minutos...
+echo.
+arduino-cli core update-index
+arduino-cli core install arduino:avr
+if errorlevel 1 goto AVR_ERROR
+echo       [OK] Core arduino:avr instalado
+echo.
+goto CHECK_DEPS
+
+:AVR_ERROR
+echo       ERROR: No se pudo instalar el core arduino:avr.
+pause
+exit /b 1
 
 REM ========================================
 REM PASO 5: Instalar dependencias Python
 REM ========================================
+:CHECK_DEPS
 echo [5/5] Verificando dependencias Python...
-python -c "import flask" 2>nul
-if errorlevel 1 (
-    echo       Instalando dependencias (flask, pyserial, etc.)...
-    echo.
-    python -m pip install --upgrade pip 2>nul
-    python -m pip install flask flask-cors pyserial requests
-    if errorlevel 1 (
-        echo.
-        echo       ERROR: No se pudieron instalar las dependencias.
-        echo       Intenta ejecutar manualmente:
-        echo       pip install flask flask-cors pyserial requests
-        echo.
-        pause
-        exit /b 1
-    )
-    echo       [OK] Dependencias instaladas
-) else (
-    echo       [OK] Dependencias ya instaladas
-)
+python -c "import flask" >nul 2>&1
+if errorlevel 1 goto INSTALL_DEPS
+echo       [OK] Dependencias ya instaladas
 echo.
+goto CHECK_AGENT
+
+:INSTALL_DEPS
+echo       Instalando dependencias (flask, pyserial, etc.)...
+echo.
+python -m pip install flask flask-cors pyserial requests
+if errorlevel 1 goto DEPS_ERROR
+echo       [OK] Dependencias instaladas
+echo.
+goto CHECK_AGENT
+
+:DEPS_ERROR
+echo.
+echo       ERROR: No se pudieron instalar las dependencias.
+echo       Intenta ejecutar manualmente:
+echo       pip install flask flask-cors pyserial requests
+echo.
+pause
+exit /b 1
 
 REM ========================================
 REM VERIFICAR QUE AGENT.PY EXISTE
 REM ========================================
-if not exist "%~dp0agent.py" (
-    echo.
-    echo ========================================================
-    echo   ERROR: No se encontro agent.py
-    echo   
-    echo   Asegurate de que este archivo esta en la misma
-    echo   carpeta que start_agent.bat
-    echo ========================================================
-    echo.
-    pause
-    exit /b 1
-)
+:CHECK_AGENT
+if not exist "%~dp0agent.py" goto NO_AGENT
+goto START_AGENT
+
+:NO_AGENT
+echo.
+echo ========================================================
+echo   ERROR: No se encontro agent.py
+echo   
+echo   Asegurate de que este archivo esta en la misma
+echo   carpeta que start_agent.bat
+echo ========================================================
+echo.
+pause
+exit /b 1
 
 REM ========================================
 REM INICIAR AGENT
 REM ========================================
+:START_AGENT
 echo.
 echo ========================================================
 echo.
@@ -179,22 +199,10 @@ echo --------------------------------------------------------
 echo.
 
 python "%~dp0agent.py" --port 8765
-set AGENT_EXIT=%errorlevel%
 
 echo.
 echo ========================================================
-if %AGENT_EXIT% neq 0 (
-    echo   ERROR: El Agent termino con codigo de error %AGENT_EXIT%
-    echo.
-    echo   Posibles causas:
-    echo   - Puerto 8765 ya esta en uso
-    echo   - Error en agent.py
-    echo.
-    echo   Intenta ejecutar manualmente para ver el error:
-    echo   python agent.py --port 8765
-) else (
-    echo   El Agent se ha detenido correctamente.
-)
+echo   El Agent se ha detenido.
 echo ========================================================
 echo.
 pause
