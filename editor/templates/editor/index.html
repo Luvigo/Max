@@ -37,6 +37,7 @@
                     <select id="boardSelect">
                         <option value="arduino:avr:uno">Arduino UNO</option>
                         <option value="arduino:avr:nano">Arduino Nano</option>
+                        <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
                         <option value="arduino:avr:mega">Arduino Mega</option>
                         <option value="arduino:avr:leonardo">Arduino Leonardo</option>
                     </select>
@@ -320,7 +321,7 @@ void loop() {
                             <div class="step-content">
                                 <div class="step-title">¡Espera la instalación automática!</div>
                                 <div class="step-desc">La primera vez instalará <strong>Python</strong> y <strong>Arduino CLI</strong> automáticamente.</div>
-                                <div class="step-note">⏱️ Primera vez: ~5-10 minutos | Después: instantáneo</div>
+                                <div class="step-note">⏱️ La instalación toma menos de un minuto.</div>
                                 <div class="step-note" style="margin-top: 8px;">⚠️ Si pide cerrar y volver a abrir, hazlo. Es normal la primera vez.</div>
                             </div>
                         </div>
@@ -444,7 +445,7 @@ void loop() {
                                 <div class="step-title">Ejecuta el Agent</div>
                                 <div class="step-desc">Copia y pega en Terminal:</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>cd ~/Descargas && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>
+                                    <code>cd ~/Downloads && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>
                                 </div>
                             </div>
                         </div>

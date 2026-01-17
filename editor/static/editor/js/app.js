@@ -1012,6 +1012,7 @@ function initEventListeners() {
         const boardNames = {
             'arduino:avr:uno': 'Arduino UNO',
             'arduino:avr:nano': 'Arduino Nano',
+            'arduino:avr:nano:cpu=atmega328old': 'Arduino Nano (Old Bootloader)',
             'arduino:avr:mega': 'Arduino Mega',
             'arduino:avr:leonardo': 'Arduino Leonardo'
         };
