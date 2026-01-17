@@ -7,10 +7,37 @@ echo ========================================================
 echo            MAX-IDE Agent - Windows
 echo ========================================================
 echo.
-echo   Este instalador configurara todo automaticamente
-echo.
 
 cd /d "%~dp0"
+
+REM ========================================
+REM DETECTAR SI SE EJECUTA DESDE UN ZIP
+REM ========================================
+echo %~dp0 | findstr /I "Temp" >nul
+if not errorlevel 1 (
+    echo %~dp0 | findstr /I ".zip" >nul
+    if not errorlevel 1 (
+        echo   ****************************************************
+        echo   *                                                  *
+        echo   *   ERROR: Estas ejecutando desde dentro del ZIP   *
+        echo   *                                                  *
+        echo   *   SOLUCION:                                      *
+        echo   *   1. Cierra esta ventana                         *
+        echo   *   2. Haz clic derecho en el archivo ZIP          *
+        echo   *   3. Selecciona "Extraer todo..."                *
+        echo   *   4. Elige una carpeta (ej: Escritorio)          *
+        echo   *   5. Abre la carpeta extraida                    *
+        echo   *   6. Ejecuta start_agent.bat desde ahi           *
+        echo   *                                                  *
+        echo   ****************************************************
+        echo.
+        pause
+        exit /b 1
+    )
+)
+
+echo   Este instalador configurara todo automaticamente
+echo.
 
 REM ========================================
 REM PASO 1: Verificar winget
