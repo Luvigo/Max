@@ -443,6 +443,71 @@ function updateAgentUI(available) {
 }
 
 /**
+ * Muestra ayuda para encontrar la ubicación del Agent instalado
+ */
+function showAgentLocationHelp() {
+    const os = detectUserOS();
+    const startCmd = getStartCommand();
+    
+    let helpText = '';
+    
+    if (os === 'windows') {
+        helpText = `🔍 UBICACIÓN DEL AGENT
+
+El Agent está en la carpeta donde lo extrajiste del ZIP.
+
+📁 LUGARES COMUNES:
+• Descargas (Downloads)\\maxide-agent
+• Escritorio (Desktop)\\maxide-agent
+• Documentos\\maxide-agent
+
+📝 PASOS:
+1. Abre el Explorador de archivos (presiona Windows + E)
+2. Busca una carpeta llamada "maxide-agent"
+3. Dentro de esa carpeta, haz doble clic en: ${startCmd}
+
+💡 TIP: Si no la encuentras, busca "start_agent.bat" en el buscador de Windows (Windows + S).`;
+    } else if (os === 'mac') {
+        helpText = `🔍 UBICACIÓN DEL AGENT
+
+El Agent está en la carpeta donde lo extrajiste del ZIP.
+
+📁 LUGARES COMUNES:
+• ~/Downloads/maxide-agent
+• ~/Desktop/maxide-agent
+• ~/Documents/maxide-agent
+
+📝 PASOS:
+1. Abre Finder
+2. Busca una carpeta llamada "maxide-agent"
+3. Abre Terminal en esa carpeta (clic derecho → "Nueva Terminal en la carpeta")
+4. Ejecuta: ${startCmd}
+
+💡 TIP: Puedes arrastrar la carpeta a Terminal para obtener la ruta.`;
+    } else {
+        // Linux
+        helpText = `🔍 UBICACIÓN DEL AGENT
+
+El Agent está en la carpeta donde lo extrajiste del ZIP.
+
+📁 LUGARES COMUNES:
+• ~/Downloads/maxide-agent
+• ~/Desktop/maxide-agent
+• ~/Documents/maxide-agent
+
+📝 PASOS:
+1. Abre el administrador de archivos
+2. Busca una carpeta llamada "maxide-agent"
+3. Abre Terminal en esa carpeta
+4. Ejecuta: ${startCmd}
+
+💡 TIP: Puedes usar: find ~ -name "maxide-agent" -type d`;
+    }
+    
+    alert(helpText);
+}
+
+/**
  * Muestra el panel de diagnóstico
  */
 function showDiagnosticPanel() {
@@ -1746,7 +1811,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     if (btnInstallAgent) {
-        btnInstallAgent.addEventListener('click', showAgentInstallModal);
+        btnInstallAgent.addEventListener('click', function() {
+            // Si el Agent ya fue instalado, mostrar ayuda para encontrar la carpeta
+            if (wasAgentInstalled()) {
+                showAgentLocationHelp();
+            } else {
+                // Primera vez - mostrar instrucciones de instalación
+                showAgentInstallModal();
+            }
+        });
     }
     
     // Botón cerrar modal del Agent
