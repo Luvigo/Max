@@ -33,7 +33,7 @@ echo.
 REM ========================================
 REM PASO 1: Verificar winget
 REM ========================================
-echo [1/5] Verificando winget...
+echo [1/6] Verificando winget...
 winget --version >nul 2>&1
 if errorlevel 1 goto NO_WINGET
 echo       [OK] winget disponible
@@ -58,7 +58,7 @@ REM ========================================
 REM PASO 2: Verificar/Instalar Python
 REM ========================================
 :CHECK_PYTHON
-echo [2/5] Verificando Python...
+echo [2/6] Verificando Python...
 python --version >nul 2>&1
 if errorlevel 1 goto INSTALL_PYTHON
 echo       [OK] Python encontrado
@@ -93,7 +93,7 @@ REM ========================================
 REM PASO 3: Verificar/Instalar Arduino CLI
 REM ========================================
 :CHECK_ARDUINO
-echo [3/5] Verificando Arduino CLI...
+echo [3/6] Verificando Arduino CLI...
 arduino-cli version >nul 2>&1
 if errorlevel 1 goto INSTALL_ARDUINO
 echo       [OK] Arduino CLI encontrado
@@ -125,12 +125,12 @@ REM ========================================
 REM PASO 4: Verificar/Instalar Core Arduino AVR
 REM ========================================
 :CHECK_AVR
-echo [4/5] Verificando core arduino:avr...
+echo [4/6] Verificando core arduino:avr...
 arduino-cli core list 2>nul | findstr "arduino:avr" >nul
 if errorlevel 1 goto INSTALL_AVR
 echo       [OK] Core arduino:avr encontrado
 echo.
-goto CHECK_DEPS
+goto CHECK_LIBS
 
 :INSTALL_AVR
 echo       Instalando core arduino:avr...
@@ -141,7 +141,7 @@ arduino-cli core install arduino:avr
 if errorlevel 1 goto AVR_ERROR
 echo       [OK] Core arduino:avr instalado
 echo.
-goto CHECK_DEPS
+goto CHECK_LIBS
 
 :AVR_ERROR
 echo       ERROR: No se pudo instalar el core arduino:avr.
@@ -149,10 +149,36 @@ pause
 exit /b 1
 
 REM ========================================
-REM PASO 5: Instalar dependencias Python
+REM PASO 5: Verificar/Instalar Librerias Arduino
+REM ========================================
+:CHECK_LIBS
+echo [5/6] Verificando librerias Arduino...
+arduino-cli lib list 2>nul | findstr "Servo" >nul
+if errorlevel 1 goto INSTALL_LIBS
+echo       [OK] Librerias instaladas
+echo.
+goto CHECK_DEPS
+
+:INSTALL_LIBS
+echo       Instalando librerias comunes (Servo, etc.)...
+echo.
+arduino-cli lib install Servo
+if errorlevel 1 goto LIBS_ERROR
+echo       [OK] Librerias instaladas
+echo.
+goto CHECK_DEPS
+
+:LIBS_ERROR
+echo       ERROR: No se pudieron instalar las librerias.
+echo       Intenta manualmente: arduino-cli lib install Servo
+pause
+exit /b 1
+
+REM ========================================
+REM PASO 6: Instalar dependencias Python
 REM ========================================
 :CHECK_DEPS
-echo [5/5] Verificando dependencias Python...
+echo [6/6] Verificando dependencias Python...
 python -c "import flask" >nul 2>&1
 if errorlevel 1 goto INSTALL_DEPS
 echo       [OK] Dependencias ya instaladas
