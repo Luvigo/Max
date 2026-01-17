@@ -70,7 +70,7 @@ echo       Python no encontrado. Instalando con winget...
 echo.
 echo       Esto puede tardar unos minutos. Por favor espera...
 echo.
-winget install -e --id Python.Python.3.11 --accept-package-agreements --accept-source-agreements
+winget install -e --id Python.Python.3.11 --source winget --accept-package-agreements --accept-source-agreements
 if errorlevel 1 goto PYTHON_ERROR
 echo.
 echo       [OK] Python instalado correctamente
@@ -103,7 +103,7 @@ goto CHECK_AVR
 :INSTALL_ARDUINO
 echo       Arduino CLI no encontrado. Instalando con winget...
 echo.
-winget install -e --id ArduinoSA.CLI --accept-package-agreements --accept-source-agreements
+winget install -e --id ArduinoSA.CLI --source winget --accept-package-agreements --accept-source-agreements
 if errorlevel 1 goto ARDUINO_ERROR
 echo.
 echo       [OK] Arduino CLI instalado correctamente
