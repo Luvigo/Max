@@ -1,42 +1,33 @@
 @echo off
 setlocal
 title MAX-IDE Agent - Windows
+cd /d "%~dp0"
 
 echo.
 echo ========================================================
 echo            MAX-IDE Agent - Windows
 echo ========================================================
 echo.
+echo   Carpeta actual: %CD%
+echo.
 
-cd /d "%~dp0"
-
-REM ========================================
-REM DETECTAR SI SE EJECUTA DESDE UN ZIP
-REM ========================================
-echo %~dp0 | findstr /I "Temp" >nul
-if not errorlevel 1 (
-    echo %~dp0 | findstr /I ".zip" >nul
-    if not errorlevel 1 (
-        echo   ****************************************************
-        echo   *                                                  *
-        echo   *   ERROR: Estas ejecutando desde dentro del ZIP   *
-        echo   *                                                  *
-        echo   *   SOLUCION:                                      *
-        echo   *   1. Cierra esta ventana                         *
-        echo   *   2. Haz clic derecho en el archivo ZIP          *
-        echo   *   3. Selecciona "Extraer todo..."                *
-        echo   *   4. Elige una carpeta (ej: Escritorio)          *
-        echo   *   5. Abre la carpeta extraida                    *
-        echo   *   6. Ejecuta start_agent.bat desde ahi           *
-        echo   *                                                  *
-        echo   ****************************************************
-        echo.
-        pause
-        exit /b 1
-    )
+REM Verificar si agent.py existe aqui
+if not exist "agent.py" (
+    echo   ERROR: No se encontro agent.py en esta carpeta.
+    echo.
+    echo   Si ejecutaste desde dentro del ZIP:
+    echo   1. Haz clic derecho en el ZIP
+    echo   2. Selecciona "Extraer todo..."
+    echo   3. Ejecuta start_agent.bat desde la carpeta extraida
+    echo.
+    pause
+    exit /b 1
 )
 
-echo   Este instalador configurara todo automaticamente
+echo   [OK] agent.py encontrado
+echo.
+echo   Presiona una tecla para continuar con la instalacion...
+pause >nul
 echo.
 
 REM ========================================
@@ -187,33 +178,10 @@ pause
 exit /b 1
 
 REM ========================================
-REM VERIFICAR QUE AGENT.PY EXISTE
+REM LISTO PARA INICIAR
 REM ========================================
 :CHECK_AGENT
-set "SCRIPT_DIR=%~dp0"
-set "AGENT_FILE=%SCRIPT_DIR%agent.py"
-
-if exist "%AGENT_FILE%" goto START_AGENT
-
-REM Si no lo encuentra, intentar en el directorio actual
-if exist "agent.py" (
-    set "AGENT_FILE=agent.py"
-    goto START_AGENT
-)
-
-echo.
-echo ========================================================
-echo   ERROR: No se encontro agent.py
-echo.
-echo   Buscado en: %AGENT_FILE%
-echo   Directorio actual: %CD%
-echo.
-echo   Asegurate de que agent.py esta en la misma
-echo   carpeta que start_agent.bat
-echo ========================================================
-echo.
-pause
-exit /b 1
+set "AGENT_FILE=agent.py"
 
 REM ========================================
 REM INICIAR AGENT
