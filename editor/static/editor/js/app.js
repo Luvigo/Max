@@ -1472,7 +1472,11 @@ function openSerialMonitor() {
     }
 }
 
-function closeSerialMonitor() {
+async function closeSerialMonitor() {
+    // Desconectar el puerto antes de cerrar el modal para liberar el COM
+    if (isSerialConnected) {
+        await disconnectSerial();
+    }
     document.getElementById('serialModal').classList.remove('active');
 }
 
