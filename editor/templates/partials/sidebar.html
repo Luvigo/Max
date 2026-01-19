@@ -1,0 +1,168 @@
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-logo">M</div>
+        <div class="sidebar-brand">
+            <span class="sidebar-brand-name">MAX-IDE</span>
+            <span class="sidebar-brand-sub">Arduino Education</span>
+        </div>
+    </div>
+    
+    <nav class="sidebar-nav">
+        <!-- Principal -->
+        <div class="nav-section">
+            <div class="nav-section-title">Principal</div>
+            
+            <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            {% if user_role == 'admin' or user_role == 'institution' %}
+            <a href="{% url 'editor:index' %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
+            </a>
+            {% else %}
+            <a href="{% url 'editor:index' %}" class="nav-item">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
+            </a>
+            {% endif %}
+        </div>
+        
+        {% if user_role == 'admin' %}
+        <!-- Admin Global -->
+        <div class="nav-section">
+            <div class="nav-section-title">Administración Global</div>
+            
+            <a href="{% url 'admin_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i>
+                <span>Panel Admin</span>
+            </a>
+            
+            <a href="{% url 'editor:institutions_list' %}" class="nav-item {% if 'institution' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-building"></i>
+                <span>Instituciones</span>
+            </a>
+            
+            <a href="#" class="nav-item">
+                <i class="fas fa-users-cog"></i>
+                <span>Usuarios</span>
+            </a>
+            
+            <a href="{% url 'admin:index' %}" class="nav-item">
+                <i class="fas fa-cog"></i>
+                <span>Django Admin</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if user_role == 'admin' or user_role == 'institution' %}
+        <!-- Gestión Institución -->
+        <div class="nav-section">
+            <div class="nav-section-title">{% if institution %}{{ institution.name|truncatechars:20 }}{% else %}Institución{% endif %}</div>
+            
+            {% if institution %}
+            <a href="{% url 'institution_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'institution_dashboard' %}active{% endif %}">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
+            {% endif %}
+            
+            <a href="{% url 'editor:courses_list' %}" class="nav-item {% if 'course' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-graduation-cap"></i>
+                <span>Cursos</span>
+            </a>
+            
+            <a href="{% url 'editor:students_list' %}" class="nav-item {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-user-graduate"></i>
+                <span>Estudiantes</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if user_role == 'tutor' %}
+        <!-- Tutor -->
+        <div class="nav-section">
+            <div class="nav-section-title">Mi Área</div>
+            
+            {% if institution %}
+            <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'tutor_dashboard' %}active{% endif %}">
+                <i class="fas fa-chalkboard-teacher"></i>
+                <span>Mi Dashboard</span>
+            </a>
+            {% endif %}
+            
+            <a href="#" class="nav-item">
+                <i class="fas fa-book-open"></i>
+                <span>Mis Cursos</span>
+            </a>
+            
+            <a href="#" class="nav-item">
+                <i class="fas fa-users"></i>
+                <span>Mis Estudiantes</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if user_role == 'student' %}
+        <!-- Estudiante -->
+        <div class="nav-section">
+            <div class="nav-section-title">Mi Área</div>
+            
+            {% if institution %}
+            <a href="{% url 'student_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
+                <i class="fas fa-user"></i>
+                <span>Mi Dashboard</span>
+            </a>
+            {% endif %}
+            
+            <a href="{% url 'editor:student_projects' %}" class="nav-item {% if request.resolver_match.url_name == 'student_projects' %}active{% endif %}">
+                <i class="fas fa-folder-open"></i>
+                <span>Mis Proyectos</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        <!-- Ayuda -->
+        <div class="nav-section">
+            <div class="nav-section-title">Ayuda</div>
+            
+            <a href="#" class="nav-item">
+                <i class="fas fa-question-circle"></i>
+                <span>Documentación</span>
+            </a>
+            
+            <a href="#" class="nav-item">
+                <i class="fas fa-bug"></i>
+                <span>Reportar Problema</span>
+            </a>
+        </div>
+    </nav>
+    
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">
+                {{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}
+            </div>
+            <div class="user-details">
+                <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+                <div class="user-role role-{{ user_role }}">
+                    {% if user_role == 'admin' %}
+                        <i class="fas fa-crown"></i> Administrador
+                    {% elif user_role == 'institution' %}
+                        <i class="fas fa-building"></i> Institución
+                    {% elif user_role == 'tutor' %}
+                        <i class="fas fa-chalkboard-teacher"></i> Tutor
+                    {% elif user_role == 'student' %}
+                        <i class="fas fa-user-graduate"></i> Estudiante
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{% url 'logout' %}" class="topbar-btn" title="Cerrar Sesión">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+    </div>
+</aside>

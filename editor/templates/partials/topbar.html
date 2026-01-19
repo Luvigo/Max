@@ -1,0 +1,58 @@
+<!-- Top Bar -->
+<header class="topbar">
+    <div class="topbar-left">
+        <button id="mobile-menu-btn" class="topbar-btn" style="display: none;">
+            <i class="fas fa-bars"></i>
+        </button>
+        
+        <nav class="breadcrumb">
+            {% block breadcrumb %}
+            <span class="breadcrumb-item"><a href="{% url 'dashboard' %}">Inicio</a></span>
+            {% if page_title %}
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">{{ page_title }}</span>
+            {% endif %}
+            {% endblock %}
+        </nav>
+    </div>
+    
+    <div class="topbar-right">
+        {% if institution %}
+        <div class="institution-badge">
+            <i class="fas fa-building"></i>
+            <span>{{ institution.name|truncatechars:25 }}</span>
+        </div>
+        {% endif %}
+        
+        {% if user_institutions.count > 1 %}
+        <a href="{% url 'select_institution' %}" class="topbar-btn" title="Cambiar Institución">
+            <i class="fas fa-exchange-alt"></i>
+        </a>
+        {% endif %}
+        
+        <button class="topbar-btn" title="Notificaciones">
+            <i class="fas fa-bell"></i>
+        </button>
+        
+        <a href="{% url 'editor:index' %}" class="btn btn-primary">
+            <i class="fas fa-code"></i>
+            <span>Abrir IDE</span>
+        </a>
+    </div>
+</header>
+
+<style>
+    @media (max-width: 768px) {
+        #mobile-menu-btn {
+            display: flex !important;
+        }
+        
+        .institution-badge span {
+            display: none;
+        }
+        
+        .btn span {
+            display: none;
+        }
+    }
+</style>

@@ -1,0 +1,196 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Dashboard Tutor - {{ institution.name }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-chalkboard-teacher" style="color: var(--color-warning);"></i>
+        Mi Dashboard de Tutor
+    </h1>
+    <p class="page-subtitle">{{ institution.name }} - Vista de tus cursos y estudiantes</p>
+</div>
+
+<!-- Métricas del Tutor -->
+<div class="metrics-grid">
+    <div class="metric-card animate-in">
+        <div class="metric-icon orange">
+            <i class="fas fa-book-open"></i>
+        </div>
+        <div class="metric-value">{{ metrics.courses }}</div>
+        <div class="metric-label">Mis Cursos</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon green">
+            <i class="fas fa-user-graduate"></i>
+        </div>
+        <div class="metric-value">{{ metrics.students }}</div>
+        <div class="metric-label">Mis Estudiantes</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon cyan">
+            <i class="fas fa-project-diagram"></i>
+        </div>
+        <div class="metric-value">{{ metrics.projects }}</div>
+        <div class="metric-label">Proyectos de Estudiantes</div>
+    </div>
+</div>
+
+<!-- Grids de Datos -->
+<div class="data-grid">
+    <!-- Mis Cursos -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-book-open" style="color: var(--color-warning);"></i>
+                Mis Cursos
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if my_courses %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Año</th>
+                        <th>Estudiantes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in my_courses %}
+                    <tr>
+                        <td>
+                            <strong>{{ course.name }}</strong>
+                            <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ course.code }}</div>
+                        </td>
+                        <td>{{ course.academic_year }}</td>
+                        <td>
+                            <span class="status-badge active">
+                                <i class="fas fa-users"></i>
+                                {{ course.students_count }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-book-open"></i>
+                <p>No tienes cursos asignados</p>
+                <p style="font-size: 0.85rem;">Contacta al administrador para que te asigne cursos</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Actividad de Estudiantes -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-clock" style="color: var(--color-primary);"></i>
+                Actividad de Estudiantes
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if recent_activity %}
+            <div class="activity-list">
+                {% for project in recent_activity %}
+                <div class="activity-item">
+                    <div class="activity-icon project">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">{{ project.name }}</div>
+                        <div class="activity-meta">
+                            {{ project.student.user.get_full_name|default:project.student.user.username }}
+                            {% if project.student.course %}
+                            - {{ project.student.course.name }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="activity-time">
+                        {{ project.updated_at|timesince }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-history"></i>
+                <p>No hay actividad reciente de tus estudiantes</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Estudiantes Recientes -->
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
+            Estudiantes Recientes
+        </h3>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if recent_students %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Estudiante</th>
+                    <th>Curso</th>
+                    <th>ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in recent_students %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                {{ student.user.first_name|slice:":1"|default:student.user.username|slice:":1"|upper }}
+                            </div>
+                            <div>
+                                <strong>{{ student.user.get_full_name|default:student.user.username }}</strong>
+                                <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ student.user.email }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ student.course.name }}</td>
+                    <td><code style="font-family: var(--font-mono); font-size: 0.85rem;">{{ student.student_id }}</code></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <p>No tienes estudiantes en tus cursos</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Acciones Rápidas -->
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-bolt" style="color: var(--color-warning);"></i>
+            Acciones Rápidas
+        </h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="{% url 'editor:index' %}" class="btn btn-primary">
+                <i class="fas fa-code"></i> Abrir IDE
+            </a>
+            <a href="#" class="btn btn-secondary">
+                <i class="fas fa-eye"></i> Ver Proyectos
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

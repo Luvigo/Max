@@ -3,16 +3,6 @@ URL configuration for arduino_ide project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -20,8 +10,29 @@ from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
 
+from editor import dashboard_views
+
 urlpatterns = [
+    # Admin de Django
     path('admin/', admin.site.urls),
+    
+    # Autenticación global
+    path('login/', auth_views.LoginView.as_view(template_name='editor/login.html'), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    
+    # Dashboard principal (redirige según rol)
+    path('dashboard/', dashboard_views.dashboard_redirect, name='dashboard'),
+    path('select-institution/', dashboard_views.select_institution, name='select_institution'),
+    
+    # Dashboards por rol
+    path('dashboard/admin/', dashboard_views.admin_dashboard, name='admin_dashboard'),
+    
+    # Dashboards con tenant (institución)
+    path('i/<slug:slug>/dashboard/', dashboard_views.institution_dashboard, name='institution_dashboard'),
+    path('i/<slug:slug>/dashboard/tutor/', dashboard_views.tutor_dashboard, name='tutor_dashboard'),
+    path('i/<slug:slug>/dashboard/student/', dashboard_views.student_dashboard, name='student_dashboard'),
+    
+    # Editor app (incluye IDE y APIs)
     path('', include('editor.urls')),
 ]
 

@@ -1,0 +1,133 @@
+@startuml
+!theme cerulean
+title Módulo 1: Diagrama de Clases - Multi-tenant + RBAC
+
+skinparam classAttributeIconSize 0
+
+package "django.contrib.auth" <<Database>> {
+    class User {
+        +id: int
+        +username: str
+        +email: str
+        +first_name: str
+        +last_name: str
+        +is_superuser: bool
+        +is_active: bool
+    }
+}
+
+package "editor.models" <<Database>> {
+    
+    class Institution {
+        +id: UUID
+        +name: str
+        +slug: str {unique}
+        +code: str {unique}
+        +description: str
+        +logo: URL
+        +status: enum(active, inactive, suspended)
+        +created_at: datetime
+        +updated_at: datetime
+        +is_active: bool
+        --
+        +save(): void
+        +get_members_count(): int
+        +get_courses_count(): int
+        +get_students_count(): int
+    }
+    
+    class Membership {
+        +id: UUID
+        +user: FK(User)
+        +institution: FK(Institution)
+        +role: enum(admin, institution, tutor, student)
+        +is_active: bool
+        +created_at: datetime
+        +updated_at: datetime
+        +notes: str
+        --
+        +is_admin: bool {property}
+        +is_institution_admin: bool {property}
+        +is_tutor_or_above: bool {property}
+        +is_student: bool {property}
+    }
+    
+    class Course {
+        +id: int
+        +institution: FK(Institution)
+        +tutor: FK(User) {nullable}
+        +name: str
+        +code: str
+        +description: str
+        +academic_year: str
+        +is_active: bool
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +get_students_count(): int
+    }
+    
+    class Student {
+        +id: int
+        +user: FK(User) {1:1}
+        +student_id: str {unique}
+        +course: FK(Course) {nullable}
+        +phone: str
+        +is_active: bool
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +get_projects_count(): int
+        +institution: Institution {property}
+    }
+    
+    class Project {
+        +id: int
+        +student: FK(Student)
+        +name: str
+        +description: str
+        +xml_content: text
+        +arduino_code: text
+        +is_active: bool
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +get_last_modified(): str
+        +institution: Institution {property}
+    }
+    
+    class UserRoleHelper <<utility>> {
+        {static} +get_user_role(user, institution?): str
+        {static} +get_user_institutions(user): QuerySet
+        {static} +user_has_role(user, roles, institution?): bool
+        {static} +get_single_institution(user): Institution?
+    }
+}
+
+' Relaciones
+User "1" -- "0..*" Membership : tiene >
+Institution "1" -- "0..*" Membership : tiene >
+Institution "1" -- "0..*" Course : contiene >
+Course "0..1" -- "0..*" Student : asignado a >
+User "1" -- "0..*" Course : tutora >
+User "1" -- "0..1" Student : perfil >
+Student "1" -- "0..*" Project : crea >
+
+note right of Membership
+  **unique_together**
+  (user, institution)
+  
+  Un usuario puede tener
+  diferentes roles en
+  diferentes instituciones.
+end note
+
+note bottom of Institution
+  **Tenant principal**
+  Todos los datos están
+  scoped a una institución.
+  El slug se usa en URLs:
+  /i/<slug>/...
+end note
+
+@enduml

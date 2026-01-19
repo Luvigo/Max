@@ -1,0 +1,189 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Dashboard {{ institution.name }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-building" style="color: var(--color-purple);"></i>
+        {{ institution.name }}
+    </h1>
+    <p class="page-subtitle">Panel de administración de la institución</p>
+</div>
+
+<!-- Métricas de Institución -->
+<div class="metrics-grid">
+    <div class="metric-card animate-in">
+        <div class="metric-icon blue">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="metric-value">{{ metrics.members }}</div>
+        <div class="metric-label">Miembros Totales</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon orange">
+            <i class="fas fa-graduation-cap"></i>
+        </div>
+        <div class="metric-value">{{ metrics.courses }}</div>
+        <div class="metric-label">Cursos Activos</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon green">
+            <i class="fas fa-user-graduate"></i>
+        </div>
+        <div class="metric-value">{{ metrics.students }}</div>
+        <div class="metric-label">Estudiantes</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon cyan">
+            <i class="fas fa-project-diagram"></i>
+        </div>
+        <div class="metric-value">{{ metrics.projects }}</div>
+        <div class="metric-label">Proyectos</div>
+    </div>
+</div>
+
+<!-- Grids de Datos -->
+<div class="data-grid">
+    <!-- Cursos -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
+                Cursos
+            </h3>
+            <a href="{% url 'editor:courses_list' %}" class="btn btn-ghost">Ver todos</a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if courses %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Año</th>
+                        <th>Estudiantes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for course in courses %}
+                    <tr>
+                        <td>
+                            <strong>{{ course.name }}</strong>
+                            <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ course.code }}</div>
+                        </td>
+                        <td>{{ course.academic_year }}</td>
+                        <td>
+                            <span class="status-badge active">
+                                <i class="fas fa-users"></i>
+                                {{ course.students_count }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-graduation-cap"></i>
+                <p>No hay cursos creados</p>
+                <a href="{% url 'editor:course_create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Curso
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Actividad Reciente -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-clock" style="color: var(--color-primary);"></i>
+                Actividad Reciente
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if recent_activity %}
+            <div class="activity-list">
+                {% for project in recent_activity %}
+                <div class="activity-item">
+                    <div class="activity-icon project">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">{{ project.name }}</div>
+                        <div class="activity-meta">
+                            {{ project.student.user.get_full_name|default:project.student.user.username }}
+                            {% if project.student.course %}
+                            - {{ project.student.course.name }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="activity-time">
+                        {{ project.updated_at|timesince }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-history"></i>
+                <p>No hay actividad reciente</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Distribución de Roles -->
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-chart-pie" style="color: var(--color-success);"></i>
+            Distribución de Miembros por Rol
+        </h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+            {% for role_data in memberships_by_role %}
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: 700; font-family: var(--font-mono);">
+                    {{ role_data.count }}
+                </div>
+                <div style="color: var(--color-text-muted); font-size: 0.85rem; text-transform: capitalize;">
+                    {% if role_data.role == 'admin' %}Admins{% elif role_data.role == 'institution' %}Inst. Admins{% elif role_data.role == 'tutor' %}Tutores{% else %}Estudiantes{% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <p style="color: var(--color-text-muted);">No hay miembros registrados</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Acciones Rápidas -->
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-bolt" style="color: var(--color-warning);"></i>
+            Acciones Rápidas
+        </h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="{% url 'editor:course_create' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Curso
+            </a>
+            <a href="{% url 'editor:student_create' %}" class="btn btn-secondary">
+                <i class="fas fa-user-plus"></i> Nuevo Estudiante
+            </a>
+            <a href="{% url 'editor:students_list' %}" class="btn btn-ghost">
+                <i class="fas fa-list"></i> Ver Estudiantes
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
