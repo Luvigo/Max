@@ -441,3 +441,272 @@ arduinoGenerator.forBlock['arduino_comment'] = function(block) {
     return `  // ${comment}\n`;
 };
 
+// ============================================
+// 🚗 GENERADORES DEL CARRITO MAX
+// ============================================
+
+// -------- INICIALIZACIÓN --------
+
+arduinoGenerator.forBlock['max_init_motores'] = function(block) {
+    const pinIzq = block.getFieldValue('PIN_IZQ');
+    const pinDer = block.getFieldValue('PIN_DER');
+    
+    arduinoGenerator.includes_['servo'] = '#include <Servo.h>';
+    arduinoGenerator.variables_['max_servos'] = `Servo servoIzq;\nServo servoDer;`;
+    arduinoGenerator.variables_['max_config'] = `#define PIN_SERVO_IZQ ${pinIzq}\n#define PIN_SERVO_DER ${pinDer}\n#define STOP_IZQ 90\n#define STOP_DER 90`;
+    
+    // Agregar las funciones de movimiento
+    arduinoGenerator.variables_['max_funciones'] = `
+// Funciones de movimiento del carrito MAX
+void adelante(int vel) {
+  vel = constrain(vel, 0, 90);
+  servoIzq.write(STOP_IZQ - vel);
+  servoDer.write(STOP_DER + vel);
+}
+
+void atras(int vel) {
+  vel = constrain(vel, 0, 90);
+  servoIzq.write(STOP_IZQ + vel);
+  servoDer.write(STOP_DER - vel);
+}
+
+void izquierda(int vel) {
+  vel = constrain(vel, 0, 90);
+  servoIzq.write(STOP_IZQ + vel);
+  servoDer.write(STOP_DER + vel);
+}
+
+void derecha(int vel) {
+  vel = constrain(vel, 0, 90);
+  servoIzq.write(STOP_IZQ - vel);
+  servoDer.write(STOP_DER - vel);
+}
+
+void detener() {
+  servoIzq.write(STOP_IZQ);
+  servoDer.write(STOP_DER);
+}`;
+    
+    return `  servoIzq.attach(PIN_SERVO_IZQ);\n  servoDer.attach(PIN_SERVO_DER);\n  detener();\n`;
+};
+
+arduinoGenerator.forBlock['max_init_distancia'] = function(block) {
+    const pinTrig = block.getFieldValue('PIN_TRIG');
+    const pinEcho = block.getFieldValue('PIN_ECHO');
+    
+    arduinoGenerator.variables_['max_distancia_pins'] = `#define PIN_TRIG ${pinTrig}\n#define PIN_ECHO ${pinEcho}`;
+    arduinoGenerator.variables_['max_distancia_vars'] = `long _max_duracion;\nfloat _max_distancia;`;
+    
+    // Función para medir distancia
+    arduinoGenerator.variables_['max_distancia_func'] = `
+// Función para medir distancia con sensor ultrasónico
+float medirDistancia() {
+  digitalWrite(PIN_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PIN_TRIG, LOW);
+  _max_duracion = pulseIn(PIN_ECHO, HIGH, 30000);
+  return _max_duracion * 0.034 / 2;
+}`;
+    
+    return `  pinMode(PIN_TRIG, OUTPUT);\n  pinMode(PIN_ECHO, INPUT);\n`;
+};
+
+arduinoGenerator.forBlock['max_init_lineas'] = function(block) {
+    const pinIzq = block.getFieldValue('PIN_IZQ');
+    const pinCent = block.getFieldValue('PIN_CENT');
+    const pinDer = block.getFieldValue('PIN_DER');
+    
+    arduinoGenerator.variables_['max_lineas_pins'] = `#define QTR_IZQ A${pinIzq}\n#define QTR_CENT A${pinCent}\n#define QTR_DER A${pinDer}`;
+    
+    return `  // Sensores de línea configurados en A${pinIzq}, A${pinCent}, A${pinDer}\n`;
+};
+
+arduinoGenerator.forBlock['max_init_buzzer'] = function(block) {
+    const pin = block.getFieldValue('PIN');
+    
+    arduinoGenerator.variables_['max_buzzer_pin'] = `#define PIN_BUZZER ${pin}`;
+    arduinoGenerator.variables_['max_notas'] = `// Notas musicales (Hz)\n#define NOTA_DO  262\n#define NOTA_RE  294\n#define NOTA_MI  330\n#define NOTA_FA  349\n#define NOTA_SOL 392\n#define NOTA_LA  440\n#define NOTA_SI  494`;
+    
+    // Función para tocar nota
+    arduinoGenerator.variables_['max_buzzer_func'] = `
+// Función para tocar una nota
+void tocarNota(int frecuencia, int duracion) {
+  tone(PIN_BUZZER, frecuencia, duracion);
+  delay(duracion);
+  noTone(PIN_BUZZER);
+  delay(50);
+}`;
+    
+    return `  pinMode(PIN_BUZZER, OUTPUT);\n`;
+};
+
+arduinoGenerator.forBlock['max_init_garra'] = function(block) {
+    const pin = block.getFieldValue('PIN');
+    const cerrada = block.getFieldValue('CERRADA');
+    const abierta = block.getFieldValue('ABIERTA');
+    
+    arduinoGenerator.includes_['servo'] = '#include <Servo.h>';
+    arduinoGenerator.variables_['max_garra'] = `Servo garra;\n#define PIN_GARRA ${pin}\n#define GARRA_CERRADA ${cerrada}\n#define GARRA_ABIERTA ${abierta}`;
+    
+    // Funciones de la garra
+    arduinoGenerator.variables_['max_garra_func'] = `
+// Funciones de la garra
+void abrirGarra() {
+  garra.write(GARRA_ABIERTA);
+}
+
+void cerrarGarra() {
+  garra.write(GARRA_CERRADA);
+}`;
+    
+    return `  garra.attach(PIN_GARRA);\n  cerrarGarra();\n`;
+};
+
+// -------- MOVIMIENTO DEL ROBOT --------
+
+arduinoGenerator.forBlock['max_adelante'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    return `  adelante(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_adelante_var'] = function(block) {
+    const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '30';
+    return `  adelante(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_atras'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    return `  atras(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_atras_var'] = function(block) {
+    const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '30';
+    return `  atras(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_izquierda'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    return `  izquierda(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_izquierda_var'] = function(block) {
+    const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '25';
+    return `  izquierda(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_derecha'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    return `  derecha(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_derecha_var'] = function(block) {
+    const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '25';
+    return `  derecha(${vel});\n`;
+};
+
+arduinoGenerator.forBlock['max_detener'] = function(block) {
+    return `  detener();\n`;
+};
+
+// -------- SENSOR DE DISTANCIA --------
+
+arduinoGenerator.forBlock['max_medir_distancia'] = function(block) {
+    return ['medirDistancia()', arduinoGenerator.ORDER_ATOMIC];
+};
+
+arduinoGenerator.forBlock['max_distancia_menor_que'] = function(block) {
+    const cm = block.getFieldValue('CM');
+    return [`(medirDistancia() < ${cm})`, arduinoGenerator.ORDER_RELATIONAL];
+};
+
+arduinoGenerator.forBlock['max_distancia_mayor_que'] = function(block) {
+    const cm = block.getFieldValue('CM');
+    return [`(medirDistancia() > ${cm})`, arduinoGenerator.ORDER_RELATIONAL];
+};
+
+// -------- SENSOR DE LÍNEAS --------
+
+arduinoGenerator.forBlock['max_leer_linea_izq'] = function(block) {
+    return ['analogRead(QTR_IZQ)', arduinoGenerator.ORDER_ATOMIC];
+};
+
+arduinoGenerator.forBlock['max_leer_linea_centro'] = function(block) {
+    return ['analogRead(QTR_CENT)', arduinoGenerator.ORDER_ATOMIC];
+};
+
+arduinoGenerator.forBlock['max_leer_linea_der'] = function(block) {
+    return ['analogRead(QTR_DER)', arduinoGenerator.ORDER_ATOMIC];
+};
+
+arduinoGenerator.forBlock['max_linea_detectada'] = function(block) {
+    const sensor = block.getFieldValue('SENSOR');
+    const umbral = block.getFieldValue('UMBRAL');
+    const sensorPin = sensor === 'IZQ' ? 'QTR_IZQ' : (sensor === 'CENT' ? 'QTR_CENT' : 'QTR_DER');
+    return [`(analogRead(${sensorPin}) < ${umbral})`, arduinoGenerator.ORDER_RELATIONAL];
+};
+
+// -------- BUZZER / NOTAS MUSICALES --------
+
+arduinoGenerator.forBlock['max_tocar_nota'] = function(block) {
+    const nota = block.getFieldValue('NOTA');
+    const duracion = block.getFieldValue('DURACION');
+    return `  tocarNota(${nota}, ${duracion});\n`;
+};
+
+arduinoGenerator.forBlock['max_tocar_frecuencia'] = function(block) {
+    const freq = arduinoGenerator.valueToCode(block, 'FREQ', arduinoGenerator.ORDER_ATOMIC) || '440';
+    const duracion = arduinoGenerator.valueToCode(block, 'DURACION', arduinoGenerator.ORDER_ATOMIC) || '300';
+    return `  tocarNota(${freq}, ${duracion});\n`;
+};
+
+arduinoGenerator.forBlock['max_detener_sonido'] = function(block) {
+    return `  noTone(PIN_BUZZER);\n`;
+};
+
+arduinoGenerator.forBlock['max_beep'] = function(block) {
+    return `  tocarNota(1000, 100);\n`;
+};
+
+// -------- GARRA --------
+
+arduinoGenerator.forBlock['max_abrir_garra'] = function(block) {
+    return `  abrirGarra();\n`;
+};
+
+arduinoGenerator.forBlock['max_cerrar_garra'] = function(block) {
+    return `  cerrarGarra();\n`;
+};
+
+arduinoGenerator.forBlock['max_mover_garra'] = function(block) {
+    const angulo = block.getFieldValue('ANGULO');
+    return `  garra.write(${angulo});\n`;
+};
+
+// -------- COMBINACIONES ÚTILES --------
+
+arduinoGenerator.forBlock['max_avanzar_tiempo'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    const tiempo = block.getFieldValue('TIEMPO');
+    return `  adelante(${vel});\n  delay(${tiempo});\n  detener();\n`;
+};
+
+arduinoGenerator.forBlock['max_retroceder_tiempo'] = function(block) {
+    const vel = block.getFieldValue('VEL');
+    const tiempo = block.getFieldValue('TIEMPO');
+    return `  atras(${vel});\n  delay(${tiempo});\n  detener();\n`;
+};
+
+arduinoGenerator.forBlock['max_girar_tiempo'] = function(block) {
+    const dir = block.getFieldValue('DIR');
+    const vel = block.getFieldValue('VEL');
+    const tiempo = block.getFieldValue('TIEMPO');
+    return `  ${dir}(${vel});\n  delay(${tiempo});\n  detener();\n`;
+};
+
+arduinoGenerator.forBlock['max_evitar_obstaculo'] = function(block) {
+    const distancia = block.getFieldValue('DISTANCIA');
+    const statements = arduinoGenerator.statementToCode(block, 'DO');
+    return `  if (medirDistancia() < ${distancia}) {\n${statements}  }\n`;
+};

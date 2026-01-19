@@ -793,3 +793,457 @@ Blockly.Blocks['arduino_comment'] = {
     }
 };
 
+// ============================================
+// 🚗 BLOQUES DEL CARRITO MAX
+// ============================================
+
+// -------- INICIALIZACIÓN --------
+
+Blockly.Blocks['max_init_motores'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🚗 Inicializar motores del carrito");
+        this.appendDummyInput()
+            .appendField("   Pin servo izquierdo:")
+            .appendField(new Blockly.FieldNumber(9, 0, 13), "PIN_IZQ");
+        this.appendDummyInput()
+            .appendField("   Pin servo derecho:")
+            .appendField(new Blockly.FieldNumber(10, 0, 13), "PIN_DER");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(190);
+        this.setTooltip("Inicializa los servos de movimiento del carrito. Colocar en setup()");
+    }
+};
+
+Blockly.Blocks['max_init_distancia'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("📡 Inicializar sensor de distancia");
+        this.appendDummyInput()
+            .appendField("   Pin TRIG:")
+            .appendField(new Blockly.FieldNumber(6, 0, 13), "PIN_TRIG")
+            .appendField("  Pin ECHO:")
+            .appendField(new Blockly.FieldNumber(7, 0, 13), "PIN_ECHO");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(190);
+        this.setTooltip("Inicializa el sensor ultrasónico de distancia. Colocar en setup()");
+    }
+};
+
+Blockly.Blocks['max_init_lineas'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Inicializar sensores de línea");
+        this.appendDummyInput()
+            .appendField("   Izq: A")
+            .appendField(new Blockly.FieldNumber(0, 0, 5), "PIN_IZQ")
+            .appendField("  Centro: A")
+            .appendField(new Blockly.FieldNumber(1, 0, 5), "PIN_CENT")
+            .appendField("  Der: A")
+            .appendField(new Blockly.FieldNumber(2, 0, 5), "PIN_DER");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(190);
+        this.setTooltip("Inicializa los sensores QTR de seguimiento de línea. Colocar en setup()");
+    }
+};
+
+Blockly.Blocks['max_init_buzzer'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🔊 Inicializar buzzer pin")
+            .appendField(new Blockly.FieldNumber(3, 0, 13), "PIN");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(190);
+        this.setTooltip("Inicializa el buzzer para reproducir sonidos. Colocar en setup()");
+    }
+};
+
+Blockly.Blocks['max_init_garra'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🦾 Inicializar garra pin")
+            .appendField(new Blockly.FieldNumber(11, 0, 13), "PIN");
+        this.appendDummyInput()
+            .appendField("   Cerrada:")
+            .appendField(new Blockly.FieldNumber(0, 0, 180), "CERRADA")
+            .appendField("°  Abierta:")
+            .appendField(new Blockly.FieldNumber(90, 0, 180), "ABIERTA")
+            .appendField("°");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(190);
+        this.setTooltip("Inicializa el servo de la garra. Colocar en setup()");
+    }
+};
+
+// -------- MOVIMIENTO DEL ROBOT --------
+
+Blockly.Blocks['max_adelante'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🚗 Avanzar velocidad")
+            .appendField(new Blockly.FieldNumber(30, 0, 90), "VEL");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Mueve el carrito hacia adelante. Velocidad: 0-90");
+    }
+};
+
+Blockly.Blocks['max_adelante_var'] = {
+    init: function() {
+        this.appendValueInput("VEL")
+            .setCheck("Number")
+            .appendField("🚗 Avanzar velocidad");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Mueve el carrito hacia adelante con velocidad variable (0-90)");
+    }
+};
+
+Blockly.Blocks['max_atras'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🔙 Retroceder velocidad")
+            .appendField(new Blockly.FieldNumber(30, 0, 90), "VEL");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Mueve el carrito hacia atrás. Velocidad: 0-90");
+    }
+};
+
+Blockly.Blocks['max_atras_var'] = {
+    init: function() {
+        this.appendValueInput("VEL")
+            .setCheck("Number")
+            .appendField("🔙 Retroceder velocidad");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Mueve el carrito hacia atrás con velocidad variable (0-90)");
+    }
+};
+
+Blockly.Blocks['max_izquierda'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("⬅️ Girar izquierda velocidad")
+            .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la izquierda. Velocidad: 0-90");
+    }
+};
+
+Blockly.Blocks['max_izquierda_var'] = {
+    init: function() {
+        this.appendValueInput("VEL")
+            .setCheck("Number")
+            .appendField("⬅️ Girar izquierda velocidad");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la izquierda con velocidad variable (0-90)");
+    }
+};
+
+Blockly.Blocks['max_derecha'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➡️ Girar derecha velocidad")
+            .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la derecha. Velocidad: 0-90");
+    }
+};
+
+Blockly.Blocks['max_derecha_var'] = {
+    init: function() {
+        this.appendValueInput("VEL")
+            .setCheck("Number")
+            .appendField("➡️ Girar derecha velocidad");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la derecha con velocidad variable (0-90)");
+    }
+};
+
+Blockly.Blocks['max_detener'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🛑 Detener carrito");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(0);
+        this.setTooltip("Detiene completamente el carrito");
+    }
+};
+
+// -------- SENSOR DE DISTANCIA --------
+
+Blockly.Blocks['max_medir_distancia'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("📡 Medir distancia (cm)");
+        this.setOutput(true, "Number");
+        this.setColour(230);
+        this.setTooltip("Mide la distancia con el sensor ultrasónico. Retorna centímetros.");
+    }
+};
+
+Blockly.Blocks['max_distancia_menor_que'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("📡 ¿Distancia <")
+            .appendField(new Blockly.FieldNumber(20, 0, 400), "CM")
+            .appendField("cm?");
+        this.setOutput(true, "Boolean");
+        this.setColour(230);
+        this.setTooltip("Retorna verdadero si la distancia es menor al valor indicado");
+    }
+};
+
+Blockly.Blocks['max_distancia_mayor_que'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("📡 ¿Distancia >")
+            .appendField(new Blockly.FieldNumber(30, 0, 400), "CM")
+            .appendField("cm?");
+        this.setOutput(true, "Boolean");
+        this.setColour(230);
+        this.setTooltip("Retorna verdadero si la distancia es mayor al valor indicado");
+    }
+};
+
+// -------- SENSOR DE LÍNEAS --------
+
+Blockly.Blocks['max_leer_linea_izq'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Leer sensor línea IZQUIERDO");
+        this.setOutput(true, "Number");
+        this.setColour(60);
+        this.setTooltip("Lee el valor del sensor de línea izquierdo (0-1023)");
+    }
+};
+
+Blockly.Blocks['max_leer_linea_centro'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Leer sensor línea CENTRO");
+        this.setOutput(true, "Number");
+        this.setColour(60);
+        this.setTooltip("Lee el valor del sensor de línea central (0-1023)");
+    }
+};
+
+Blockly.Blocks['max_leer_linea_der'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Leer sensor línea DERECHO");
+        this.setOutput(true, "Number");
+        this.setColour(60);
+        this.setTooltip("Lee el valor del sensor de línea derecho (0-1023)");
+    }
+};
+
+Blockly.Blocks['max_linea_detectada'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ ¿Línea detectada en")
+            .appendField(new Blockly.FieldDropdown([
+                ["izquierdo", "IZQ"],
+                ["centro", "CENT"],
+                ["derecho", "DER"]
+            ]), "SENSOR")
+            .appendField("? (umbral:")
+            .appendField(new Blockly.FieldNumber(500, 0, 1023), "UMBRAL")
+            .appendField(")");
+        this.setOutput(true, "Boolean");
+        this.setColour(60);
+        this.setTooltip("Retorna verdadero si el sensor detecta la línea (valor < umbral)");
+    }
+};
+
+// -------- BUZZER / NOTAS MUSICALES --------
+
+Blockly.Blocks['max_tocar_nota'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🎵 Tocar nota")
+            .appendField(new Blockly.FieldDropdown([
+                ["DO", "262"],
+                ["RE", "294"],
+                ["MI", "330"],
+                ["FA", "349"],
+                ["SOL", "392"],
+                ["LA", "440"],
+                ["SI", "494"],
+                ["DO alto", "523"],
+                ["RE alto", "587"],
+                ["MI alto", "659"]
+            ]), "NOTA")
+            .appendField("duración")
+            .appendField(new Blockly.FieldNumber(300, 50, 2000), "DURACION")
+            .appendField("ms");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(300);
+        this.setTooltip("Reproduce una nota musical por un tiempo determinado");
+    }
+};
+
+Blockly.Blocks['max_tocar_frecuencia'] = {
+    init: function() {
+        this.appendValueInput("FREQ")
+            .setCheck("Number")
+            .appendField("🎵 Tocar frecuencia");
+        this.appendValueInput("DURACION")
+            .setCheck("Number")
+            .appendField("Hz duración");
+        this.appendDummyInput()
+            .appendField("ms");
+        this.setInputsInline(true);
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(300);
+        this.setTooltip("Reproduce un tono con frecuencia y duración personalizadas");
+    }
+};
+
+Blockly.Blocks['max_detener_sonido'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🔇 Detener sonido");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(300);
+        this.setTooltip("Detiene el sonido del buzzer");
+    }
+};
+
+Blockly.Blocks['max_beep'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🔔 Beep");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(300);
+        this.setTooltip("Emite un beep corto");
+    }
+};
+
+// -------- GARRA --------
+
+Blockly.Blocks['max_abrir_garra'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🦾 Abrir garra");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(45);
+        this.setTooltip("Abre la garra del carrito");
+    }
+};
+
+Blockly.Blocks['max_cerrar_garra'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🦾 Cerrar garra");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(45);
+        this.setTooltip("Cierra la garra del carrito");
+    }
+};
+
+Blockly.Blocks['max_mover_garra'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🦾 Mover garra a")
+            .appendField(new Blockly.FieldNumber(45, 0, 180), "ANGULO")
+            .appendField("°");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(45);
+        this.setTooltip("Mueve la garra a un ángulo específico (0-180)");
+    }
+};
+
+// -------- COMBINACIONES ÚTILES --------
+
+Blockly.Blocks['max_avanzar_tiempo'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🚗 Avanzar a velocidad")
+            .appendField(new Blockly.FieldNumber(30, 0, 90), "VEL")
+            .appendField("por")
+            .appendField(new Blockly.FieldNumber(1000, 0, 10000), "TIEMPO")
+            .appendField("ms");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Avanza a una velocidad por un tiempo y luego se detiene");
+    }
+};
+
+Blockly.Blocks['max_retroceder_tiempo'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🔙 Retroceder a velocidad")
+            .appendField(new Blockly.FieldNumber(30, 0, 90), "VEL")
+            .appendField("por")
+            .appendField(new Blockly.FieldNumber(1000, 0, 10000), "TIEMPO")
+            .appendField("ms");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Retrocede a una velocidad por un tiempo y luego se detiene");
+    }
+};
+
+Blockly.Blocks['max_girar_tiempo'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("↪️ Girar a la")
+            .appendField(new Blockly.FieldDropdown([
+                ["izquierda", "izquierda"],
+                ["derecha", "derecha"]
+            ]), "DIR")
+            .appendField("velocidad")
+            .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL")
+            .appendField("por")
+            .appendField(new Blockly.FieldNumber(500, 0, 5000), "TIEMPO")
+            .appendField("ms");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira en una dirección por un tiempo y luego se detiene");
+    }
+};
+
+Blockly.Blocks['max_evitar_obstaculo'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("🚧 Si hay obstáculo a menos de")
+            .appendField(new Blockly.FieldNumber(20, 5, 100), "DISTANCIA")
+            .appendField("cm");
+        this.appendStatementInput("DO")
+            .setCheck(null)
+            .appendField("hacer:");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(230);
+        this.setTooltip("Ejecuta código si hay un obstáculo cercano");
+    }
+};
