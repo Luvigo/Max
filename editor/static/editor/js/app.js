@@ -956,7 +956,7 @@ function initEventListeners() {
     document.getElementById('btnCompile').addEventListener('click', verifyCode);
     document.getElementById('btnUpload').addEventListener('click', uploadCode);
     document.getElementById('btnRefreshPorts').addEventListener('click', refreshPorts);
-    document.getElementById('btnAddPort').addEventListener('click', refreshPorts); // Refresca desde Agent
+    document.getElementById('btnAddPort').addEventListener('click', requestSerialPort); // Abre diálogo Web Serial
     
     // Botones de archivo
     document.getElementById('btnNew').addEventListener('click', newProject);
@@ -1074,8 +1074,53 @@ void loop() {
 }
 
 // ============================================
-// GESTIÓN DE PUERTOS (Agent local)
+// GESTIÓN DE PUERTOS (Agent local + Web Serial)
 // ============================================
+
+/**
+ * Solicita acceso a un puerto serial usando Web Serial API
+ * Abre el diálogo nativo del navegador para seleccionar puerto
+ */
+async function requestSerialPort() {
+    // Verificar soporte de Web Serial API
+    if (!('serial' in navigator)) {
+        showToast('Web Serial API no disponible. Usa Chrome, Edge u Opera.', 'warning');
+        logToConsole('[SERIAL] Web Serial API no soportada en este navegador', 'warning');
+        // Fallback: refrescar desde Agent
+        await refreshPorts();
+        return;
+    }
+    
+    try {
+        logToConsole('[SERIAL] Abriendo selector de puertos...', 'info');
+        
+        // Solicitar puerto al usuario (abre diálogo nativo)
+        const port = await navigator.serial.requestPort();
+        
+        // Obtener información del puerto
+        const info = port.getInfo();
+        const vendorId = info.usbVendorId ? `0x${info.usbVendorId.toString(16)}` : 'N/A';
+        const productId = info.usbProductId ? `0x${info.usbProductId.toString(16)}` : 'N/A';
+        
+        logToConsole(`[SERIAL] ✓ Puerto seleccionado (VID: ${vendorId}, PID: ${productId})`, 'success');
+        showToast('Puerto agregado. Ahora refresca la lista.', 'success');
+        
+        // Refrescar la lista de puertos del Agent para que aparezca
+        await refreshPorts();
+        
+    } catch (error) {
+        if (error.name === 'NotFoundError') {
+            // Usuario canceló el diálogo
+            logToConsole('[SERIAL] Selección cancelada', 'info');
+        } else if (error.name === 'SecurityError') {
+            logToConsole('[SERIAL] Error de seguridad. Verifica que uses HTTPS.', 'error');
+            showToast('Error de seguridad. Usa HTTPS.', 'error');
+        } else {
+            logToConsole(`[SERIAL] Error: ${error.message}`, 'error');
+            showToast('Error al solicitar puerto', 'error');
+        }
+    }
+}
 
 /**
  * Refresca la lista de puertos desde el Agent local
