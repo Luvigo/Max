@@ -1,0 +1,103 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}Panel de Administración - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="stats">
+    <div class="stat-card">
+        <h3>{{ institutions_count }}</h3>
+        <p>Instituciones</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ courses_count }}</h3>
+        <p>Cursos</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ students_count }}</h3>
+        <p>Estudiantes</p>
+    </div>
+    <div class="stat-card">
+        <h3>{{ projects_count }}</h3>
+        <p>Proyectos</p>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <div class="card">
+        <h2>📚 Accesos Rápidos</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="{% url 'editor:institution_create' %}" class="btn btn-primary">➕ Crear Institución</a>
+            <a href="{% url 'editor:course_create' %}" class="btn btn-primary">➕ Crear Curso</a>
+            <a href="{% url 'editor:student_create' %}" class="btn btn-primary">➕ Crear Estudiante</a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>📋 Enlaces</h2>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="{% url 'editor:institutions_list' %}" class="btn">Ver Instituciones</a>
+            <a href="{% url 'editor:courses_list' %}" class="btn">Ver Cursos</a>
+            <a href="{% url 'editor:students_list' %}" class="btn">Ver Estudiantes</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>👥 Estudiantes Recientes</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID Estudiante</th>
+                <th>Nombre</th>
+                <th>Curso</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in recent_students %}
+            <tr>
+                <td>{{ student.student_id }}</td>
+                <td>{{ student.user.get_full_name|default:student.user.username }}</td>
+                <td>{{ student.course.name|default:"Sin curso" }}</td>
+                <td>{{ student.created_at|date:"d/m/Y" }}</td>
+                <td><a href="{% url 'editor:student_detail' student.id %}" class="btn btn-sm">Ver</a></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #8b949e;">No hay estudiantes registrados</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>📦 Proyectos Recientes</h2>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Proyecto</th>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th>Última Modificación</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in recent_projects %}
+            <tr>
+                <td>{{ project.name }}</td>
+                <td>{{ project.student.user.get_full_name|default:project.student.user.username }}</td>
+                <td>{{ project.student.course.name|default:"Sin curso" }}</td>
+                <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4" style="text-align: center; color: #8b949e;">No hay proyectos</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

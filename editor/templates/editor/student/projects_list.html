@@ -1,0 +1,44 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}Mis Proyectos - MAX-IDE{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>📦 Mis Proyectos</h1>
+    <a href="{% url 'editor:index' %}?editor=true" class="btn btn-primary">➕ Crear Nuevo Proyecto</a>
+</div>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Descripción</th>
+                <th>Creado</th>
+                <th>Última Modificación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in projects %}
+            <tr>
+                <td><strong>{{ project.name }}</strong></td>
+                <td>{{ project.description|truncatewords:15|default:"Sin descripción" }}</td>
+                <td>{{ project.created_at|date:"d/m/Y" }}</td>
+                <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'editor:project_detail' project.id %}" class="btn btn-sm btn-primary">Abrir</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: #8b949e;">
+                    No tienes proyectos aún. <a href="{% url 'editor:index' %}?editor=true">¡Crea tu primer proyecto!</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+

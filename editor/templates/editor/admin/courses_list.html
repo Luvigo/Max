@@ -1,0 +1,68 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}Cursos - MAX-IDE{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>📚 Cursos</h1>
+    <a href="{% url 'editor:course_create' %}" class="btn btn-primary">➕ Crear Curso</a>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <form method="get" style="display: flex; gap: 10px; align-items: end;">
+        <div class="form-group" style="flex: 1;">
+            <label for="institution">Filtrar por Institución</label>
+            <select id="institution" name="institution" onchange="this.form.submit()">
+                <option value="">Todas las instituciones</option>
+                {% for inst in institutions %}
+                <option value="{{ inst.id }}" {% if inst.id|stringformat:"s" == selected_institution %}selected{% endif %}>
+                    {{ inst.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Código</th>
+                <th>Institución</th>
+                <th>Año Académico</th>
+                <th>Estudiantes</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for course in courses %}
+            <tr>
+                <td><strong>{{ course.name }}</strong></td>
+                <td>{{ course.code }}</td>
+                <td>{{ course.institution.name }}</td>
+                <td>{{ course.academic_year }}</td>
+                <td>{{ course.students_count }}</td>
+                <td>
+                    {% if course.is_active %}
+                        <span style="color: #3fb950;">● Activo</span>
+                    {% else %}
+                        <span style="color: #f85149;">● Inactivo</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'admin:editor_course_change' course.id %}" class="btn btn-sm">Editar</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align: center; color: #8b949e;">No hay cursos registrados</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
