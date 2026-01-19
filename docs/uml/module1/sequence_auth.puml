@@ -1,0 +1,66 @@
+@startuml
+!theme cerulean
+title Módulo 1: Flujo de Autenticación y Resolución de Tenant
+
+actor Usuario
+participant "Browser" as Browser
+participant "Django\nAuth" as Auth
+participant "Tenant\nMiddleware" as TM
+participant "Dashboard\nView" as DV
+participant "Models" as DB
+
+== Login ==
+Usuario -> Browser: Accede a /login/
+Browser -> Auth: GET /login/
+Auth --> Browser: Formulario login
+
+Usuario -> Browser: Ingresa credenciales
+Browser -> Auth: POST /login/
+Auth -> DB: Verificar usuario
+DB --> Auth: Usuario válido
+
+alt Usuario válido
+    Auth --> Browser: Redirect /dashboard/
+else Credenciales inválidas
+    Auth --> Browser: Error "Login fallido"
+end
+
+== Resolución de Dashboard ==
+Browser -> TM: GET /dashboard/
+TM -> DB: get_user_institutions(user)
+DB --> TM: Lista de instituciones
+
+alt Solo 1 institución
+    TM -> DB: get_user_role(user, institution)
+    DB --> TM: rol (admin/institution/tutor/student)
+    TM --> Browser: Redirect /i/<slug>/dashboard/<rol>/
+else Múltiples instituciones
+    TM --> Browser: Redirect /select-institution/
+end
+
+== Acceso a Dashboard con Tenant ==
+Browser -> TM: GET /i/mi-colegio/dashboard/student/
+TM -> DB: Institution.get(slug="mi-colegio")
+DB --> TM: Institution object
+
+TM -> DB: Membership.get(user, institution)
+DB --> TM: Membership object
+
+alt Tiene acceso
+    TM -> DV: request (con current_institution)
+    DV -> DB: Queries filtradas por institución
+    DB --> DV: Datos del estudiante
+    DV --> Browser: HTML Dashboard
+else Sin acceso (cross-tenant)
+    TM --> Browser: Redirect + Error 403
+end
+
+note over TM
+  El middleware añade:
+  - request.current_institution
+  - request.current_membership
+  - request.user_role
+  - request.user_institutions
+end note
+
+@enduml

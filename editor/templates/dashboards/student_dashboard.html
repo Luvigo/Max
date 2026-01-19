@@ -1,0 +1,146 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Mi Dashboard - {{ institution.name }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
+        ¡Hola, {{ user.first_name|default:user.username }}!
+    </h1>
+    <p class="page-subtitle">{{ institution.name }} {% if current_course %}- {{ current_course.name }}{% endif %}</p>
+</div>
+
+<!-- Métricas del Estudiante -->
+<div class="metrics-grid">
+    <div class="metric-card animate-in">
+        <div class="metric-icon cyan">
+            <i class="fas fa-project-diagram"></i>
+        </div>
+        <div class="metric-value">{{ metrics.projects }}</div>
+        <div class="metric-label">Mis Proyectos</div>
+    </div>
+    
+    {% if current_course %}
+    <div class="metric-card animate-in">
+        <div class="metric-icon orange">
+            <i class="fas fa-book-open"></i>
+        </div>
+        <div class="metric-value">1</div>
+        <div class="metric-label">Mi Curso</div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Info del Curso -->
+{% if current_course %}
+<div class="card animate-in" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
+            Mi Curso
+        </h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+            <div>
+                <div style="font-size: 1.25rem; font-weight: 600;">{{ current_course.name }}</div>
+                <div style="color: var(--color-text-muted);">Código: {{ current_course.code }}</div>
+            </div>
+            <div>
+                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Año Académico</div>
+                <div style="font-weight: 500;">{{ current_course.academic_year }}</div>
+            </div>
+            {% if current_course.tutor %}
+            <div>
+                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Tutor</div>
+                <div style="font-weight: 500;">{{ current_course.tutor.get_full_name|default:current_course.tutor.username }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle"></i>
+    <span>No estás asignado a ningún curso. Contacta a tu tutor o administrador.</span>
+</div>
+{% endif %}
+
+<!-- Proyectos Recientes -->
+<div class="card animate-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-folder-open" style="color: var(--color-primary);"></i>
+            Mis Proyectos Recientes
+        </h3>
+        <a href="{% url 'editor:student_projects' %}" class="btn btn-ghost">Ver todos</a>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if recent_projects %}
+        <div class="activity-list">
+            {% for project in recent_projects %}
+            <div class="activity-item">
+                <div class="activity-icon project">
+                    <i class="fas fa-code"></i>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-title">{{ project.name }}</div>
+                    <div class="activity-meta">
+                        {% if project.description %}
+                        {{ project.description|truncatechars:50 }}
+                        {% else %}
+                        Sin descripción
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="activity-time">
+                    {{ project.updated_at|timesince }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-rocket"></i>
+            <p>¡Aún no tienes proyectos!</p>
+            <p style="font-size: 0.85rem; margin-bottom: 1rem;">Comienza creando tu primer proyecto en el IDE</p>
+            <a href="{% url 'editor:index' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear Proyecto
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Acciones Rápidas -->
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-bolt" style="color: var(--color-warning);"></i>
+            ¡Empieza a Programar!
+        </h3>
+    </div>
+    <div class="card-body">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="{% url 'editor:index' %}" class="btn btn-primary">
+                <i class="fas fa-code"></i> Abrir IDE
+            </a>
+            <a href="{% url 'editor:student_projects' %}" class="btn btn-secondary">
+                <i class="fas fa-folder-open"></i> Mis Proyectos
+            </a>
+        </div>
+        
+        <div style="margin-top: 1.5rem; padding: 1rem; background: var(--color-bg-hover); border-radius: 8px;">
+            <div style="font-weight: 500; margin-bottom: 0.5rem;">
+                <i class="fas fa-lightbulb" style="color: var(--color-warning);"></i>
+                Consejo del día
+            </div>
+            <p style="color: var(--color-text-muted); font-size: 0.9rem; margin: 0;">
+                Usa los bloques de <strong>Carrito MAX</strong> para programar tu robot. 
+                ¡Empieza con el bloque de inicialización de motores!
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

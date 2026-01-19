@@ -1,0 +1,94 @@
+@startuml
+!theme cerulean
+title Módulo 1: Multi-tenant + RBAC + Dashboards - Casos de Uso
+
+left to right direction
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+
+actor "Administrador\nGlobal" as Admin <<admin>>
+actor "Admin\nInstitución" as Inst <<institution>>
+actor Tutor <<tutor>>
+actor Estudiante <<student>>
+
+rectangle "Sistema MAX-IDE" {
+    
+    package "Autenticación" {
+        usecase "Iniciar sesión" as UC_Login
+        usecase "Cerrar sesión" as UC_Logout
+        usecase "Recuperar contraseña" as UC_Recovery
+    }
+    
+    package "Tenant Management" {
+        usecase "Seleccionar Institución\n(si tiene múltiples)" as UC_SelectTenant
+        usecase "Cambiar Institución" as UC_ChangeTenant
+        usecase "Acceso tenant-safe" as UC_TenantScope
+    }
+    
+    package "Dashboards" {
+        usecase "Ver Dashboard Admin\n(métricas globales)" as UC_AdminDash
+        usecase "Ver Dashboard Institución\n(métricas institución)" as UC_InstDash
+        usecase "Ver Dashboard Tutor\n(mis cursos y estudiantes)" as UC_TutorDash
+        usecase "Ver Dashboard Estudiante\n(mis proyectos)" as UC_StudentDash
+    }
+    
+    package "Errores y Excepciones" <<Frame>> {
+        usecase "ERROR: Login fallido" as E_LoginFail
+        usecase "ERROR: Acceso denegado\n(cross-tenant)" as E_Forbidden
+        usecase "ERROR: Cuenta desactivada" as E_Disabled
+        usecase "ERROR: Sesión expirada" as E_Expired
+        usecase "ERROR: Institución no encontrada" as E_NotFound
+    }
+}
+
+' Relaciones Admin Global
+Admin --> UC_Login
+Admin --> UC_Logout
+Admin --> UC_AdminDash
+Admin --> UC_InstDash : "puede ver\ncualquiera"
+Admin --> UC_TutorDash : "puede ver\ncualquiera"
+Admin --> UC_StudentDash : "puede ver\ncualquiera"
+Admin --> UC_TenantScope
+
+' Relaciones Admin Institución
+Inst --> UC_Login
+Inst --> UC_Logout
+Inst --> UC_SelectTenant
+Inst --> UC_ChangeTenant
+Inst --> UC_InstDash : "solo su\ninstitución"
+Inst --> UC_TenantScope
+
+' Relaciones Tutor
+Tutor --> UC_Login
+Tutor --> UC_Logout
+Tutor --> UC_SelectTenant
+Tutor --> UC_TutorDash : "solo su\ninstitución"
+Tutor --> UC_TenantScope
+
+' Relaciones Estudiante
+Estudiante --> UC_Login
+Estudiante --> UC_Logout
+Estudiante --> UC_SelectTenant
+Estudiante --> UC_StudentDash : "solo su\ninstitución"
+Estudiante --> UC_TenantScope
+
+' Extensiones de error
+UC_Login ..> E_LoginFail : <<extend>>
+UC_Login ..> E_Disabled : <<extend>>
+UC_Login ..> E_Expired : <<extend>>
+UC_TenantScope ..> E_Forbidden : <<extend>>
+UC_SelectTenant ..> E_NotFound : <<extend>>
+
+note right of UC_TenantScope
+  Todas las consultas a BD
+  filtran por institución.
+  No se puede acceder a datos
+  de otra institución.
+end note
+
+note bottom of Admin
+  Superuser de Django
+  Acceso total al sistema
+end note
+
+@enduml
