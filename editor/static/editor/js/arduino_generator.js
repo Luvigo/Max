@@ -262,6 +262,61 @@ arduinoGenerator.forBlock['arduino_if_else'] = function(block) {
     return `  if (${condition}) {\n${doStatements}  } else {\n${elseStatements}  }\n`;
 };
 
+// Bloque if-elseif (sin else final)
+arduinoGenerator.forBlock['arduino_if_elseif'] = function(block) {
+    const condition1 = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const statements1 = arduinoGenerator.statementToCode(block, 'DO');
+    const condition2 = arduinoGenerator.valueToCode(block, 'CONDITION2', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const statements2 = arduinoGenerator.statementToCode(block, 'DO2');
+    return `  if (${condition1}) {\n${statements1}  } else if (${condition2}) {\n${statements2}  }\n`;
+};
+
+// Bloque if-elseif-else completo
+arduinoGenerator.forBlock['arduino_if_elseif_else'] = function(block) {
+    const condition1 = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const statements1 = arduinoGenerator.statementToCode(block, 'DO');
+    const condition2 = arduinoGenerator.valueToCode(block, 'CONDITION2', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const statements2 = arduinoGenerator.statementToCode(block, 'DO2');
+    const elseStatements = arduinoGenerator.statementToCode(block, 'ELSE');
+    return `  if (${condition1}) {\n${statements1}  } else if (${condition2}) {\n${statements2}  } else {\n${elseStatements}  }\n`;
+};
+
+// Bloque if con múltiples elseif (mutador dinámico)
+arduinoGenerator.forBlock['arduino_if_multi'] = function(block) {
+    const condition0 = arduinoGenerator.valueToCode(block, 'CONDITION0', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const statements0 = arduinoGenerator.statementToCode(block, 'DO0');
+    
+    let code = `  if (${condition0}) {\n${statements0}  }`;
+    
+    // Agregar todos los else if
+    for (let i = 1; i <= block.elseifCount_; i++) {
+        const conditionN = arduinoGenerator.valueToCode(block, 'CONDITION' + i, arduinoGenerator.ORDER_ATOMIC) || 'false';
+        const statementsN = arduinoGenerator.statementToCode(block, 'DO' + i);
+        code += ` else if (${conditionN}) {\n${statementsN}  }`;
+    }
+    
+    // Agregar else si existe
+    if (block.elseCount_) {
+        const elseStatements = arduinoGenerator.statementToCode(block, 'ELSE');
+        code += ` else {\n${elseStatements}  }`;
+    }
+    
+    return code + '\n';
+};
+
+// Los bloques contenedores del mutador no generan código
+arduinoGenerator.forBlock['arduino_if_container'] = function(block) {
+    return '';
+};
+
+arduinoGenerator.forBlock['arduino_if_elseif_item'] = function(block) {
+    return '';
+};
+
+arduinoGenerator.forBlock['arduino_if_else_item'] = function(block) {
+    return '';
+};
+
 arduinoGenerator.forBlock['arduino_for'] = function(block) {
     const variable = block.getFieldValue('VAR');
     const from = block.getFieldValue('FROM');

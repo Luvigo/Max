@@ -51,8 +51,123 @@ except ImportError:
 # CONFIGURACIÓN
 # ============================================
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 DEFAULT_PORT = 8765
+
+# ============================================
+# FUNCIONES DE UTILIDAD - PUERTO SERIAL
+# ============================================
+
+def reset_serial_port(port, log_func=None):
+    """
+    Intenta limpiar/resetear un puerto serial antes de usarlo.
+    Esto puede ayudar si el puerto quedó "bloqueado" por una conexión anterior.
+    
+    Args:
+        port: Nombre del puerto (ej: "COM3", "/dev/ttyUSB0")
+        log_func: Función opcional para logging
+    
+    Returns:
+        bool: True si se pudo limpiar, False si hubo error
+    """
+    import serial
+    
+    def log(msg):
+        if log_func:
+            log_func(msg)
+        else:
+            print(f"[RESET_PORT] {msg}")
+    
+    log(f"Intentando limpiar puerto {port}...")
+    
+    try:
+        # Paso 1: Intentar cerrar cualquier conexión existente
+        # abriendo y cerrando el puerto
+        try:
+            ser = serial.Serial()
+            ser.port = port
+            ser.baudrate = 9600
+            ser.timeout = 0.5
+            ser.dtr = False
+            ser.rts = False
+            
+            # Abrir el puerto
+            ser.open()
+            log(f"Puerto {port} abierto para limpieza")
+            
+            # Limpiar buffers
+            if ser.is_open:
+                ser.reset_input_buffer()
+                ser.reset_output_buffer()
+                log("Buffers limpiados")
+            
+            # Pequeña pausa
+            time.sleep(0.2)
+            
+            # Cerrar
+            ser.close()
+            log(f"Puerto {port} cerrado correctamente")
+            
+        except serial.SerialException as e:
+            # Si no se puede abrir, puede que ya esté cerrado o bloqueado
+            log(f"No se pudo abrir para limpiar: {e}")
+            # Continuar de todos modos
+        
+        # Paso 2: En Windows, intentar reset adicional
+        if platform.system() == 'Windows':
+            log("Aplicando reset adicional para Windows...")
+            try:
+                # Intentar con DTR toggle (reset del Arduino)
+                ser = serial.Serial()
+                ser.port = port
+                ser.baudrate = 1200  # Baudrate especial para forzar reset en algunos Arduinos
+                ser.timeout = 0.1
+                ser.open()
+                ser.dtr = True
+                time.sleep(0.1)
+                ser.dtr = False
+                time.sleep(0.1)
+                ser.close()
+                log("Reset DTR aplicado")
+            except Exception as e:
+                log(f"Reset DTR falló (normal si el puerto ya está limpio): {e}")
+        
+        # Paso 3: Esperar un momento para que el puerto se estabilice
+        log("Esperando estabilización del puerto...")
+        time.sleep(0.5)
+        
+        log(f"✓ Puerto {port} listo")
+        return True
+        
+    except Exception as e:
+        log(f"Error durante limpieza de puerto: {e}")
+        return False
+
+
+def force_close_port_windows(port):
+    """
+    Intenta forzar el cierre de un puerto en Windows usando comandos del sistema.
+    
+    Args:
+        port: Nombre del puerto (ej: "COM3")
+    
+    Returns:
+        bool: True si se ejecutó el comando, False si falló
+    """
+    if platform.system() != 'Windows':
+        return False
+    
+    try:
+        # En Windows, mode puede ayudar a resetear el puerto
+        subprocess.run(
+            ['mode', port],
+            capture_output=True,
+            timeout=5
+        )
+        time.sleep(0.3)
+        return True
+    except Exception:
+        return False
 
 # Dominios permitidos para CORS
 # El Agent corre localmente, así que permitimos todos los orígenes
@@ -670,9 +785,24 @@ def upload():
             log(f"HEX generado: {hex_file}")
         
         # ========================================
-        # UPLOAD: Ejecutar arduino-cli upload
+        # RESET PORT: Limpiar puerto antes de upload
         # ========================================
-        log(f"Ejecutando upload a {port}...")
+        log("Limpiando puerto serial antes de upload...")
+        port_reset_ok = reset_serial_port(port, log)
+        if not port_reset_ok:
+            log("⚠ No se pudo limpiar el puerto, intentando upload de todos modos...")
+        else:
+            log("✓ Puerto limpiado correctamente")
+        
+        # Pequeño delay adicional para asegurar estabilidad
+        time.sleep(0.3)
+        
+        # ========================================
+        # UPLOAD: Ejecutar arduino-cli upload (con reintentos)
+        # ========================================
+        MAX_RETRIES = 2
+        retry_count = 0
+        upload_result = None
         
         upload_cmd = [
             ARDUINO_CLI, 'upload',
@@ -682,14 +812,42 @@ def upload():
             '-v'  # Verbose
         ]
         
-        log(f"Comando: {' '.join(upload_cmd)}")
-        
-        upload_result = subprocess.run(
-            upload_cmd,
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
+        while retry_count <= MAX_RETRIES:
+            if retry_count > 0:
+                log(f"🔄 Reintento {retry_count}/{MAX_RETRIES}...")
+                # Esperar antes de reintentar
+                time.sleep(1.5)
+                # Intentar limpiar el puerto de nuevo
+                reset_serial_port(port, log)
+                time.sleep(0.5)
+            
+            log(f"Ejecutando upload a {port}...")
+            log(f"Comando: {' '.join(upload_cmd)}")
+            
+            upload_result = subprocess.run(
+                upload_cmd,
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            
+            # Si fue exitoso, salir del loop
+            if upload_result.returncode == 0:
+                break
+            
+            # Verificar si el error es transitorio (puede mejorar con reintento)
+            error_output = (upload_result.stderr + upload_result.stdout).lower()
+            is_transient_error = any(x in error_output for x in [
+                'busy', 'in use', 'resource busy', 'com-state',
+                'timeout', 'timed out', "can't open device"
+            ])
+            
+            if is_transient_error and retry_count < MAX_RETRIES:
+                log(f"⚠ Error transitorio detectado, reintentando...")
+                retry_count += 1
+            else:
+                # Error no transitorio o ya se acabaron los reintentos
+                break
         
         # Capturar output completo
         stdout_lines = upload_result.stdout.strip().split('\n') if upload_result.stdout else []
@@ -726,19 +884,33 @@ def upload():
             hint = None
             error_code = 'UPLOAD_FAIL'
             
+            # Error específico de Windows: can't set com-state
+            if "can't set com-state" in error_lower or 'com-state' in error_lower:
+                hint = '⚠️ Error de comunicación con el puerto (COM-state).\n' \
+                       'Posibles soluciones:\n' \
+                       '1. Desconecta y reconecta el cable USB\n' \
+                       '2. Prueba otro puerto USB (preferiblemente USB 2.0)\n' \
+                       '3. Si es Arduino Nano (clon CH340), selecciona "Arduino Nano (Old Bootloader)"\n' \
+                       '4. Cierra todas las aplicaciones que puedan usar el puerto\n' \
+                       '5. Reinicia el PC si el problema persiste\n' \
+                       '6. Prueba con otro cable USB (algunos solo cargan, no transmiten datos)'
+                error_code = 'COM_STATE_ERROR'
+            
             # Puerto ocupado
-            if 'busy' in error_lower or 'in use' in error_lower or 'resource busy' in error_lower:
+            elif 'busy' in error_lower or 'in use' in error_lower or 'resource busy' in error_lower:
                 hint = 'El puerto está ocupado. Cierra el Serial Monitor, Arduino IDE u otras aplicaciones que usen el puerto.'
                 error_code = 'PORT_BUSY'
             
             # Error de sincronización
             elif 'sync' in error_lower or 'not in sync' in error_lower or 'programmer is not responding' in error_lower:
-                hint = 'Error de sincronización con el bootloader. Posibles soluciones:\n' \
-                       '- Prueba con otro cable USB\n' \
-                       '- Evita usar hubs USB\n' \
-                       '- Si es CH340, instala los drivers\n' \
-                       '- Presiona RESET en la placa justo antes de subir\n' \
-                       '- Prueba otro puerto USB'
+                hint = '⚠️ Error de sincronización con el bootloader.\n' \
+                       'Posibles soluciones:\n' \
+                       '1. Si es Arduino Nano (clon CH340), selecciona "Arduino Nano (Old Bootloader)" ← MÁS COMÚN\n' \
+                       '2. Prueba con otro cable USB (que soporte datos, no solo carga)\n' \
+                       '3. Evita usar hubs USB, conecta directo\n' \
+                       '4. Instala los drivers CH340 si no los tienes\n' \
+                       '5. Presiona RESET en la placa justo antes de subir\n' \
+                       '6. Prueba otro puerto USB'
                 error_code = 'SYNC_FAIL'
             
             # Puerto no encontrado

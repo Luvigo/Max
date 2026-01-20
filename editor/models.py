@@ -2,10 +2,12 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.text import slugify
+import uuid
 
 
 class Institution(models.Model):
     """Institución educativa - Tenant principal"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, verbose_name="Nombre")
     slug = models.SlugField(max_length=100, unique=True, blank=True, verbose_name="Slug URL")
     code = models.CharField(max_length=50, unique=True, verbose_name="Código")
@@ -68,6 +70,7 @@ class Membership(models.Model):
         ('student', 'Estudiante'),
     ]
     
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='memberships', verbose_name="Usuario")
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='memberships', verbose_name="Institución")
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student', verbose_name="Rol")
