@@ -412,7 +412,7 @@ Blockly.Blocks['arduino_if_else'] = {
     }
 };
 
-// Bloque if-elseif (sin else final)
+// Bloque si/sino si (else if simple)
 Blockly.Blocks['arduino_if_elseif'] = {
     init: function() {
         this.appendValueInput("CONDITION")
@@ -423,18 +423,18 @@ Blockly.Blocks['arduino_if_elseif'] = {
             .appendField("entonces");
         this.appendValueInput("CONDITION2")
             .setCheck("Boolean")
-            .appendField("sino si");
+            .appendField("⤵️ sino si");
         this.appendStatementInput("DO2")
             .setCheck(null)
             .appendField("entonces");
         this.setPreviousStatement(true, null);
         this.setNextStatement(true, null);
         this.setColour(210);
-        this.setTooltip("Ejecuta código si la primera condición es verdadera, sino evalúa la segunda condición");
+        this.setTooltip("if / else if - Ejecuta código según dos condiciones");
     }
 };
 
-// Bloque if-elseif-else completo
+// Bloque si/sino si/sino (else if con else)
 Blockly.Blocks['arduino_if_elseif_else'] = {
     init: function() {
         this.appendValueInput("CONDITION")
@@ -445,189 +445,48 @@ Blockly.Blocks['arduino_if_elseif_else'] = {
             .appendField("entonces");
         this.appendValueInput("CONDITION2")
             .setCheck("Boolean")
-            .appendField("sino si");
+            .appendField("⤵️ sino si");
         this.appendStatementInput("DO2")
             .setCheck(null)
             .appendField("entonces");
         this.appendStatementInput("ELSE")
             .setCheck(null)
-            .appendField("sino");
+            .appendField("⤵️ sino");
         this.setPreviousStatement(true, null);
         this.setNextStatement(true, null);
         this.setColour(210);
-        this.setTooltip("Ejecuta código según múltiples condiciones, con un bloque final si ninguna se cumple");
+        this.setTooltip("if / else if / else - Ejecuta código según condiciones, con un bloque final si ninguna se cumple");
     }
 };
 
-// Bloque if con múltiples elseif (mutador dinámico)
-Blockly.Blocks['arduino_if_multi'] = {
+// Bloque con 2 else if (para casos más complejos)
+Blockly.Blocks['arduino_if_elseif2_else'] = {
     init: function() {
-        this.appendValueInput("CONDITION0")
+        this.appendValueInput("CONDITION")
             .setCheck("Boolean")
             .appendField("🔀 si");
-        this.appendStatementInput("DO0")
+        this.appendStatementInput("DO")
             .setCheck(null)
             .appendField("entonces");
+        this.appendValueInput("CONDITION2")
+            .setCheck("Boolean")
+            .appendField("⤵️ sino si");
+        this.appendStatementInput("DO2")
+            .setCheck(null)
+            .appendField("entonces");
+        this.appendValueInput("CONDITION3")
+            .setCheck("Boolean")
+            .appendField("⤵️ sino si");
+        this.appendStatementInput("DO3")
+            .setCheck(null)
+            .appendField("entonces");
+        this.appendStatementInput("ELSE")
+            .setCheck(null)
+            .appendField("⤵️ sino");
         this.setPreviousStatement(true, null);
         this.setNextStatement(true, null);
         this.setColour(210);
-        this.setTooltip("Condicional con múltiples 'sino si'. Usa el ⚙️ para agregar más condiciones.");
-        this.setMutator(new Blockly.Mutator(['arduino_if_elseif_item', 'arduino_if_else_item']));
-        this.elseifCount_ = 0;
-        this.elseCount_ = 0;
-    },
-    
-    mutationToDom: function() {
-        var container = document.createElement('mutation');
-        container.setAttribute('elseif', this.elseifCount_);
-        container.setAttribute('else', this.elseCount_);
-        return container;
-    },
-    
-    domToMutation: function(xmlElement) {
-        this.elseifCount_ = parseInt(xmlElement.getAttribute('elseif'), 10) || 0;
-        this.elseCount_ = parseInt(xmlElement.getAttribute('else'), 10) || 0;
-        this.updateShape_();
-    },
-    
-    decompose: function(workspace) {
-        var containerBlock = workspace.newBlock('arduino_if_container');
-        containerBlock.initSvg();
-        var connection = containerBlock.getInput('STACK').connection;
-        
-        for (var i = 1; i <= this.elseifCount_; i++) {
-            var elseifBlock = workspace.newBlock('arduino_if_elseif_item');
-            elseifBlock.initSvg();
-            connection.connect(elseifBlock.previousConnection);
-            connection = elseifBlock.nextConnection;
-        }
-        
-        if (this.elseCount_) {
-            var elseBlock = workspace.newBlock('arduino_if_else_item');
-            elseBlock.initSvg();
-            connection.connect(elseBlock.previousConnection);
-        }
-        
-        return containerBlock;
-    },
-    
-    compose: function(containerBlock) {
-        var clauseBlock = containerBlock.getInputTargetBlock('STACK');
-        
-        // Contar elseif y else
-        this.elseifCount_ = 0;
-        this.elseCount_ = 0;
-        var valueConnections = [null];
-        var statementConnections = [null];
-        var elseStatementConnection = null;
-        
-        while (clauseBlock) {
-            switch (clauseBlock.type) {
-                case 'arduino_if_elseif_item':
-                    this.elseifCount_++;
-                    valueConnections.push(clauseBlock.valueConnection_);
-                    statementConnections.push(clauseBlock.statementConnection_);
-                    break;
-                case 'arduino_if_else_item':
-                    this.elseCount_++;
-                    elseStatementConnection = clauseBlock.statementConnection_;
-                    break;
-            }
-            clauseBlock = clauseBlock.nextConnection && clauseBlock.nextConnection.targetBlock();
-        }
-        
-        this.updateShape_();
-        
-        // Reconectar inputs
-        for (var i = 1; i <= this.elseifCount_; i++) {
-            Blockly.Mutator.reconnect(valueConnections[i], this, 'CONDITION' + i);
-            Blockly.Mutator.reconnect(statementConnections[i], this, 'DO' + i);
-        }
-        Blockly.Mutator.reconnect(elseStatementConnection, this, 'ELSE');
-    },
-    
-    saveConnections: function(containerBlock) {
-        var clauseBlock = containerBlock.getInputTargetBlock('STACK');
-        var i = 1;
-        while (clauseBlock) {
-            switch (clauseBlock.type) {
-                case 'arduino_if_elseif_item':
-                    var inputCondition = this.getInput('CONDITION' + i);
-                    var inputDo = this.getInput('DO' + i);
-                    clauseBlock.valueConnection_ = inputCondition && inputCondition.connection.targetConnection;
-                    clauseBlock.statementConnection_ = inputDo && inputDo.connection.targetConnection;
-                    i++;
-                    break;
-                case 'arduino_if_else_item':
-                    var inputElse = this.getInput('ELSE');
-                    clauseBlock.statementConnection_ = inputElse && inputElse.connection.targetConnection;
-                    break;
-            }
-            clauseBlock = clauseBlock.nextConnection && clauseBlock.nextConnection.targetBlock();
-        }
-    },
-    
-    updateShape_: function() {
-        // Eliminar todos los elseif y else existentes
-        var i = 1;
-        while (this.getInput('CONDITION' + i)) {
-            this.removeInput('CONDITION' + i);
-            this.removeInput('DO' + i);
-            i++;
-        }
-        if (this.getInput('ELSE')) {
-            this.removeInput('ELSE');
-        }
-        
-        // Agregar nuevos elseif
-        for (i = 1; i <= this.elseifCount_; i++) {
-            this.appendValueInput('CONDITION' + i)
-                .setCheck('Boolean')
-                .appendField('sino si');
-            this.appendStatementInput('DO' + i)
-                .appendField('entonces');
-        }
-        
-        // Agregar else si es necesario
-        if (this.elseCount_) {
-            this.appendStatementInput('ELSE')
-                .appendField('sino');
-        }
-    }
-};
-
-// Bloques contenedores para el mutador
-Blockly.Blocks['arduino_if_container'] = {
-    init: function() {
-        this.appendDummyInput()
-            .appendField("si");
-        this.appendStatementInput('STACK');
-        this.setColour(210);
-        this.setTooltip("Arrastra 'sino si' o 'sino' aquí para agregar condiciones");
-        this.contextMenu = false;
-    }
-};
-
-Blockly.Blocks['arduino_if_elseif_item'] = {
-    init: function() {
-        this.appendDummyInput()
-            .appendField("sino si");
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        this.setColour(210);
-        this.setTooltip("Agrega una condición 'else if'");
-        this.contextMenu = false;
-    }
-};
-
-Blockly.Blocks['arduino_if_else_item'] = {
-    init: function() {
-        this.appendDummyInput()
-            .appendField("sino");
-        this.setPreviousStatement(true);
-        this.setColour(210);
-        this.setTooltip("Agrega un bloque 'else' final");
-        this.contextMenu = false;
+        this.setTooltip("if / else if / else if / else - Para 3 condiciones diferentes más un caso por defecto");
     }
 };
 
