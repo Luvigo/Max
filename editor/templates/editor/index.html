@@ -28,6 +28,16 @@
             </div>
             
             <div class="header-controls">
+                <!-- Activity Status Badge (solo visible si hay actividad) -->
+                <div id="activityStatusContainer" class="activity-status-container" style="display: none;">
+                    <span class="activity-badge" id="submissionStatusBadge">
+                        <span class="badge-inprogress">🟡 En progreso</span>
+                    </span>
+                    <button class="btn btn-success btn-sm" id="btnSubmitActivity" style="display: none;">
+                        📤 Entregar
+                    </button>
+                </div>
+                
                 <!-- Board Selector -->
                 <div class="control-group">
                     <label>
@@ -829,5 +839,182 @@ void loop() {
         }, 1000);
     </script>
     {% endif %}
+    
+    <!-- Modal de confirmación de entrega (P3.1) -->
+    <div class="submit-modal-overlay" id="submitModalOverlay">
+        <div class="submit-modal">
+            <h3>📤 Confirmar Entrega</h3>
+            <p id="submitModalMessage">
+                ¿Estás seguro de que quieres entregar esta actividad?
+            </p>
+            <div class="submit-status-message" id="submitStatusMessage"></div>
+            <div class="submit-modal-actions">
+                <button class="btn btn-cancel" id="btnCancelSubmit">Cancelar</button>
+                <button class="btn btn-confirm" id="btnConfirmSubmit">
+                    <span id="btnConfirmSubmitText">Entregar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // Sistema de entrega de actividades (P3.1)
+    (function() {
+        // Solo inicializar si hay IDE_CONFIG con actividad
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initActivitySubmitSystem, 500);
+        });
+        
+        function initActivitySubmitSystem() {
+            // Verificar si hay contexto de actividad
+            if (typeof IDE_CONFIG === 'undefined' || !IDE_CONFIG.activityId) {
+                console.debug('[Submit] No hay contexto de actividad');
+                return;
+            }
+            
+            console.debug('[Submit] Inicializando sistema de entrega para actividad:', IDE_CONFIG.activityId);
+            
+            // Mostrar contenedor de estado
+            const statusContainer = document.getElementById('activityStatusContainer');
+            const submitBtn = document.getElementById('btnSubmitActivity');
+            const badge = document.getElementById('submissionStatusBadge');
+            
+            if (statusContainer) {
+                statusContainer.style.display = 'flex';
+            }
+            
+            // Mostrar botón si puede entregar
+            if (submitBtn && IDE_CONFIG.canSubmit && !IDE_CONFIG.isReadOnly && !IDE_CONFIG.isFrozen) {
+                submitBtn.style.display = 'inline-flex';
+                submitBtn.addEventListener('click', openSubmitModal);
+            }
+            
+            // Actualizar badge según estado actual
+            updateBadgeFromConfig();
+            
+            // Event listeners del modal
+            document.getElementById('btnCancelSubmit')?.addEventListener('click', closeSubmitModal);
+            document.getElementById('btnConfirmSubmit')?.addEventListener('click', performSubmit);
+            document.getElementById('submitModalOverlay')?.addEventListener('click', function(e) {
+                if (e.target === this) closeSubmitModal();
+            });
+        }
+        
+        function updateBadgeFromConfig() {
+            const badge = document.getElementById('submissionStatusBadge');
+            if (!badge) return;
+            
+            // Detectar estado desde IDE_CONFIG o desde la página
+            if (IDE_CONFIG.isFrozen || IDE_CONFIG.isReadOnly) {
+                if (IDE_CONFIG.submissionStatus === 'graded') {
+                    badge.innerHTML = '<span class="badge-graded">🟢 Calificada</span>';
+                } else {
+                    badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
+                }
+            } else {
+                badge.innerHTML = '<span class="badge-inprogress">🟡 En progreso</span>';
+            }
+        }
+        
+        window.openSubmitModal = function() {
+            const modal = document.getElementById('submitModalOverlay');
+            const statusMsg = document.getElementById('submitStatusMessage');
+            const confirmBtn = document.getElementById('btnConfirmSubmit');
+            const confirmText = document.getElementById('btnConfirmSubmitText');
+            
+            // Reset estado
+            if (statusMsg) {
+                statusMsg.className = 'submit-status-message';
+                statusMsg.textContent = '';
+            }
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (confirmText) confirmText.textContent = 'Entregar';
+            
+            // Actualizar mensaje
+            const msgEl = document.getElementById('submitModalMessage');
+            if (msgEl) {
+                let msg = '¿Estás seguro de que quieres entregar esta actividad?';
+                if (IDE_CONFIG.allowResubmit === false) {
+                    msg += '<br><strong>⚠️ Nota:</strong> Esta actividad no permite re-entregas. Una vez entregada, no podrás editarla.';
+                }
+                msgEl.innerHTML = msg;
+            }
+            
+            if (modal) modal.classList.add('active');
+        };
+        
+        window.closeSubmitModal = function() {
+            const modal = document.getElementById('submitModalOverlay');
+            if (modal) modal.classList.remove('active');
+        };
+        
+        window.performSubmit = async function() {
+            const confirmBtn = document.getElementById('btnConfirmSubmit');
+            const confirmText = document.getElementById('btnConfirmSubmitText');
+            const statusMsg = document.getElementById('submitStatusMessage');
+            
+            if (confirmBtn) confirmBtn.disabled = true;
+            if (confirmText) confirmText.innerHTML = '<span class="mini-spinner"></span> Entregando...';
+            if (statusMsg) statusMsg.className = 'submit-status-message';
+            
+            try {
+                // Obtener URL de submit
+                const submitUrl = IDE_CONFIG.submitUrl || 
+                    `/i/${IDE_CONFIG.institutionSlug}/student/activities/${IDE_CONFIG.activityId}/submit/`;
+                
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('project_id', IDE_CONFIG.projectId || currentProjectId || '');
+                
+                const response = await fetch(submitUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': IDE_CONFIG.csrfToken || getCsrfToken()
+                    },
+                    body: formData
+                });
+                
+                if (response.redirected || response.ok) {
+                    // Éxito
+                    if (statusMsg) {
+                        statusMsg.className = 'submit-status-message show success';
+                        statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
+                    }
+                    if (confirmText) confirmText.textContent = '✓ Entregado';
+                    
+                    // Actualizar badge
+                    const badge = document.getElementById('submissionStatusBadge');
+                    if (badge) {
+                        badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
+                    }
+                    
+                    // Ocultar botón de entregar si no permite re-entrega
+                    if (!IDE_CONFIG.allowResubmit) {
+                        const submitBtn = document.getElementById('btnSubmitActivity');
+                        if (submitBtn) submitBtn.style.display = 'none';
+                    }
+                    
+                    // Recargar después de un momento
+                    setTimeout(() => {
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                        } else {
+                            window.location.reload();
+                        }
+                    }, 1500);
+                } else {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+            } catch (error) {
+                if (statusMsg) {
+                    statusMsg.className = 'submit-status-message show error';
+                    statusMsg.textContent = '✗ Error al entregar: ' + (error.message || 'Intenta de nuevo');
+                }
+                if (confirmBtn) confirmBtn.disabled = false;
+                if (confirmText) confirmText.textContent = 'Reintentar';
+            }
+        };
+    })();
+    </script>
 </body>
 </html>
