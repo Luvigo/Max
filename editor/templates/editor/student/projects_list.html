@@ -5,7 +5,7 @@
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h1>📦 Mis Proyectos</h1>
-    <a href="{% url 'editor:index' %}?editor=true" class="btn btn-primary">➕ Crear Nuevo Proyecto</a>
+    <a href="/?editor=true" class="btn btn-primary">➕ Crear Nuevo Proyecto</a>
 </div>
 
 <div class="card">
@@ -33,7 +33,7 @@
             {% empty %}
             <tr>
                 <td colspan="5" style="text-align: center; color: #8b949e;">
-                    No tienes proyectos aún. <a href="{% url 'editor:index' %}?editor=true">¡Crea tu primer proyecto!</a>
+                    No tienes proyectos aún. <a href="/?editor=true">¡Crea tu primer proyecto!</a>
                 </td>
             </tr>
             {% endfor %}

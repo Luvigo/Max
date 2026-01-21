@@ -234,7 +234,7 @@
                 {% else %}
                     <a href="{% url 'editor:student_dashboard' %}">Mi Panel</a>
                     <a href="{% url 'editor:student_projects' %}">Mis Proyectos</a>
-                    <a href="{% url 'editor:index' %}?editor=true">Editor</a>
+                    <a href="/?editor=true">Editor</a>
                 {% endif %}
                 <a href="{% url 'admin:logout' %}">Cerrar Sesión</a>
             {% else %}

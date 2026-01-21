@@ -46,7 +46,7 @@
             {% empty %}
             <tr>
                 <td colspan="3" style="text-align: center; color: #8b949e;">
-                    No tienes proyectos aún. <a href="{% url 'editor:index' %}?editor=true">¡Crea tu primer proyecto!</a>
+                    No tienes proyectos aún. <a href="/?editor=true">¡Crea tu primer proyecto!</a>
                 </td>
             </tr>
             {% endfor %}
@@ -55,7 +55,7 @@
 </div>
 
 <div style="margin-top: 20px; text-align: center;">
-    <a href="{% url 'editor:index' %}?editor=true" class="btn btn-primary" style="font-size: 18px; padding: 15px 30px;">
+    <a href="/?editor=true" class="btn btn-primary" style="font-size: 18px; padding: 15px 30px;">
         🚀 Abrir MAX-IDE Editor
     </a>
 </div>
