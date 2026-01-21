@@ -55,7 +55,7 @@
                 <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
                 Cursos
             </h3>
-            <a href="{% url 'editor:courses_list' %}" class="btn btn-ghost">Ver todos</a>
+            <a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}" class="btn btn-ghost">Ver todos</a>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if courses %}
@@ -89,7 +89,7 @@
             <div class="empty-state">
                 <i class="fas fa-graduation-cap"></i>
                 <p>No hay cursos creados</p>
-                <a href="{% url 'editor:course_create' %}" class="btn btn-primary">
+                <a href="{% url 'editor:institution_course_create' institution_slug=institution.slug %}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Crear Curso
                 </a>
             </div>
@@ -174,14 +174,14 @@
     </div>
     <div class="card-body">
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="{% url 'editor:course_create' %}" class="btn btn-primary">
+            <a href="{% url 'editor:institution_course_create' institution_slug=institution.slug %}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Curso
             </a>
-            <a href="{% url 'editor:student_create' %}" class="btn btn-secondary">
-                <i class="fas fa-user-plus"></i> Nuevo Estudiante
+            <a href="{% url 'editor:institution_import_csv' institution_slug=institution.slug %}" class="btn btn-secondary">
+                <i class="fas fa-file-csv"></i> Importar Estudiantes CSV
             </a>
-            <a href="{% url 'editor:students_list' %}" class="btn btn-ghost">
-                <i class="fas fa-list"></i> Ver Estudiantes
+            <a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}" class="btn btn-ghost">
+                <i class="fas fa-list"></i> Ver Cursos
             </a>
         </div>
     </div>
