@@ -1,0 +1,43 @@
+@startuml
+left to right direction
+
+actor Admin
+actor Institucion
+actor Tutor
+actor Estudiante
+actor "Agent Local" as Agent
+
+rectangle "Módulo 5 v2: Agent Institucional" {
+
+  usecase "Registrar Agent" as UC_Register
+  usecase "Heartbeat Agent" as UC_Heartbeat
+  usecase "Listar Agents" as UC_List
+  usecase "Ver estado Agent" as UC_Status
+  usecase "Verificar Agent en IDE" as UC_Check
+  usecase "Guía instalación" as UC_Guide
+
+  usecase "ERROR: Agent Offline" as E_Offline
+  usecase "ERROR: Versión incompatible" as E_Version
+  usecase "ERROR: Token inválido" as E_Token
+}
+
+Agent --> UC_Register
+Agent --> UC_Heartbeat
+
+Admin --> UC_List
+Admin --> UC_Status
+
+Institucion --> UC_List
+Institucion --> UC_Status
+
+Tutor --> UC_Check
+Tutor --> UC_Guide
+
+Estudiante --> UC_Check
+Estudiante --> UC_Guide
+
+UC_Check ..> E_Offline : <<extend>>
+UC_Check ..> E_Version : <<extend>>
+UC_Register ..> E_Token : <<extend>>
+
+@enduml

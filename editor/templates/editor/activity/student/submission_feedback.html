@@ -1,0 +1,82 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Feedback - {{ submission.activity.title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-comment"></i> Feedback</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:student_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:student_activity_detail' institution_slug=institution.slug activity_id=activity.id %}">{{ activity.title }}</a></li>
+                <li class="breadcrumb-item active">Feedback</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Feedback - {{ activity.title }}</h3>
+            </div>
+            <div class="card-body">
+                {% if feedback %}
+                <div class="mb-3">
+                    <h5>Puntaje</h5>
+                    <p class="h3">{{ feedback.score }}
+                        {% if feedback.get_percentage_score %}
+                        <small class="text-muted">({{ feedback.get_percentage_score|floatformat:1 }}%)</small>
+                        {% endif %}
+                    </p>
+                    {% if rubric %}
+                    <small class="text-muted">Puntaje máximo: {{ rubric.get_total_max_score }}</small>
+                    {% endif %}
+                </div>
+                
+                {% if feedback.comments %}
+                <div class="mb-3">
+                    <h5>Comentarios</h5>
+                    <p>{{ feedback.comments|linebreaks }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <small class="text-muted">
+                        Calificado por: {{ feedback.tutor.get_full_name|default:feedback.tutor.username }}
+                        <br>Fecha: {{ feedback.created_at|date:"d/m/Y H:i" }}
+                    </small>
+                </div>
+                {% else %}
+                <p class="text-muted">Aún no hay feedback disponible para esta entrega.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Mi Entrega</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>Intento:</strong> {{ submission.attempt }}</p>
+                <p><strong>Fecha de Entrega:</strong> {{ submission.submitted_at|date:"d/m/Y H:i" }}</p>
+                <p><strong>Estado:</strong> 
+                    {% if submission.status == 'graded' %}
+                    <span class="badge badge-success">Calificada</span>
+                    {% else %}
+                    <span class="badge badge-warning">Entregada</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

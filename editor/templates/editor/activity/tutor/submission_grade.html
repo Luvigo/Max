@@ -1,0 +1,84 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Calificar Entrega - {{ submission.student.username }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-check-circle"></i> Calificar Entrega</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}">{{ activity.title }}</a></li>
+                <li class="breadcrumb-item active">Calificar</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Calificar Entrega</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Estudiante:</strong> {{ submission.student.get_full_name|default:submission.student.username }}
+                    <br><strong>Email:</strong> {{ submission.student.email }}
+                    <br><strong>Intento:</strong> {{ submission.attempt }}
+                    <br><strong>Fecha de Entrega:</strong> {{ submission.submitted_at|date:"d/m/Y H:i" }}
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label for="{{ form.score.id_for_label }}">{{ form.score.label }}</label>
+                        {{ form.score }}
+                        {% if form.score.errors %}
+                        <div class="text-danger">{{ form.score.errors }}</div>
+                        {% endif %}
+                        {% if rubric %}
+                        <small class="form-text text-muted">Puntaje máximo: {{ rubric.get_total_max_score }}</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="{{ form.comments.id_for_label }}">{{ form.comments.label }}</label>
+                        {{ form.comments }}
+                        {% if form.comments.errors %}
+                        <div class="text-danger">{{ form.comments.errors }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar Calificación
+                        </button>
+                        <a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Actividad</h3>
+            </div>
+            <div class="card-body">
+                <p><strong>{{ activity.title }}</strong></p>
+                <p>{{ activity.objective|truncatewords:20 }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

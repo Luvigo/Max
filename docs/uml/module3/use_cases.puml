@@ -1,0 +1,34 @@
+@startuml
+left to right direction
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 3: Actividades y Entregas" {
+  usecase "Crear Actividad" as UC_CreateAct
+  usecase "Publicar Actividad" as UC_PublishAct
+  usecase "Ver Actividades" as UC_ViewAct
+  usecase "Entregar Actividad" as UC_Submit
+  usecase "Calificar Entrega" as UC_Grade
+  usecase "Ver Feedback" as UC_ViewFeedback
+
+  usecase "ERROR: No publicada" as E_NotPublished
+  usecase "ERROR: Fuera de plazo" as E_Deadline
+  usecase "ERROR: Re-entrega bloqueada" as E_NoResubmit
+  usecase "ERROR: Entrega vacía" as E_Empty
+  usecase "ERROR: Doble envío" as E_DoubleSubmit
+}
+
+Tutor --> UC_CreateAct
+Tutor --> UC_PublishAct
+Tutor --> UC_Grade
+
+Estudiante --> UC_ViewAct
+Estudiante --> UC_Submit
+Estudiante --> UC_ViewFeedback
+
+UC_Submit ..> E_NotPublished : <<extend>>
+UC_Submit ..> E_Deadline : <<extend>>
+UC_Submit ..> E_NoResubmit : <<extend>>
+UC_Submit ..> E_Empty : <<extend>>
+UC_Submit ..> E_DoubleSubmit : <<extend>>
+@enduml

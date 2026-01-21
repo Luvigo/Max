@@ -1,7 +1,13 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Institution, Membership, Course, Student, Project
+from .models import (
+    Institution, Membership, Course, Enrollment, TeachingAssignment, Student, Project,
+    Activity, Submission, Rubric, Feedback,
+    IDEProject, ProjectSnapshot, ActivityWorkspace,
+    AgentInstance,
+    AuditLog, ErrorEvent
+)
 
 
 @admin.register(Institution)
@@ -60,15 +66,64 @@ class MembershipAdmin(admin.ModelAdmin):
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ['name', 'code', 'institution', 'tutor', 'academic_year', 'is_active', 'get_students_count']
-    list_filter = ['institution', 'academic_year', 'is_active', 'created_at']
+    list_display = ['name', 'code', 'institution', 'grade_level', 'status', 'academic_year', 'is_active', 'get_students_count']
+    list_filter = ['institution', 'status', 'grade_level', 'academic_year', 'is_active', 'created_at']
     search_fields = ['name', 'code', 'institution__name', 'tutor__username']
     readonly_fields = ['created_at', 'updated_at', 'get_students_count']
     raw_id_fields = ['institution', 'tutor']
+    fieldsets = (
+        ('Información General', {
+            'fields': ('institution', 'name', 'code', 'description', 'grade_level')
+        }),
+        ('Año Académico', {
+            'fields': ('academic_year',)
+        }),
+        ('Estado', {
+            'fields': ('status', 'is_active')
+        }),
+        ('Tutor (Legacy)', {
+            'fields': ('tutor',),
+            'classes': ('collapse',)
+        }),
+        ('Estadísticas', {
+            'fields': ('get_students_count',),
+            'classes': ('collapse',)
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
     
     def get_students_count(self, obj):
         return obj.get_students_count()
     get_students_count.short_description = 'Estudiantes'
+
+
+@admin.register(Enrollment)
+class EnrollmentAdmin(admin.ModelAdmin):
+    list_display = ['student', 'course', 'status', 'enrolled_at', 'get_institution']
+    list_filter = ['status', 'enrolled_at', 'course__institution']
+    search_fields = ['student__username', 'student__email', 'course__name', 'course__code']
+    readonly_fields = ['enrolled_at', 'updated_at']
+    raw_id_fields = ['student', 'course']
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+
+
+@admin.register(TeachingAssignment)
+class TeachingAssignmentAdmin(admin.ModelAdmin):
+    list_display = ['tutor', 'course', 'status', 'assigned_at', 'get_institution']
+    list_filter = ['status', 'assigned_at', 'course__institution']
+    search_fields = ['tutor__username', 'tutor__email', 'course__name', 'course__code']
+    readonly_fields = ['assigned_at', 'updated_at']
+    raw_id_fields = ['tutor', 'course']
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
 
 
 class MembershipInline(admin.TabularInline):
@@ -158,6 +213,233 @@ class ProjectAdmin(admin.ModelAdmin):
 # Re-register UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
+
+@admin.register(Activity)
+class ActivityAdmin(admin.ModelAdmin):
+    list_display = ['title', 'course', 'status', 'deadline', 'allow_resubmit', 'published_at', 'created_at']
+    list_filter = ['status', 'allow_resubmit', 'deadline', 'created_at', 'course__institution']
+    search_fields = ['title', 'objective', 'instructions', 'course__name']
+    readonly_fields = ['created_at', 'updated_at', 'published_at', 'get_submissions_count', 'get_pending_submissions_count']
+    raw_id_fields = ['course']
+    date_hierarchy = 'deadline'
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('course', 'title', 'objective', 'instructions')
+        }),
+        ('Configuración', {
+            'fields': ('deadline', 'status', 'allow_resubmit')
+        }),
+        ('Estadísticas', {
+            'fields': ('get_submissions_count', 'get_pending_submissions_count'),
+            'classes': ('collapse',)
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at', 'published_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_submissions_count(self, obj):
+        return obj.get_submissions_count()
+    get_submissions_count.short_description = 'Entregas'
+    
+    def get_pending_submissions_count(self, obj):
+        return obj.get_pending_submissions_count()
+    get_pending_submissions_count.short_description = 'Pendientes'
+
+
+@admin.register(Submission)
+class SubmissionAdmin(admin.ModelAdmin):
+    list_display = ['student', 'activity', 'attempt', 'status', 'submitted_at', 'get_institution']
+    list_filter = ['status', 'submitted_at', 'created_at', 'activity__course__institution']
+    search_fields = ['student__username', 'student__email', 'activity__title']
+    readonly_fields = ['created_at', 'updated_at', 'submitted_at']
+    raw_id_fields = ['activity', 'student']
+    date_hierarchy = 'submitted_at'
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+
+
+@admin.register(Rubric)
+class RubricAdmin(admin.ModelAdmin):
+    list_display = ['activity', 'get_total_max_score', 'created_at']
+    list_filter = ['created_at', 'activity__course__institution']
+    search_fields = ['activity__title', 'activity__course__name']
+    readonly_fields = ['created_at', 'updated_at']
+    raw_id_fields = ['activity']
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ['submission', 'tutor', 'score', 'get_percentage_score', 'created_at', 'get_institution']
+    list_filter = ['created_at', 'submission__activity__course__institution']
+    search_fields = ['submission__student__username', 'submission__activity__title', 'tutor__username']
+    readonly_fields = ['created_at', 'updated_at', 'get_percentage_score']
+    raw_id_fields = ['submission', 'tutor']
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Información', {
+            'fields': ('submission', 'tutor')
+        }),
+        ('Calificación', {
+            'fields': ('score', 'comments', 'rubric_breakdown')
+        }),
+        ('Estadísticas', {
+            'fields': ('get_percentage_score',),
+            'classes': ('collapse',)
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_percentage_score(self, obj):
+        return f"{obj.get_percentage_score():.1f}%" if obj.get_percentage_score() else "-"
+    get_percentage_score.short_description = 'Porcentaje'
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+
+
+@admin.register(IDEProject)
+class IDEProjectAdmin(admin.ModelAdmin):
+    list_display = ['name', 'owner', 'institution', 'updated_at', 'get_institution', 'is_frozen']
+    list_filter = ['created_at', 'updated_at', 'institution']
+    search_fields = ['name', 'owner__username', 'owner__email', 'institution__name']
+    readonly_fields = ['created_at', 'updated_at', 'get_last_modified', 'is_frozen']
+    raw_id_fields = ['owner', 'institution']
+    date_hierarchy = 'updated_at'
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+    
+    def is_frozen(self, obj):
+        return obj.is_frozen()
+    is_frozen.boolean = True
+    is_frozen.short_description = 'Congelado'
+
+
+@admin.register(ProjectSnapshot)
+class ProjectSnapshotAdmin(admin.ModelAdmin):
+    list_display = ['project', 'label', 'created_at', 'get_institution']
+    list_filter = ['created_at', 'project__institution']
+    search_fields = ['project__name', 'label', 'project__owner__username']
+    readonly_fields = ['created_at']
+    raw_id_fields = ['project']
+    date_hierarchy = 'created_at'
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+
+
+@admin.register(ActivityWorkspace)
+class ActivityWorkspaceAdmin(admin.ModelAdmin):
+    list_display = ['activity', 'student', 'project', 'status', 'frozen_at', 'get_institution']
+    list_filter = ['status', 'frozen_at', 'created_at', 'activity__course__institution']
+    search_fields = ['activity__title', 'student__username', 'student__email', 'project__name']
+    readonly_fields = ['created_at', 'updated_at', 'frozen_at']
+    raw_id_fields = ['activity', 'student', 'project']
+    date_hierarchy = 'created_at'
+    
+    def get_institution(self, obj):
+        return obj.institution.name if obj.institution else "-"
+    get_institution.short_description = 'Institución'
+
+
+@admin.register(AgentInstance)
+class AgentInstanceAdmin(admin.ModelAdmin):
+    list_display = ['hostname', 'institution', 'os', 'agent_version', 'status', 'last_seen', 'is_online_display']
+    list_filter = ['status', 'os', 'agent_version', 'created_at', 'last_seen', 'institution']
+    search_fields = ['hostname', 'institution__name', 'os', 'agent_version']
+    readonly_fields = ['created_at', 'updated_at', 'last_seen', 'is_online_display']
+    raw_id_fields = ['institution']
+    date_hierarchy = 'last_seen'
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('institution', 'hostname', 'os')
+        }),
+        ('Versiones', {
+            'fields': ('agent_version', 'ide_version_compatible')
+        }),
+        ('Estado', {
+            'fields': ('status', 'last_seen', 'is_online_display')
+        }),
+        ('Metadata', {
+            'fields': ('meta',),
+            'classes': ('collapse',)
+        }),
+        ('Fechas', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def is_online_display(self, obj):
+        return obj.is_online()
+    is_online_display.boolean = True
+    is_online_display.short_description = 'Online'
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ['actor', 'institution', 'action', 'entity', 'entity_id', 'ts']
+    list_filter = ['action', 'entity', 'ts', 'institution']
+    search_fields = ['actor__username', 'actor__email', 'entity', 'entity_id', 'institution__name']
+    readonly_fields = ['ts']
+    raw_id_fields = ['actor', 'institution']
+    date_hierarchy = 'ts'
+    
+    fieldsets = (
+        ('Acción', {
+            'fields': ('actor', 'institution', 'action')
+        }),
+        ('Entidad', {
+            'fields': ('entity', 'entity_id')
+        }),
+        ('Metadata', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+        ('Fecha', {
+            'fields': ('ts',)
+        }),
+    )
+
+
+@admin.register(ErrorEvent)
+class ErrorEventAdmin(admin.ModelAdmin):
+    list_display = ['code', 'severity', 'institution', 'user', 'resolved', 'ts']
+    list_filter = ['code', 'severity', 'resolved', 'ts', 'institution']
+    search_fields = ['code', 'message', 'user__username', 'institution__name']
+    readonly_fields = ['ts', 'resolved_at', 'resolved_by']
+    raw_id_fields = ['institution', 'user', 'resolved_by']
+    date_hierarchy = 'ts'
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('institution', 'user', 'code', 'severity', 'message')
+        }),
+        ('Contexto', {
+            'fields': ('context',),
+            'classes': ('wide',)
+        }),
+        ('Resolución', {
+            'fields': ('resolved', 'resolved_at', 'resolved_by')
+        }),
+        ('Fecha', {
+            'fields': ('ts',)
+        }),
+    )
+
 
 # Configuración del admin site
 admin.site.site_header = "MAX-IDE Administración"

@@ -1,0 +1,82 @@
+@startuml
+!theme cerulean
+title Módulo 2: Diagrama de Clases - Estructura Académica
+
+skinparam classAttributeIconSize 0
+
+package "django.contrib.auth" <<Database>> {
+    class User {
+        +id: int
+        +username: str
+        +email: str
+        +first_name: str
+        +last_name: str
+    }
+}
+
+package "editor.models" <<Database>> {
+    
+    class Institution {
+        +id: UUID
+        +name: str
+        +slug: str {unique}
+        +status: enum
+    }
+    
+    class Course {
+        +id: int
+        +institution: FK(Institution)
+        +name: str
+        +code: str
+        +grade_level: str
+        +status: enum(active, inactive, completed, cancelled)
+        +academic_year: str
+        +description: str
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +get_students_count(): int
+        +get_enrolled_students(): QuerySet
+        +get_assigned_tutors(): QuerySet
+    }
+    
+    class Enrollment {
+        +id: UUID
+        +course: FK(Course)
+        +student: FK(User)
+        +status: enum(active, inactive, completed, dropped)
+        +enrolled_at: datetime
+        +notes: str
+        --
+        +institution: Institution {property}
+    }
+    
+    class TeachingAssignment {
+        +id: UUID
+        +course: FK(Course)
+        +tutor: FK(User)
+        +status: enum(active, inactive, completed)
+        +assigned_at: datetime
+        +notes: str
+        --
+        +institution: Institution {property}
+    }
+    
+    class Membership {
+        +id: UUID
+        +user: FK(User)
+        +institution: FK(Institution)
+        +role: enum(admin, institution, tutor, student)
+        +is_active: bool
+    }
+}
+
+' Relaciones
+Institution ||--o{ Course : "tiene"
+Course ||--o{ Enrollment : "matricula"
+Course ||--o{ TeachingAssignment : "asigna"
+User ||--o{ Enrollment : "está matriculado"
+User ||--o{ TeachingAssignment : "tutorea"
+User ||--o{ Membership : "pertenece"
+
+@enduml

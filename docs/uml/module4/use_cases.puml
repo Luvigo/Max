@@ -1,0 +1,29 @@
+@startuml
+left to right direction
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 4: IDE + Workspaces" {
+  usecase "Abrir IDE de Actividad" as UC_OpenIDE
+  usecase "Autosave Workspace" as UC_Autosave
+  usecase "Crear Snapshot" as UC_Snapshot
+  usecase "Congelar Workspace" as UC_Freeze
+  usecase "Sandbox Tutor" as UC_TutorSandbox
+  usecase "Ver IDE Read-only (Tutor)" as UC_ViewRO
+
+  usecase "ERROR: XML corrupto" as E_XML
+  usecase "ERROR: Conflicto 2 pestañas" as E_Conflict
+  usecase "ERROR: Editar frozen" as E_ReadOnly
+}
+
+Estudiante --> UC_OpenIDE
+Estudiante --> UC_Autosave
+Estudiante --> UC_Snapshot
+
+Tutor --> UC_TutorSandbox
+Tutor --> UC_ViewRO
+
+UC_Autosave ..> E_Conflict : <<extend>>
+UC_OpenIDE ..> E_XML : <<extend>>
+UC_OpenIDE ..> E_ReadOnly : <<extend>>
+@enduml

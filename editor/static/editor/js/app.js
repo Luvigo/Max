@@ -958,6 +958,17 @@ function initEventListeners() {
     document.getElementById('btnRefreshPorts').addEventListener('click', refreshPorts);
     document.getElementById('btnAddPort').addEventListener('click', requestSerialPort); // Abre diálogo Web Serial
     
+    // Módulo 6: Copiar diagnóstico y reportar errores
+    const btnCopyDiagnostic = document.getElementById('btnCopyDiagnostic');
+    if (btnCopyDiagnostic) {
+        btnCopyDiagnostic.addEventListener('click', copyDiagnosticToClipboard);
+    }
+    
+    const btnReportError = document.getElementById('btnReportError');
+    if (btnReportError) {
+        btnReportError.addEventListener('click', reportErrorToBackend);
+    }
+    
     // Botones de archivo
     document.getElementById('btnNew').addEventListener('click', newProject);
     document.getElementById('btnSave').addEventListener('click', saveProject);
@@ -1946,6 +1957,150 @@ function getCsrfToken() {
         }
     }
     return '';
+}
+
+// ============================================
+// MÓDULO 6: Observabilidad - Copiar Diagnóstico y Reportar Errores
+// ============================================
+
+/**
+ * Copia el diagnóstico completo al portapapeles
+ */
+async function copyDiagnosticToClipboard() {
+    try {
+        // Actualizar diagnóstico
+        updateDiagnostics({ available: AgentConfig.available, error: AgentConfig.lastError });
+        
+        // Obtener información del contexto del IDE
+        const institutionSlug = document.querySelector('.app-container')?.dataset?.institutionSlug || 'N/A';
+        const activityId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.activityId || 'N/A' : 'N/A';
+        const projectId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.projectId || 'N/A' : 'N/A';
+        
+        // Construir diagnóstico completo
+        const diagnostic = `
+╔═══════════════════════════════════════════════════╗
+║           DIAGNÓSTICO MAX-IDE                     ║
+╠═══════════════════════════════════════════════════╣
+║ Institución:      ${institutionSlug}
+║ Actividad ID:     ${activityId}
+║ Proyecto ID:      ${projectId}
+║ Origin:           ${DiagnosticInfo.origin}
+║ Secure Context:   ${DiagnosticInfo.isSecureContext ? 'Sí (HTTPS)' : 'No (HTTP)'}
+║ Agent URL:        ${DiagnosticInfo.agentUrl}
+║ Estado Agent:     ${DiagnosticInfo.lastHealthStatus || 'No verificado'}
+║ Último error:     ${DiagnosticInfo.lastError || 'Ninguno'}
+║ Versión Agent:    ${AgentConfig.version || 'N/A'}
+║ Plataforma:       ${AgentConfig.platform || 'N/A'}
+║ arduino-cli:      ${AgentConfig.arduinoCli || 'No detectado'}
+║ Timestamp:        ${DiagnosticInfo.timestamp}
+╚═══════════════════════════════════════════════════╝
+
+${!AgentConfig.available ? `
+⚠️ SOLUCIÓN:
+1. Descarga el Agent desde el botón "Cómo instalar"
+2. Descomprime y ejecuta start_agent (Windows: .bat, Linux/Mac: .sh)
+3. El Agent debe estar corriendo en ${AgentConfig.baseUrl}
+4. Haz clic en "Verificar conexión" para reintentar
+` : '✓ Agent funcionando correctamente'}
+        `.trim();
+        
+        // Copiar al portapapeles
+        await navigator.clipboard.writeText(diagnostic);
+        
+        showToast('✅ Diagnóstico copiado al portapapeles', 'success');
+        logToConsole('Diagnóstico copiado al portapapeles', 'success');
+        
+        // También mostrar en consola
+        console.log('=== DIAGNÓSTICO COPIADO ===');
+        console.log(diagnostic);
+        
+    } catch (error) {
+        showToast('Error al copiar diagnóstico: ' + error.message, 'error');
+        logToConsole('Error al copiar diagnóstico: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Reporta un error al backend
+ */
+async function reportErrorToBackend() {
+    try {
+        // Solicitar código de error y mensaje al usuario
+        const errorCode = prompt('Código de error:\n\nOpciones:\n- BootloaderSyncFailed\n- PortBusy\n- AgentMissing\n- UploadFailed\n- WorkspaceCorrupt\n- SubmissionRace\n- CompilationError\n- SerialError\n\nIngrese el código:', 'GenericError');
+        
+        if (!errorCode) {
+            return; // Usuario canceló
+        }
+        
+        const errorMessage = prompt('Descripción del error:', '');
+        if (!errorMessage) {
+            return; // Usuario canceló
+        }
+        
+        // Obtener información del contexto
+        const institutionSlug = document.querySelector('.app-container')?.dataset?.institutionSlug || null;
+        const activityId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.activityId || null : null;
+        const projectId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.projectId || null : null;
+        
+        // Actualizar diagnóstico antes de reportar
+        updateDiagnostics({ available: AgentConfig.available, error: AgentConfig.lastError });
+        
+        // Construir contexto del error
+        const context = {
+            institution_slug: institutionSlug,
+            activity_id: activityId,
+            project_id: projectId,
+            agent_status: DiagnosticInfo.lastHealthStatus,
+            agent_error: DiagnosticInfo.lastError,
+            agent_version: AgentConfig.version,
+            platform: AgentConfig.platform,
+            arduino_cli: AgentConfig.arduinoCli,
+            origin: DiagnosticInfo.origin,
+            secure_context: DiagnosticInfo.isSecureContext,
+            user_agent: navigator.userAgent,
+            timestamp: DiagnosticInfo.timestamp,
+        };
+        
+        // Determinar severidad basada en el código de error
+        let severity = 'medium';
+        const criticalCodes = ['AgentMissing', 'WorkspaceCorrupt', 'SubmissionRace'];
+        const highCodes = ['UploadFailed', 'BootloaderSyncFailed'];
+        
+        if (criticalCodes.includes(errorCode)) {
+            severity = 'critical';
+        } else if (highCodes.includes(errorCode)) {
+            severity = 'high';
+        }
+        
+        // Enviar al backend
+        const response = await fetch('/api/errors/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                code: errorCode,
+                severity: severity,
+                message: errorMessage,
+                context: context
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+            showToast(`✅ Error reportado (ID: ${data.error_id.substring(0, 8)})`, 'success');
+            logToConsole(`Error reportado: ${errorCode} - ID: ${data.error_id}`, 'success');
+        } else {
+            showToast('Error al reportar: ' + (data.error || 'Error desconocido'), 'error');
+            logToConsole('Error al reportar: ' + (data.error || 'Error desconocido'), 'error');
+        }
+        
+    } catch (error) {
+        showToast('Error al reportar: ' + error.message, 'error');
+        logToConsole('Error al reportar: ' + error.message, 'error');
+    }
 }
 
 // Función para cargar proyecto desde template

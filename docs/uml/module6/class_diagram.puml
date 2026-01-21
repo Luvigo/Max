@@ -1,0 +1,106 @@
+@startuml
+!define PRIMARY_KEY(x) <b><color:red>PK:</color></b> x
+!define FOREIGN_KEY(x) <b><color:blue>FK:</color></b> x
+
+package "Módulo 6: Observabilidad" {
+    
+    class AuditLog {
+        PRIMARY_KEY(id: UUID)
+        FOREIGN_KEY(actor: User)
+        FOREIGN_KEY(institution: Institution)
+        action: String
+        entity: String
+        entity_id: String
+        metadata: JSONField
+        ts: DateTime
+        --
+        __str__()
+    }
+    
+    class ErrorEvent {
+        PRIMARY_KEY(id: UUID)
+        FOREIGN_KEY(institution: Institution)
+        FOREIGN_KEY(user: User)
+        code: String
+        severity: String
+        message: TextField
+        context: JSONField
+        ts: DateTime
+        resolved: Boolean
+        resolved_at: DateTime
+        FOREIGN_KEY(resolved_by: User)
+        --
+        mark_resolved(user)
+        __str__()
+    }
+    
+    class Institution {
+        PRIMARY_KEY(id: UUID)
+        name: String
+        slug: SlugField
+        ...
+    }
+    
+    class User {
+        PRIMARY_KEY(id: Integer)
+        username: String
+        ...
+    }
+    
+    class Course {
+        PRIMARY_KEY(id: UUID)
+        ...
+    }
+    
+    class Activity {
+        PRIMARY_KEY(id: UUID)
+        FOREIGN_KEY(course: Course)
+        ...
+    }
+    
+    class IDEProject {
+        PRIMARY_KEY(id: UUID)
+        ...
+    }
+    
+    class AgentInstance {
+        PRIMARY_KEY(id: UUID)
+        ...
+    }
+}
+
+' Relaciones
+Institution ||--o{ AuditLog : "tiene"
+User ||--o{ AuditLog : "realiza"
+
+Institution ||--o{ ErrorEvent : "registra"
+User ||--o{ ErrorEvent : "afecta"
+User ||--o{ ErrorEvent : "resuelve"
+
+' Relaciones con otros módulos (referencias en context)
+ErrorEvent ..> Course : "puede referenciar"
+ErrorEvent ..> Activity : "puede referenciar"
+ErrorEvent ..> IDEProject : "puede referenciar"
+ErrorEvent ..> AgentInstance : "puede referenciar"
+
+note right of AuditLog
+    Registra todas las acciones
+    del sistema para auditoría:
+    - create, update, delete
+    - publish, submit, grade
+    - login, logout, access
+end note
+
+note right of ErrorEvent
+    Eventos de error para observabilidad:
+    - BootloaderSyncFailed
+    - PortBusy
+    - AgentMissing
+    - UploadFailed
+    - WorkspaceCorrupt
+    - SubmissionRace
+    - CompilationError
+    - SerialError
+end note
+
+@enduml

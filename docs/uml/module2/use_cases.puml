@@ -1,0 +1,34 @@
+@startuml
+left to right direction
+actor Admin
+actor "Institución" as Inst
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 2: Estructura Académica" {
+  usecase "Crear/Editar Curso" as UC_CourseCRUD
+  usecase "Asignar Tutor a Curso" as UC_AssignTutor
+  usecase "Matricular Estudiantes" as UC_Enroll
+  usecase "Importar CSV Estudiantes" as UC_ImportCSV
+  usecase "Ver cursos asignados (Tutor)" as UC_TutorCourses
+  usecase "Ver roster del curso (Tutor)" as UC_Roster
+  usecase "Ver cursos matriculados (Estudiante)" as UC_StudentCourses
+
+  usecase "ERROR: CSV inválido" as E_CSV
+  usecase "ERROR: Cross-tenant" as E_CrossTenant
+  usecase "ERROR: Duplicados" as E_Duplicate
+}
+
+Admin --> UC_CourseCRUD
+Inst --> UC_CourseCRUD
+Inst --> UC_AssignTutor
+Inst --> UC_Enroll
+Inst --> UC_ImportCSV
+Tutor --> UC_TutorCourses
+Tutor --> UC_Roster
+Estudiante --> UC_StudentCourses
+
+UC_ImportCSV ..> E_CSV : <<extend>>
+UC_AssignTutor ..> E_CrossTenant : <<extend>>
+UC_Enroll ..> E_Duplicate : <<extend>>
+@enduml

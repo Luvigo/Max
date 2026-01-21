@@ -1,0 +1,137 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ course.name }} - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-book"></i> {{ course.name }}</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}">Cursos</a></li>
+                <li class="breadcrumb-item active">{{ course.name }}</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'editor:institution_course_edit' institution_slug=institution.slug course_id=course.id %}" class="btn btn-secondary">
+            <i class="fas fa-edit"></i> Editar
+        </a>
+        <a href="{% url 'editor:institution_course_assign_tutor' institution_slug=institution.slug course_id=course.id %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Asignar Tutor
+        </a>
+        <a href="{% url 'editor:institution_enroll_student' institution_slug=institution.slug course_id=course.id %}" class="btn btn-success">
+            <i class="fas fa-user-graduate"></i> Matricular Estudiante
+        </a>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Información del Curso</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Código:</dt>
+                    <dd class="col-sm-9"><code>{{ course.code }}</code></dd>
+                    
+                    <dt class="col-sm-3">Nivel:</dt>
+                    <dd class="col-sm-9">{{ course.grade_level|default:"-" }}</dd>
+                    
+                    <dt class="col-sm-3">Año Académico:</dt>
+                    <dd class="col-sm-9">{{ course.academic_year }}</dd>
+                    
+                    <dt class="col-sm-3">Estado:</dt>
+                    <dd class="col-sm-9">
+                        {% if course.status == 'active' %}
+                        <span class="badge badge-success">Activo</span>
+                        {% elif course.status == 'completed' %}
+                        <span class="badge badge-info">Completado</span>
+                        {% elif course.status == 'cancelled' %}
+                        <span class="badge badge-danger">Cancelado</span>
+                        {% else %}
+                        <span class="badge badge-secondary">Inactivo</span>
+                        {% endif %}
+                    </dd>
+                    
+                    {% if course.description %}
+                    <dt class="col-sm-3">Descripción:</dt>
+                    <dd class="col-sm-9">{{ course.description|linebreaks }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3>Estudiantes Matriculados ({{ enrollments.count }})</h3>
+            </div>
+            <div class="card-body">
+                {% if enrollments %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Estudiante</th>
+                                <th>Email</th>
+                                <th>Fecha de Matrícula</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for enrollment in enrollments %}
+                            <tr>
+                                <td>{{ enrollment.student.get_full_name|default:enrollment.student.username }}</td>
+                                <td>{{ enrollment.student.email }}</td>
+                                <td>{{ enrollment.enrolled_at|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% if enrollment.status == 'active' %}
+                                    <span class="badge badge-success">Activo</span>
+                                    {% else %}
+                                    <span class="badge badge-secondary">{{ enrollment.get_status_display }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">No hay estudiantes matriculados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Tutores Asignados ({{ assignments.count }})</h3>
+            </div>
+            <div class="card-body">
+                {% if assignments %}
+                <ul class="list-group">
+                    {% for assignment in assignments %}
+                    <li class="list-group-item">
+                        <strong>{{ assignment.tutor.get_full_name|default:assignment.tutor.username }}</strong>
+                        <br>
+                        <small class="text-muted">{{ assignment.tutor.email }}</small>
+                        <br>
+                        <small class="text-muted">Asignado: {{ assignment.assigned_at|date:"d/m/Y" }}</small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">No hay tutores asignados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

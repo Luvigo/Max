@@ -1,0 +1,109 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Actividades - {{ course.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-tasks"></i> Actividades</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:student_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:student_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
+                <li class="breadcrumb-item active">{{ course.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>Actividades - {{ course.name }}</h3>
+    </div>
+    <div class="card-body">
+        {% if activities_with_submissions %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Fecha Límite</th>
+                        <th>Estado</th>
+                        <th>Puntaje</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in activities_with_submissions %}
+                    {% with activity=item.activity submission=item.submission %}
+                    <tr>
+                        <td>
+                            <strong>{{ activity.title }}</strong>
+                            {% if activity.objective %}
+                            <br><small class="text-muted">{{ activity.objective|truncatewords:10 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if activity.deadline %}
+                            {{ activity.deadline|date:"d/m/Y H:i" }}
+                            {% if activity.is_deadline_passed %}
+                            <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Vencida</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if submission %}
+                            {% if submission.status == 'submitted' %}
+                            <span class="badge badge-warning">Entregada</span>
+                            {% elif submission.status == 'graded' %}
+                            <span class="badge badge-success">Calificada</span>
+                            {% else %}
+                            <span class="badge badge-secondary">Pendiente</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="badge badge-danger">Sin entregar</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if submission and submission.status == 'graded' %}
+                            {% with feedback=submission.get_latest_feedback %}
+                            {% if feedback and feedback.score %}
+                            <strong>{{ feedback.score }}</strong>
+                            {% if feedback.get_percentage_score %}
+                            <br><small class="text-muted">({{ feedback.get_percentage_score|floatformat:1 }}%)</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                            {% endwith %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:student_activity_detail' institution_slug=institution.slug activity_id=activity.id %}" 
+                               class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye"></i> Ver Detalles
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-tasks fa-3x text-muted"></i>
+            <h3>No hay actividades disponibles</h3>
+            <p class="text-muted">Aún no hay actividades publicadas para este curso.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ action|default:"Crear" }} Actividad - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-{% if action == 'Editar' %}edit{% else %}plus{% endif %}"></i> {{ action|default:"Crear" }} Actividad</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
+                {% if activity %}
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
+                <li class="breadcrumb-item active">{{ action }}</li>
+                {% else %}
+                <li class="breadcrumb-item active">{{ action|default:"Crear" }}</li>
+                {% endif %}
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>{{ action|default:"Crear" }} Actividad</h3>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            {% if not activity %}
+            <div class="form-group">
+                <label for="course">Curso</label>
+                <select name="course" id="course" class="form-select" required>
+                    <option value="">Selecciona un curso</option>
+                    {% for c in courses %}
+                    <option value="{{ c.id }}" {% if selected_course and selected_course.id == c.id %}selected{% endif %}>
+                        {{ c.name }} - {{ c.code }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <div class="form-group">
+                <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+                {{ form.title }}
+                {% if form.title.errors %}
+                <div class="text-danger">{{ form.title.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.objective.id_for_label }}">{{ form.objective.label }}</label>
+                {{ form.objective }}
+                {% if form.objective.errors %}
+                <div class="text-danger">{{ form.objective.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.instructions.id_for_label }}">{{ form.instructions.label }}</label>
+                {{ form.instructions }}
+                {% if form.instructions.errors %}
+                <div class="text-danger">{{ form.instructions.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.deadline.id_for_label }}">{{ form.deadline.label }}</label>
+                        {{ form.deadline }}
+                        {% if form.deadline.errors %}
+                        <div class="text-danger">{{ form.deadline.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                        <div class="text-danger">{{ form.status.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <div class="form-check">
+                    {{ form.allow_resubmit }}
+                    <label class="form-check-label" for="{{ form.allow_resubmit.id_for_label }}">
+                        {{ form.allow_resubmit.label }}
+                    </label>
+                    {% if form.allow_resubmit.errors %}
+                    <div class="text-danger">{{ form.allow_resubmit.errors }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                {% if activity %}
+                <a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+                {% else %}
+                <a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

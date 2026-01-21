@@ -1,0 +1,169 @@
+{% extends 'editor/base.html' %}
+{% load static %}
+
+{% block title %}Sandbox - {{ activity.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .sandbox-context {
+        background: var(--color-bg-card, #161b22);
+        border-bottom: 1px solid var(--color-border, #30363d);
+        padding: 12px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .sandbox-badge {
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        background: var(--color-warning-glow, rgba(210, 153, 34, 0.15));
+        color: var(--color-warning, #d29922);
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="app-container">
+    <!-- Sandbox Context Bar -->
+    <div class="sandbox-context">
+        <div>
+            <span class="sandbox-badge">🧪 SANDBOX - {{ activity.title }}</span>
+        </div>
+        <div>
+            <a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}" class="btn btn-sm btn-secondary">
+                ← Volver a Actividades
+            </a>
+        </div>
+    </div>
+    
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">⚡</div>
+            <div class="logo-text">MAX-IDE</div>
+            <span class="logo-badge">ARDUINO - SANDBOX</span>
+        </div>
+        
+        <div class="header-controls">
+            <!-- Board Selector -->
+            <div class="control-group">
+                <label>
+                    <span>🎯</span>
+                    Board
+                </label>
+                <select id="boardSelect">
+                    <option value="arduino:avr:uno">Arduino UNO</option>
+                    <option value="arduino:avr:nano">Arduino Nano</option>
+                    <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
+                    <option value="arduino:avr:mega">Arduino Mega</option>
+                    <option value="arduino:avr:leonardo">Arduino Leonardo</option>
+                </select>
+            </div>
+            
+            <!-- Port Selector -->
+            <div class="control-group">
+                <label>
+                    <span>🔌</span>
+                    Puerto
+                </label>
+                <select id="portSelect">
+                    <option value="">Seleccionar...</option>
+                </select>
+                <button class="btn btn-icon-only btn-ghost" id="btnAddPort" title="Agregar nuevo puerto">
+                    ➕
+                </button>
+                <button class="btn btn-icon-only btn-ghost" id="btnRefreshPorts" title="Actualizar puertos">
+                    🔄
+                </button>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn btn-ghost" id="btnSerialMonitor" title="Monitor Serial">
+                    <span>📟</span>
+                    <span>Serial</span>
+                </button>
+                <button class="btn btn-warning" id="btnCompile">
+                    <span>⚙️</span>
+                    <span>Verificar</span>
+                </button>
+                <button class="btn btn-success" id="btnUpload">
+                    <span>🚀</span>
+                    <span>Subir</span>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Workspace de Blockly -->
+        <div class="workspace-container">
+            <div class="workspace-header">
+                <div class="workspace-tabs">
+                    <button class="workspace-tab active">
+                        <span>📦</span>
+                        Bloques
+                    </button>
+                </div>
+                <div class="workspace-actions">
+                    <button class="btn btn-sm btn-ghost" id="btnAutoSave" title="Auto-guardado activo">
+                        💾 Auto-guardado
+                    </button>
+                    <button class="btn btn-sm btn-ghost" id="btnCreateSnapshot" title="Crear Snapshot">
+                        📸 Snapshot
+                    </button>
+                </div>
+            </div>
+            <div id="blocklyDiv" class="blockly-workspace"></div>
+        </div>
+        
+        <!-- Code Editor -->
+        <div class="code-container">
+            <div class="code-header">
+                <div class="code-tabs">
+                    <button class="code-tab active" data-tab="arduino">
+                        <span>📝</span>
+                        Arduino
+                    </button>
+                </div>
+                <div class="code-actions">
+                    <button class="btn btn-sm btn-ghost" id="btnCopyCode" title="Copiar código">
+                        📋 Copiar
+                    </button>
+                </div>
+            </div>
+            <pre id="arduinoCode" class="code-content"></pre>
+        </div>
+    </main>
+</div>
+
+<!-- Toolbox XML -->
+<xml id="toolbox" style="display: none;">
+    <!-- El toolbox se carga desde el template base o desde un archivo separado -->
+</xml>
+
+<script>
+    // Configuración del IDE sandbox
+    const IDE_CONFIG = {
+        projectId: '{{ project.id }}',
+        activityId: '{{ activity.id }}',
+        institutionSlug: '{{ institution.slug }}',
+        isReadOnly: false,
+        isSandbox: true,
+        autosaveEnabled: true,
+        autosaveInterval: 30000, // 30 segundos
+    };
+    
+    // Inicializar Blockly con el proyecto
+    const blocklyXml = {{ project.blockly_xml|default:"''"|safe }};
+</script>
+
+<!-- Scripts del IDE -->
+<script src="{% static 'editor/js/app.js' %}"></script>
+<script src="{% static 'editor/js/arduino_blocks.js' %}"></script>
+<script src="{% static 'editor/js/arduino_generator.js' %}"></script>
+{% endblock %}

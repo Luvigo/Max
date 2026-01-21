@@ -3,6 +3,14 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.text import slugify
 import uuid
+import json
+
+# JSONField nativo de Django (disponible desde Django 3.1+)
+# Si usas Django < 3.1, cambia a django.contrib.postgres.fields.JSONField
+try:
+    from django.db.models import JSONField
+except ImportError:
+    from django.contrib.postgres.fields import JSONField
 
 
 class Institution(models.Model):
@@ -29,6 +37,9 @@ class Institution(models.Model):
     # Legacy field - mantener compatibilidad
     is_active = models.BooleanField(default=True, verbose_name="Activa")
     
+    # Token para registro de Agents
+    agent_token = models.CharField(max_length=64, blank=True, null=True, verbose_name="Token de Agent", help_text="Token para que los Agents se registren")
+    
     class Meta:
         verbose_name = "Institución"
         verbose_name_plural = "Instituciones"
@@ -48,7 +59,20 @@ class Institution(models.Model):
                 counter += 1
         # Sincronizar is_active con status
         self.is_active = (self.status == 'active')
+        
+        # Generar token de agent si no existe
+        if not self.agent_token:
+            import secrets
+            self.agent_token = secrets.token_urlsafe(32)
+        
         super().save(*args, **kwargs)
+    
+    def generate_new_agent_token(self):
+        """Generar un nuevo token para agents"""
+        import secrets
+        self.agent_token = secrets.token_urlsafe(32)
+        self.save(update_fields=['agent_token'])
+        return self.agent_token
     
     def get_members_count(self):
         return self.memberships.filter(is_active=True).count()
@@ -119,7 +143,19 @@ class Course(models.Model):
     description = models.TextField(blank=True, verbose_name="Descripción")
     academic_year = models.CharField(max_length=20, default="2024-2025", verbose_name="Año Académico")
     
-    # Tutor asignado
+    # Nivel de grado (ej: "1ro", "2do", "3ro", "Bachillerato", etc.)
+    grade_level = models.CharField(max_length=50, blank=True, verbose_name="Nivel de Grado")
+    
+    # Estado del curso
+    STATUS_CHOICES = [
+        ('active', 'Activo'),
+        ('inactive', 'Inactivo'),
+        ('completed', 'Completado'),
+        ('cancelled', 'Cancelado'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Estado")
+    
+    # Tutor asignado (legacy - mantener para compatibilidad)
     tutor = models.ForeignKey(
         User, 
         on_delete=models.SET_NULL, 
@@ -143,7 +179,87 @@ class Course(models.Model):
         return f"{self.name} - {self.institution.name}"
     
     def get_students_count(self):
-        return self.students.filter(is_active=True).count()
+        """Obtener número de estudiantes matriculados activos"""
+        return self.enrollments.filter(status='active').count()
+    
+    def get_enrolled_students(self):
+        """Obtener estudiantes matriculados activos"""
+        return User.objects.filter(
+            enrollments__course=self,
+            enrollments__status='active'
+        ).distinct()
+    
+    def get_assigned_tutors(self):
+        """Obtener tutores asignados activos"""
+        return User.objects.filter(
+            teaching_assignments__course=self,
+            teaching_assignments__status='active'
+        ).distinct()
+
+
+class Enrollment(models.Model):
+    """Matrícula de estudiante en un curso"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments', verbose_name="Curso")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments', verbose_name="Estudiante")
+    
+    STATUS_CHOICES = [
+        ('active', 'Activo'),
+        ('inactive', 'Inactivo'),
+        ('completed', 'Completado'),
+        ('dropped', 'Abandonado'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Estado")
+    
+    enrolled_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Matrícula")
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Matrícula"
+        verbose_name_plural = "Matrículas"
+        unique_together = ['course', 'student']
+        ordering = ['-enrolled_at']
+    
+    def __str__(self):
+        return f"{self.student.username} - {self.course.name}"
+    
+    @property
+    def institution(self):
+        """Obtener institución del curso"""
+        return self.course.institution
+
+
+class TeachingAssignment(models.Model):
+    """Asignación de tutor a un curso"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='teaching_assignments', verbose_name="Curso")
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='teaching_assignments', verbose_name="Tutor")
+    
+    STATUS_CHOICES = [
+        ('active', 'Activo'),
+        ('inactive', 'Inactivo'),
+        ('completed', 'Completado'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active', verbose_name="Estado")
+    
+    assigned_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Asignación")
+    updated_at = models.DateTimeField(auto_now=True)
+    notes = models.TextField(blank=True, verbose_name="Notas")
+    
+    class Meta:
+        verbose_name = "Asignación de Tutor"
+        verbose_name_plural = "Asignaciones de Tutores"
+        unique_together = ['course', 'tutor']
+        ordering = ['-assigned_at']
+    
+    def __str__(self):
+        return f"{self.tutor.username} - {self.course.name}"
+    
+    @property
+    def institution(self):
+        """Obtener institución del curso"""
+        return self.course.institution
 
 
 class Student(models.Model):
@@ -203,6 +319,429 @@ class Project(models.Model):
         if self.student and self.student.course:
             return self.student.course.institution
         return None
+
+
+# ============================================
+# MÓDULO 3: ACTIVIDADES Y ENTREGAS
+# ============================================
+
+class Activity(models.Model):
+    """Actividad o tarea asignada a un curso"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='activities', verbose_name="Curso")
+    
+    title = models.CharField(max_length=200, verbose_name="Título")
+    objective = models.TextField(blank=True, verbose_name="Objetivo")
+    instructions = models.TextField(verbose_name="Instrucciones")
+    deadline = models.DateTimeField(null=True, blank=True, verbose_name="Fecha Límite")
+    
+    STATUS_CHOICES = [
+        ('draft', 'Borrador'),
+        ('published', 'Publicada'),
+        ('closed', 'Cerrada'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name="Estado")
+    allow_resubmit = models.BooleanField(default=False, verbose_name="Permitir Re-entrega")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Publicación")
+    
+    class Meta:
+        verbose_name = "Actividad"
+        verbose_name_plural = "Actividades"
+        ordering = ['-deadline', '-created_at']
+        indexes = [
+            models.Index(fields=['course', 'status']),
+            models.Index(fields=['deadline']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} - {self.course.name}"
+    
+    @property
+    def institution(self):
+        """Obtener institución del curso"""
+        return self.course.institution
+    
+    def is_published(self):
+        """Verificar si la actividad está publicada"""
+        return self.status == 'published'
+    
+    def is_closed(self):
+        """Verificar si la actividad está cerrada"""
+        return self.status == 'closed'
+    
+    def is_deadline_passed(self):
+        """Verificar si ya pasó la fecha límite"""
+        if not self.deadline:
+            return False
+        return timezone.now() > self.deadline
+    
+    def get_submissions_count(self):
+        """Obtener número de entregas"""
+        return self.submissions.filter(status__in=['submitted', 'graded']).count()
+    
+    def get_pending_submissions_count(self):
+        """Obtener número de entregas pendientes de calificar"""
+        return self.submissions.filter(status='submitted').count()
+
+
+class Submission(models.Model):
+    """Entrega de un estudiante para una actividad"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='submissions', verbose_name="Actividad")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submissions', verbose_name="Estudiante")
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('submitted', 'Entregada'),
+        ('graded', 'Calificada'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Estado")
+    
+    attempt = models.IntegerField(default=1, verbose_name="Intento")
+    artifact_ref = models.JSONField(default=dict, blank=True, verbose_name="Referencia al Artefacto")
+    # artifact_ref puede contener: {"project_id": 123, "xml_content": "...", "arduino_code": "..."}
+    
+    submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Entrega")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Entrega"
+        verbose_name_plural = "Entregas"
+        unique_together = [['activity', 'student', 'attempt']]
+        ordering = ['-submitted_at', '-created_at']
+        indexes = [
+            models.Index(fields=['activity', 'student']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.student.username} - {self.activity.title} (Intento {self.attempt})"
+    
+    @property
+    def institution(self):
+        """Obtener institución de la actividad"""
+        return self.activity.institution
+    
+    def can_resubmit(self):
+        """Verificar si puede re-entregar"""
+        if not self.activity.allow_resubmit:
+            return False
+        if self.activity.is_closed():
+            return False
+        if self.activity.is_deadline_passed():
+            return False
+        return True
+    
+    def get_latest_feedback(self):
+        """Obtener el feedback más reciente"""
+        return self.feedbacks.order_by('-created_at').first()
+
+
+class Rubric(models.Model):
+    """Rúbrica de evaluación para una actividad"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    activity = models.OneToOneField(Activity, on_delete=models.CASCADE, related_name='rubric', verbose_name="Actividad")
+    
+    # criteria es un JSON con la estructura de la rúbrica
+    # Ejemplo: {
+    #   "criteria": [
+    #     {"name": "Funcionalidad", "weight": 0.4, "max_score": 10},
+    #     {"name": "Código", "weight": 0.3, "max_score": 10},
+    #     {"name": "Documentación", "weight": 0.3, "max_score": 10}
+    #   ],
+    #   "total_max_score": 10
+    # }
+    criteria = models.JSONField(default=dict, blank=True, verbose_name="Criterios")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Rúbrica"
+        verbose_name_plural = "Rúbricas"
+    
+    def __str__(self):
+        return f"Rúbrica - {self.activity.title}"
+    
+    @property
+    def institution(self):
+        """Obtener institución de la actividad"""
+        return self.activity.institution
+    
+    def get_total_max_score(self):
+        """Obtener el puntaje máximo total"""
+        if not self.criteria or 'total_max_score' not in self.criteria:
+            return 10  # Default
+        return self.criteria.get('total_max_score', 10)
+
+
+class Feedback(models.Model):
+    """Feedback y calificación de una entrega"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.ForeignKey(Submission, on_delete=models.CASCADE, related_name='feedbacks', verbose_name="Entrega")
+    tutor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='feedbacks_given', verbose_name="Tutor")
+    
+    score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, verbose_name="Puntaje")
+    comments = models.TextField(blank=True, verbose_name="Comentarios")
+    
+    # rubric_breakdown contiene los puntajes por criterio según la rúbrica
+    # Ejemplo: {
+    #   "Funcionalidad": 8.5,
+    #   "Código": 7.0,
+    #   "Documentación": 9.0
+    # }
+    rubric_breakdown = models.JSONField(default=dict, blank=True, verbose_name="Desglose de Rúbrica")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Feedback"
+        verbose_name_plural = "Feedbacks"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['submission', 'tutor']),
+        ]
+    
+    def __str__(self):
+        return f"Feedback - {self.submission.student.username} - {self.submission.activity.title}"
+    
+    @property
+    def institution(self):
+        """Obtener institución de la entrega"""
+        return self.submission.institution
+    
+    def get_percentage_score(self):
+        """Obtener el puntaje como porcentaje"""
+        if not self.score:
+            return None
+        rubric = self.submission.activity.rubric
+        if rubric:
+            max_score = rubric.get_total_max_score()
+            if max_score > 0:
+                return (float(self.score) / float(max_score)) * 100
+        return None
+
+
+# ============================================
+# MÓDULO 4: IDE Y WORKSPACES
+# ============================================
+
+class IDEProject(models.Model):
+    """Proyecto del IDE de Arduino"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ide_projects', verbose_name="Propietario")
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='ide_projects', verbose_name="Institución")
+    
+    name = models.CharField(max_length=200, verbose_name="Nombre del Proyecto")
+    blockly_xml = models.TextField(blank=True, verbose_name="Contenido XML (Blockly)")
+    arduino_code = models.TextField(blank=True, verbose_name="Código Arduino")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última Modificación")
+    
+    class Meta:
+        verbose_name = "Proyecto IDE"
+        verbose_name_plural = "Proyectos IDE"
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['owner', 'institution']),
+            models.Index(fields=['-updated_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.name} - {self.owner.username}"
+    
+    def get_last_modified(self):
+        """Obtener fecha de última modificación formateada"""
+        return self.updated_at.strftime("%d/%m/%Y %H:%M")
+    
+    def is_frozen(self):
+        """Verificar si el proyecto está congelado (read-only)"""
+        # Verificar si hay un workspace frozen asociado
+        return self.activity_workspaces.filter(status='frozen').exists()
+
+
+class ProjectSnapshot(models.Model):
+    """Snapshot (instantánea) de un proyecto"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(IDEProject, on_delete=models.CASCADE, related_name='snapshots', verbose_name="Proyecto")
+    
+    label = models.CharField(max_length=200, blank=True, verbose_name="Etiqueta")
+    blockly_xml = models.TextField(blank=True, verbose_name="Contenido XML (Blockly)")
+    arduino_code = models.TextField(blank=True, verbose_name="Código Arduino")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    
+    class Meta:
+        verbose_name = "Snapshot de Proyecto"
+        verbose_name_plural = "Snapshots de Proyectos"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['project', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"Snapshot - {self.project.name} ({self.label or 'Sin etiqueta'})"
+    
+    @property
+    def institution(self):
+        """Obtener institución del proyecto"""
+        return self.project.institution
+
+
+class ActivityWorkspace(models.Model):
+    """Workspace de actividad - relación entre actividad, estudiante y proyecto"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='workspaces', verbose_name="Actividad")
+    student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_workspaces', verbose_name="Estudiante")
+    project = models.ForeignKey(IDEProject, on_delete=models.CASCADE, related_name='activity_workspaces', verbose_name="Proyecto")
+    
+    STATUS_CHOICES = [
+        ('in_progress', 'En Progreso'),
+        ('frozen', 'Congelado (Read-only)'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='in_progress', verbose_name="Estado")
+    
+    frozen_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Congelamiento")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Workspace de Actividad"
+        verbose_name_plural = "Workspaces de Actividades"
+        unique_together = [['activity', 'student']]
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['activity', 'student']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Workspace - {self.activity.title} - {self.student.username}"
+    
+    @property
+    def institution(self):
+        """Obtener institución de la actividad"""
+        return self.activity.institution
+    
+    def is_frozen(self):
+        """Verificar si el workspace está congelado"""
+        return self.status == 'frozen'
+    
+    def freeze(self):
+        """Congelar el workspace (read-only)"""
+        if self.status != 'frozen':
+            self.status = 'frozen'
+            self.frozen_at = timezone.now()
+            self.save()
+    
+    def unfreeze(self):
+        """Descongelar el workspace (solo si allow_resubmit está permitido)"""
+        if self.status == 'frozen' and self.activity.allow_resubmit:
+            self.status = 'in_progress'
+            self.frozen_at = None
+            self.save()
+
+
+# ============================================
+# MÓDULO 5: AGENT LOCAL INSTITUCIONAL
+# ============================================
+
+class AgentInstance(models.Model):
+    """Instancia de Agent Local registrada en el sistema"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='agent_instances', verbose_name="Institución")
+    
+    hostname = models.CharField(max_length=255, verbose_name="Hostname")
+    os = models.CharField(max_length=100, verbose_name="Sistema Operativo")
+    agent_version = models.CharField(max_length=50, verbose_name="Versión del Agent")
+    ide_version_compatible = models.CharField(max_length=50, blank=True, verbose_name="Versión IDE Compatible")
+    
+    # Estado del Agent
+    STATUS_CHOICES = [
+        ('online', 'Online'),
+        ('offline', 'Offline'),
+        ('error', 'Error'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='offline', verbose_name="Estado")
+    
+    last_seen = models.DateTimeField(null=True, blank=True, verbose_name="Última Conexión")
+    
+    # Metadata adicional en JSON
+    meta = models.JSONField(default=dict, blank=True, verbose_name="Metadata")
+    # meta puede contener: {"ip": "...", "port": 8765, "arduino_cli_version": "...", "python_version": "..."}
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Registro")
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Instancia de Agent"
+        verbose_name_plural = "Instancias de Agents"
+        unique_together = [['institution', 'hostname']]
+        ordering = ['-last_seen', '-created_at']
+        indexes = [
+            models.Index(fields=['institution', 'status']),
+            models.Index(fields=['-last_seen']),
+        ]
+    
+    def __str__(self):
+        return f"{self.hostname} - {self.institution.name} ({self.get_status_display()})"
+    
+    def is_online(self):
+        """Verificar si el agent está online"""
+        if self.status != 'online':
+            return False
+        
+        # Verificar si last_seen es reciente (últimos 2 minutos)
+        if not self.last_seen:
+            return False
+        
+        threshold = timezone.now() - timezone.timedelta(minutes=2)
+        return self.last_seen > threshold
+    
+    def update_heartbeat(self):
+        """Actualizar heartbeat del agent"""
+        self.last_seen = timezone.now()
+        self.status = 'online'
+        self.save(update_fields=['last_seen', 'status', 'updated_at'])
+    
+    def mark_offline(self):
+        """Marcar agent como offline"""
+        if self.status == 'online':
+            self.status = 'offline'
+            self.save(update_fields=['status', 'updated_at'])
+    
+    def mark_error(self, error_message=None):
+        """Marcar agent con error"""
+        self.status = 'error'
+        if error_message:
+            if not self.meta:
+                self.meta = {}
+            self.meta['last_error'] = error_message
+        self.save(update_fields=['status', 'meta', 'updated_at'])
+    
+    def get_info(self):
+        """Obtener información del Agent para APIs"""
+        return {
+            'id': str(self.id),
+            'hostname': self.hostname,
+            'os': self.os,
+            'status': self.status,
+            'agent_version': self.agent_version,
+            'ide_version_compatible': self.ide_version_compatible,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None,
+            'meta': self.meta,
+            'institution': {
+                'id': str(self.institution.id),
+                'name': self.institution.name,
+                'slug': self.institution.slug,
+            },
+        }
 
 
 # ============================================
@@ -271,3 +810,132 @@ class UserRoleHelper:
         if institutions.count() == 1:
             return institutions.first()
         return None
+
+
+class AuditLog(models.Model):
+    """Log de auditoría de acciones del sistema"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Actor (usuario que realiza la acción)
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs', verbose_name="Actor")
+    
+    # Institución (tenant)
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='audit_logs', null=True, blank=True, verbose_name="Institución")
+    
+    # Acción realizada
+    ACTION_CHOICES = [
+        ('create', 'Crear'),
+        ('update', 'Actualizar'),
+        ('delete', 'Eliminar'),
+        ('publish', 'Publicar'),
+        ('submit', 'Entregar'),
+        ('grade', 'Calificar'),
+        ('enroll', 'Matricular'),
+        ('assign', 'Asignar'),
+        ('login', 'Iniciar Sesión'),
+        ('logout', 'Cerrar Sesión'),
+        ('access', 'Acceder'),
+        ('export', 'Exportar'),
+        ('import', 'Importar'),
+    ]
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES, verbose_name="Acción")
+    
+    # Entidad afectada
+    entity = models.CharField(max_length=100, verbose_name="Entidad", help_text="Nombre del modelo (ej: Course, Activity)")
+    entity_id = models.CharField(max_length=100, null=True, blank=True, verbose_name="ID de Entidad")
+    
+    # Metadata adicional en JSON
+    metadata = models.JSONField(default=dict, blank=True, verbose_name="Metadata")
+    
+    # Timestamp
+    ts = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp", db_index=True)
+    
+    class Meta:
+        verbose_name = "Log de Auditoría"
+        verbose_name_plural = "Logs de Auditoría"
+        ordering = ['-ts']
+        indexes = [
+            models.Index(fields=['-ts']),
+            models.Index(fields=['institution', '-ts']),
+            models.Index(fields=['actor', '-ts']),
+            models.Index(fields=['entity', 'entity_id']),
+        ]
+    
+    def __str__(self):
+        actor_name = self.actor.username if self.actor else "Sistema"
+        return f"{actor_name} - {self.get_action_display()} - {self.entity}"
+
+
+class ErrorEvent(models.Model):
+    """Eventos de error del sistema para observabilidad"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # Institución (tenant)
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='error_events', null=True, blank=True, verbose_name="Institución")
+    
+    # Usuario afectado (nullable para errores del sistema)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='error_events', verbose_name="Usuario")
+    
+    # Código del error
+    ERROR_CODE_CHOICES = [
+        ('BootloaderSyncFailed', 'BootloaderSyncFailed'),
+        ('PortBusy', 'PortBusy'),
+        ('AgentMissing', 'AgentMissing'),
+        ('UploadFailed', 'UploadFailed'),
+        ('WorkspaceCorrupt', 'WorkspaceCorrupt'),
+        ('SubmissionRace', 'SubmissionRace'),
+        ('CompilationError', 'CompilationError'),
+        ('SerialError', 'SerialError'),
+        ('AuthenticationError', 'AuthenticationError'),
+        ('PermissionError', 'PermissionError'),
+        ('ValidationError', 'ValidationError'),
+        ('NetworkError', 'NetworkError'),
+        ('GenericError', 'GenericError'),
+    ]
+    code = models.CharField(max_length=100, choices=ERROR_CODE_CHOICES, verbose_name="Código de Error")
+    
+    # Severidad
+    SEVERITY_CHOICES = [
+        ('low', 'Baja'),
+        ('medium', 'Media'),
+        ('high', 'Alta'),
+        ('critical', 'Crítica'),
+    ]
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='medium', verbose_name="Severidad")
+    
+    # Mensaje del error
+    message = models.TextField(verbose_name="Mensaje")
+    
+    # Contexto adicional en JSON
+    context = models.JSONField(default=dict, blank=True, verbose_name="Contexto")
+    
+    # Timestamp
+    ts = models.DateTimeField(auto_now_add=True, verbose_name="Timestamp", db_index=True)
+    
+    # Resolución (opcional)
+    resolved = models.BooleanField(default=False, verbose_name="Resuelto")
+    resolved_at = models.DateTimeField(null=True, blank=True, verbose_name="Resuelto en")
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_errors', verbose_name="Resuelto por")
+    
+    class Meta:
+        verbose_name = "Evento de Error"
+        verbose_name_plural = "Eventos de Error"
+        ordering = ['-ts']
+        indexes = [
+            models.Index(fields=['-ts']),
+            models.Index(fields=['institution', '-ts']),
+            models.Index(fields=['code', '-ts']),
+            models.Index(fields=['severity', '-ts']),
+            models.Index(fields=['resolved', '-ts']),
+        ]
+    
+    def __str__(self):
+        return f"{self.code} - {self.message[:50]} ({self.get_severity_display()})"
+    
+    def mark_resolved(self, user=None):
+        """Marcar error como resuelto"""
+        self.resolved = True
+        self.resolved_at = timezone.now()
+        if user:
+            self.resolved_by = user
+        self.save(update_fields=['resolved', 'resolved_at', 'resolved_by'])

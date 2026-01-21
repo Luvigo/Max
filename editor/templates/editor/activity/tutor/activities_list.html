@@ -1,0 +1,122 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Actividades - {{ course.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-tasks"></i> Actividades</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
+                <li class="breadcrumb-item active">{{ course.name }}</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="page-header-actions">
+        <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}?course={{ course.id }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nueva Actividad
+        </a>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>Lista de Actividades - {{ course.name }}</h3>
+    </div>
+    <div class="card-body">
+        {% if activities %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Título</th>
+                        <th>Estado</th>
+                        <th>Fecha Límite</th>
+                        <th>Entregas</th>
+                        <th>Pendientes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activity in activities %}
+                    <tr>
+                        <td>
+                            <strong>{{ activity.title }}</strong>
+                            {% if activity.objective %}
+                            <br><small class="text-muted">{{ activity.objective|truncatewords:15 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if activity.status == 'draft' %}
+                            <span class="badge badge-secondary">Borrador</span>
+                            {% elif activity.status == 'published' %}
+                            <span class="badge badge-success">Publicada</span>
+                            {% elif activity.status == 'closed' %}
+                            <span class="badge badge-danger">Cerrada</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if activity.deadline %}
+                            {{ activity.deadline|date:"d/m/Y H:i" }}
+                            {% if activity.is_deadline_passed %}
+                            <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Vencida</small>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-info">{{ activity.submissions_count }}</span></td>
+                        <td>
+                            {% if activity.pending_count > 0 %}
+                            <span class="badge badge-warning">{{ activity.pending_count }}</span>
+                            {% else %}
+                            <span class="badge badge-success">0</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}" 
+                                   class="btn btn-sm btn-primary" title="Ver entregas">
+                                    <i class="fas fa-eye"></i> Entregas
+                                </a>
+                                <a href="{% url 'editor:tutor_activity_ide_sandbox' institution_slug=institution.slug activity_id=activity.id %}" 
+                                   class="btn btn-sm btn-info" title="Abrir Sandbox">
+                                    <i class="fas fa-flask"></i> Sandbox
+                                </a>
+                                <a href="{% url 'editor:tutor_activity_edit' institution_slug=institution.slug activity_id=activity.id %}" 
+                                   class="btn btn-sm btn-secondary" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% if activity.status == 'draft' %}
+                                <form method="post" action="{% url 'editor:tutor_activity_publish' institution_slug=institution.slug activity_id=activity.id %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-success" title="Publicar">
+                                        <i class="fas fa-paper-plane"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-tasks fa-3x text-muted"></i>
+            <h3>No hay actividades</h3>
+            <p class="text-muted">Comienza creando tu primera actividad.</p>
+            <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}?course={{ course.id }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Crear Actividad
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

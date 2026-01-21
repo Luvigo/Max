@@ -1,0 +1,77 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Importar CSV - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-file-csv"></i> Importar Estudiantes desde CSV</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}">Cursos</a></li>
+                <li class="breadcrumb-item active">Importar CSV</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Subir Archivo CSV</h3>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <label for="{{ form.csv_file.id_for_label }}">{{ form.csv_file.label }}</label>
+                        {{ form.csv_file }}
+                        {% if form.csv_file.errors %}
+                        <div class="text-danger">{{ form.csv_file.errors }}</div>
+                        {% endif %}
+                        {% if form.csv_file.help_text %}
+                        <small class="form-text text-muted">{{ form.csv_file.help_text }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload"></i> Importar
+                        </button>
+                        <a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}" class="btn btn-secondary">
+                            Cancelar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Formato del CSV</h3>
+            </div>
+            <div class="card-body">
+                <p>El archivo CSV debe tener las siguientes columnas:</p>
+                <ul>
+                    <li><strong>username</strong> (requerido)</li>
+                    <li><strong>email</strong> (requerido)</li>
+                    <li><strong>first_name</strong> (opcional)</li>
+                    <li><strong>last_name</strong> (opcional)</li>
+                    <li><strong>student_id</strong> (opcional)</li>
+                </ul>
+                <hr>
+                <h5>Ejemplo:</h5>
+                <pre class="bg-dark p-2 rounded"><code>username,email,first_name,last_name,student_id
+juan.perez,juan@example.com,Juan,Pérez,2024001
+maria.garcia,maria@example.com,María,García,2024002</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

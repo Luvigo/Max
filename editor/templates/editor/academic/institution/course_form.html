@@ -1,0 +1,99 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ action }} Curso - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-{% if action == 'Crear' %}plus{% else %}edit{% endif %}"></i> {{ action }} Curso</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}">Cursos</a></li>
+                <li class="breadcrumb-item active">{{ action }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="card">
+    <div class="card-header">
+        <h3>{{ action }} Curso</h3>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <div class="text-danger">{{ form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+                        {{ form.code }}
+                        {% if form.code.errors %}
+                        <div class="text-danger">{{ form.code.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.grade_level.id_for_label }}">{{ form.grade_level.label }}</label>
+                        {{ form.grade_level }}
+                        {% if form.grade_level.errors %}
+                        <div class="text-danger">{{ form.grade_level.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="{{ form.academic_year.id_for_label }}">{{ form.academic_year.label }}</label>
+                        {{ form.academic_year }}
+                        {% if form.academic_year.errors %}
+                        <div class="text-danger">{{ form.academic_year.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                {{ form.status }}
+                {% if form.status.errors %}
+                <div class="text-danger">{{ form.status.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <div class="text-danger">{{ form.description.errors }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+                <a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}" class="btn btn-secondary">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

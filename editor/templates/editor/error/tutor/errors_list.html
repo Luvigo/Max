@@ -1,0 +1,142 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Errores - Tutor{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-exclamation-triangle"></i> Eventos de Error</h1>
+        <p class="text-muted">Errores relacionados con tus cursos</p>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<!-- Estadísticas -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ stats.total }}</h3>
+                <p class="text-muted mb-0">Total Errores</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="mb-0 text-warning">{{ stats.unresolved }}</h3>
+                <p class="text-muted mb-0">Sin Resolver</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <h3 class="mb-0">{{ courses.count }}</h3>
+                <p class="text-muted mb-0">Cursos</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="code" class="form-label">Código de Error</label>
+                <select name="code" id="code" class="form-select">
+                    <option value="">Todos</option>
+                    {% for code, label in error_codes %}
+                        <option value="{{ code }}" {% if code_filter == code %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="severity" class="form-label">Severidad</label>
+                <select name="severity" id="severity" class="form-select">
+                    <option value="">Todas</option>
+                    {% for sev, label in severities %}
+                        <option value="{{ sev }}" {% if severity_filter == sev %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabla de Errores -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Código</th>
+                        <th>Severidad</th>
+                        <th>Mensaje</th>
+                        <th>Usuario</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for error in errors %}
+                    <tr>
+                        <td><code>{{ error.id|truncatechars:8 }}</code></td>
+                        <td><span class="badge bg-secondary">{{ error.get_code_display }}</span></td>
+                        <td>
+                            {% if error.severity == 'critical' %}
+                                <span class="badge bg-danger">Crítica</span>
+                            {% elif error.severity == 'high' %}
+                                <span class="badge bg-warning">Alta</span>
+                            {% elif error.severity == 'medium' %}
+                                <span class="badge bg-info">Media</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Baja</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ error.message|truncatechars:60 }}</td>
+                        <td>{{ error.user.username|default:"Sistema" }}</td>
+                        <td>{{ error.ts|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">No se encontraron errores</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if errors.has_other_pages %}
+        <nav aria-label="Paginación">
+            <ul class="pagination justify-content-center mt-3">
+                {% if errors.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ errors.previous_page_number }}{% if code_filter %}&code={{ code_filter }}{% endif %}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}">Anterior</a>
+                </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">Página {{ errors.number }} de {{ errors.paginator.num_pages }}</span>
+                </li>
+                {% if errors.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ errors.next_page_number }}{% if code_filter %}&code={{ code_filter }}{% endif %}{% if severity_filter %}&severity={{ severity_filter }}{% endif %}">Siguiente</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

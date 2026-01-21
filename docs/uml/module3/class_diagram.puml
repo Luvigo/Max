@@ -1,0 +1,86 @@
+@startuml
+!theme cerulean
+title Módulo 3: Diagrama de Clases - Actividades y Entregas
+
+skinparam classAttributeIconSize 0
+
+package "django.contrib.auth" <<Database>> {
+    class User {
+        +id: int
+        +username: str
+        +email: str
+    }
+}
+
+package "editor.models" <<Database>> {
+    
+    class Course {
+        +id: int
+        +name: str
+        +code: str
+    }
+    
+    class Activity {
+        +id: UUID
+        +course: FK(Course)
+        +title: str
+        +objective: str
+        +instructions: str
+        +deadline: datetime
+        +status: enum(draft, published, closed)
+        +allow_resubmit: bool
+        +published_at: datetime
+        +created_at: datetime
+        --
+        +is_published(): bool
+        +is_closed(): bool
+        +is_deadline_passed(): bool
+        +get_submissions_count(): int
+        +get_pending_submissions_count(): int
+    }
+    
+    class Submission {
+        +id: UUID
+        +activity: FK(Activity)
+        +student: FK(User)
+        +status: enum(pending, submitted, graded)
+        +attempt: int
+        +artifact_ref: JSON
+        +submitted_at: datetime
+        +created_at: datetime
+        --
+        +can_resubmit(): bool
+        +get_latest_feedback(): Feedback
+    }
+    
+    class Rubric {
+        +id: UUID
+        +activity: FK(Activity) {1:1}
+        +criteria: JSON
+        +created_at: datetime
+        --
+        +get_total_max_score(): int
+    }
+    
+    class Feedback {
+        +id: UUID
+        +submission: FK(Submission)
+        +tutor: FK(User)
+        +score: decimal
+        +comments: str
+        +rubric_breakdown: JSON
+        +created_at: datetime
+        --
+        +get_percentage_score(): float
+    }
+}
+
+' Relaciones
+Course ||--o{ Activity : "tiene"
+Activity ||--o{ Submission : "recibe"
+Activity ||--|| Rubric : "tiene"
+Submission ||--o{ Feedback : "tiene"
+User ||--o{ Submission : "entrega"
+User ||--o{ Feedback : "califica"
+
+@enduml

@@ -51,6 +51,16 @@
                 <span>Usuarios</span>
             </a>
             
+            <a href="{% url 'editor:admin_agents_list' %}" class="nav-item {% if 'agent' in request.resolver_match.url_name and 'admin' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-server"></i>
+                <span>Agents Locales</span>
+            </a>
+            
+            <a href="{% url 'editor:admin_errors_list' %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'admin' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Errores</span>
+            </a>
+            
             <a href="{% url 'admin:index' %}" class="nav-item">
                 <i class="fas fa-cog"></i>
                 <span>Django Admin</span>
@@ -79,6 +89,18 @@
                 <i class="fas fa-user-graduate"></i>
                 <span>Estudiantes</span>
             </a>
+            
+            {% if institution %}
+            <a href="{% url 'editor:institution_agents_list' institution_slug=institution.slug %}" class="nav-item {% if 'agent' in request.resolver_match.url_name and 'institution' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-server"></i>
+                <span>Agents Locales</span>
+            </a>
+            
+            <a href="{% url 'editor:institution_errors_list' institution_slug=institution.slug %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'institution' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Errores</span>
+            </a>
+            {% endif %}
         </div>
         {% endif %}
         
@@ -103,6 +125,13 @@
                 <i class="fas fa-users"></i>
                 <span>Mis Estudiantes</span>
             </a>
+            
+            {% if institution %}
+            <a href="{% url 'editor:tutor_errors_list' institution_slug=institution.slug %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'tutor' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Errores</span>
+            </a>
+            {% endif %}
         </div>
         {% endif %}
         

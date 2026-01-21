@@ -1,0 +1,83 @@
+@startuml
+!theme cerulean
+title Módulo 4: Diagrama de Clases - IDE y Workspaces
+
+skinparam classAttributeIconSize 0
+
+package "django.contrib.auth" <<Database>> {
+    class User {
+        +id: int
+        +username: str
+        +email: str
+    }
+}
+
+package "editor.models" <<Database>> {
+    
+    class Activity {
+        +id: UUID
+        +title: str
+        +allow_resubmit: bool
+    }
+    
+    class Submission {
+        +id: UUID
+        +activity: FK(Activity)
+        +student: FK(User)
+        +artifact_ref: JSON
+        +status: enum
+    }
+    
+    class IDEProject {
+        +id: UUID
+        +owner: FK(User)
+        +institution: FK(Institution)
+        +name: str
+        +blockly_xml: text
+        +arduino_code: text
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +is_frozen(): bool
+        +get_last_modified(): str
+    }
+    
+    class ProjectSnapshot {
+        +id: UUID
+        +project: FK(IDEProject)
+        +label: str
+        +blockly_xml: text
+        +arduino_code: text
+        +created_at: datetime
+    }
+    
+    class ActivityWorkspace {
+        +id: UUID
+        +activity: FK(Activity)
+        +student: FK(User)
+        +project: FK(IDEProject)
+        +status: enum(in_progress, frozen)
+        +frozen_at: datetime
+        +created_at: datetime
+        --
+        +is_frozen(): bool
+        +freeze(): void
+        +unfreeze(): void
+    }
+    
+    class Institution {
+        +id: UUID
+        +name: str
+    }
+}
+
+' Relaciones
+Activity ||--o{ ActivityWorkspace : "tiene"
+Activity ||--o{ Submission : "recibe"
+User ||--o{ IDEProject : "posee"
+User ||--o{ ActivityWorkspace : "trabaja en"
+IDEProject ||--o{ ProjectSnapshot : "tiene"
+IDEProject ||--o{ ActivityWorkspace : "usado en"
+Submission --> IDEProject : "referencia en artifact_ref"
+
+@enduml

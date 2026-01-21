@@ -1,0 +1,40 @@
+@startuml
+left to right direction
+actor Admin
+actor "Institución" as Inst
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 6: Observabilidad" {
+  usecase "Registrar ErrorEvent" as UC_ErrorLog
+  usecase "Dashboard Errores (Admin)" as UC_AdminDash
+  usecase "Dashboard Errores (Institución)" as UC_InstDash
+  usecase "Dashboard Errores (Tutor)" as UC_TutorDash
+  usecase "Copiar diagnóstico (IDE)" as UC_CopyDiag
+  usecase "Reportar incidente" as UC_Report
+  usecase "Exportar logs" as UC_Export
+
+  usecase "ERROR: BootloaderSyncFailed" as E_Boot
+  usecase "ERROR: AgentMissing" as E_AgentMissing
+  usecase "ERROR: WorkspaceCorrupt" as E_Corrupt
+  usecase "ERROR: SubmissionRace" as E_Race
+  usecase "ERROR: PortBusy" as E_Port
+  usecase "ERROR: UploadFailed" as E_Upload
+}
+
+Estudiante --> UC_CopyDiag
+Estudiante --> UC_Report
+Tutor --> UC_TutorDash
+Tutor --> UC_Report
+Inst --> UC_InstDash
+Admin --> UC_AdminDash
+Admin --> UC_Export
+
+UC_Report --> UC_ErrorLog : <<include>>
+UC_ErrorLog ..> E_Boot : <<extend>>
+UC_ErrorLog ..> E_AgentMissing : <<extend>>
+UC_ErrorLog ..> E_Corrupt : <<extend>>
+UC_ErrorLog ..> E_Race : <<extend>>
+UC_ErrorLog ..> E_Port : <<extend>>
+UC_ErrorLog ..> E_Upload : <<extend>>
+@enduml

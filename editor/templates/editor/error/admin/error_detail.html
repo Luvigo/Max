@@ -1,0 +1,130 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Error #{{ error.id|truncatechars:8 }} - Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-exclamation-triangle"></i> Detalle de Error</h1>
+        <p class="text-muted">ID: <code>{{ error.id }}</code></p>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Información del Error</h5>
+                {% if error.resolved %}
+                    <span class="badge bg-success">Resuelto</span>
+                {% else %}
+                    <span class="badge bg-warning">Sin Resolver</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Código:</dt>
+                    <dd class="col-sm-9"><code>{{ error.get_code_display }}</code></dd>
+                    
+                    <dt class="col-sm-3">Severidad:</dt>
+                    <dd class="col-sm-9">
+                        {% if error.severity == 'critical' %}
+                            <span class="badge bg-danger">Crítica</span>
+                        {% elif error.severity == 'high' %}
+                            <span class="badge bg-warning">Alta</span>
+                        {% elif error.severity == 'medium' %}
+                            <span class="badge bg-info">Media</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Baja</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-3">Mensaje:</dt>
+                    <dd class="col-sm-9">{{ error.message }}</dd>
+                    
+                    <dt class="col-sm-3">Usuario:</dt>
+                    <dd class="col-sm-9">{{ error.user.username|default:"Sistema" }}</dd>
+                    
+                    <dt class="col-sm-3">Institución:</dt>
+                    <dd class="col-sm-9">{{ error.institution.name|default:"N/A" }}</dd>
+                    
+                    <dt class="col-sm-3">Fecha:</dt>
+                    <dd class="col-sm-9">{{ error.ts|date:"d/m/Y H:i:s" }}</dd>
+                    
+                    {% if error.resolved %}
+                    <dt class="col-sm-3">Resuelto:</dt>
+                    <dd class="col-sm-9">
+                        {{ error.resolved_at|date:"d/m/Y H:i:s" }}
+                        {% if error.resolved_by %}
+                            por <strong>{{ error.resolved_by.username }}</strong>
+                        {% endif %}
+                    </dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Contexto -->
+        {% if error.context %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Contexto</h5>
+            </div>
+            <div class="card-body">
+                <pre class="bg-light p-3 rounded"><code>{{ error.context|safe }}</code></pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <!-- Acciones -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Acciones</h5>
+            </div>
+            <div class="card-body">
+                {% if not error.resolved %}
+                <form method="post" action="{% url 'editor:admin_error_detail' error_id=error.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="resolve">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-check"></i> Marcar como Resuelto
+                    </button>
+                </form>
+                {% else %}
+                <form method="post" action="{% url 'editor:admin_error_detail' error_id=error.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="unresolve">
+                    <button type="submit" class="btn btn-warning w-100 mb-2">
+                        <i class="fas fa-undo"></i> Marcar como No Resuelto
+                    </button>
+                </form>
+                {% endif %}
+                
+                <a href="{% url 'editor:admin_errors_list' %}" class="btn btn-secondary w-100">
+                    <i class="fas fa-arrow-left"></i> Volver a Lista
+                </a>
+            </div>
+        </div>
+
+        <!-- Información de Resolución -->
+        {% if error.resolved and error.resolved_at %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Resolución</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>Fecha:</strong> {{ error.resolved_at|date:"d/m/Y H:i:s" }}</p>
+                {% if error.resolved_by %}
+                <p class="mb-0"><strong>Por:</strong> {{ error.resolved_by.username }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+@startuml
+!theme cerulean
+title Módulo 5: Diagrama de Clases - Agent Local Institucional
+
+skinparam classAttributeIconSize 0
+
+package "editor.models" <<Database>> {
+    
+    class Institution {
+        +id: UUID
+        +name: str
+        +slug: str
+    }
+    
+    class AgentInstance {
+        +id: UUID
+        +institution: FK(Institution)
+        +hostname: str
+        +os: str
+        +agent_version: str
+        +ide_version_compatible: str
+        +status: enum(online, offline, error)
+        +last_seen: datetime
+        +meta: JSON
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +is_online(): bool
+        +update_heartbeat(): void
+        +mark_offline(): void
+        +mark_error(): void
+        +get_info(): dict
+    }
+}
+
+' Relaciones
+Institution ||--o{ AgentInstance : "tiene"
+
+@enduml
