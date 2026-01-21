@@ -852,7 +852,26 @@ function initBlockly() {
         }
     });
     
-    addInitialBlocks();
+    // Cargar proyecto desde template si existe (después de que Blockly esté listo)
+    setTimeout(function() {
+        // Verificar si hay blocklyXml definido globalmente (desde templates)
+        if (typeof blocklyXml !== 'undefined' && blocklyXml && blocklyXml.trim()) {
+            try {
+                const xml = Blockly.utils.xml.textToDom(blocklyXml);
+                workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, workspace);
+                updateCode();
+                logToConsole('Proyecto cargado desde template', 'success');
+            } catch (e) {
+                console.error('Error cargando proyecto desde template:', e);
+                // Si falla, cargar bloques iniciales vacíos
+                addInitialBlocks();
+            }
+        } else {
+            // Si no hay proyecto, cargar bloques iniciales vacíos
+            addInitialBlocks();
+        }
+    }, 100);
     
     window.addEventListener('resize', function() {
         Blockly.svgResize(workspace);
@@ -890,54 +909,17 @@ function applyCustomStyles() {
 }
 
 /**
- * Añade bloques iniciales al workspace
+ * Añade bloques iniciales al workspace (setup y loop vacíos)
  */
 function addInitialBlocks() {
     const xml = `
         <xml>
             <block type="arduino_setup" x="50" y="50">
                 <statement name="SETUP_CODE">
-                    <block type="arduino_pin_mode">
-                        <field name="PIN">13</field>
-                        <field name="MODE">OUTPUT</field>
-                        <next>
-                            <block type="arduino_serial_begin">
-                                <field name="BAUD">9600</field>
-                            </block>
-                        </next>
-                    </block>
                 </statement>
             </block>
             <block type="arduino_loop" x="50" y="220">
                 <statement name="LOOP_CODE">
-                    <block type="arduino_digital_write">
-                        <field name="PIN">13</field>
-                        <field name="VALUE">HIGH</field>
-                        <next>
-                            <block type="arduino_delay">
-                                <value name="TIME">
-                                    <block type="arduino_number">
-                                        <field name="NUM">1000</field>
-                                    </block>
-                                </value>
-                                <next>
-                                    <block type="arduino_digital_write">
-                                        <field name="PIN">13</field>
-                                        <field name="VALUE">LOW</field>
-                                        <next>
-                                            <block type="arduino_delay">
-                                                <value name="TIME">
-                                                    <block type="arduino_number">
-                                                        <field name="NUM">1000</field>
-                                                    </block>
-                                                </value>
-                                            </block>
-                                        </next>
-                                    </block>
-                                </next>
-                            </block>
-                        </next>
-                    </block>
                 </statement>
             </block>
         </xml>
