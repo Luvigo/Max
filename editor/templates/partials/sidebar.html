@@ -18,17 +18,10 @@
                 <span>Dashboard</span>
             </a>
             
-            {% if user_role == 'admin' or user_role == 'institution' %}
-            <a href="{% url 'editor:index' %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
                 <i class="fas fa-code"></i>
                 <span>Editor IDE</span>
             </a>
-            {% else %}
-            <a href="{% url 'editor:index' %}" class="nav-item">
-                <i class="fas fa-code"></i>
-                <span>Editor IDE</span>
-            </a>
-            {% endif %}
         </div>
         
         {% if user_role == 'admin' %}
