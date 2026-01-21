@@ -189,11 +189,11 @@
                     <span>📟</span>
                     <span>Serial</span>
                 </button>
-                <button class="btn btn-warning" id="btnCompile" {% if is_read_only %}disabled{% endif %}>
+                <button class="btn btn-warning" id="btnCompile" data-action="verify" {% if is_read_only %}disabled{% endif %}>
                     <span>⚙️</span>
                     <span>Verificar</span>
                 </button>
-                <button class="btn btn-success" id="btnUpload" {% if is_read_only %}disabled{% endif %}>
+                <button class="btn btn-success" id="btnUpload" data-action="upload" {% if is_read_only %}disabled{% endif %}>
                     <span>🚀</span>
                     <span>Subir</span>
                 </button>

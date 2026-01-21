@@ -948,13 +948,123 @@ function addInitialBlocks() {
     updateCode();
 }
 
+// ============================================
+// UI FEEDBACK HELPERS (P1.2 - Solo UI, sin lógica)
+// ============================================
+
+/**
+ * Sistema de tracking del último resultado de toast para feedback visual
+ * NO modifica la lógica existente, solo observa
+ */
+let _lastToastResult = null;
+let _toastResultTimeout = null;
+
+// Interceptar showToast para capturar el tipo (aditivo, no destructivo)
+const _originalShowToastRef = typeof showToast === 'function' ? showToast : null;
+
+/**
+ * Wrapper para capturar el resultado del último toast
+ * Se usará después de que showToast sea definido
+ */
+function _captureToastResult(type) {
+    _lastToastResult = type;
+    // Reset después de 3 segundos para evitar falsos positivos
+    clearTimeout(_toastResultTimeout);
+    _toastResultTimeout = setTimeout(() => { _lastToastResult = null; }, 3000);
+}
+
+/**
+ * Aplica feedback visual a un botón después de una operación
+ * @param {HTMLElement} btn - El botón
+ * @param {string} result - 'success' | 'error'
+ * @param {number} duration - Duración del flash en ms
+ */
+function applyButtonFeedback(btn, result, duration = 1000) {
+    if (!btn) return;
+    
+    // Limpiar clases previas
+    btn.classList.remove('btn-success-flash', 'btn-error-flash', 'btn-loading', 'btn-pulse');
+    
+    // Forzar reflow para reiniciar animación
+    void btn.offsetWidth;
+    
+    // Aplicar clase de feedback
+    const feedbackClass = result === 'success' ? 'btn-success-flash' : 'btn-error-flash';
+    btn.classList.add(feedbackClass);
+    
+    // Remover después de la duración
+    setTimeout(() => {
+        btn.classList.remove(feedbackClass);
+    }, duration);
+}
+
+/**
+ * Wrapper que agrega feedback visual a operaciones async de botones
+ * NO modifica la lógica de la función original
+ * @param {HTMLElement} btn - El botón que dispara la acción
+ * @param {Function} asyncFn - La función async original
+ * @param {Object} options - Opciones de configuración
+ */
+async function withButtonFeedback(btn, asyncFn, options = {}) {
+    const {
+        successDuration = 1000,
+        errorDuration = 1500
+    } = options;
+    
+    // Si no hay botón, ejecutar la función sin wrapper
+    if (!btn) {
+        try { await asyncFn(); } catch(e) { /* silencioso */ }
+        return;
+    }
+    
+    // Agregar clase de pulse durante la operación
+    btn.classList.add('btn-pulse');
+    
+    // Reset el tracker de toast antes de la operación
+    _lastToastResult = null;
+    
+    try {
+        // Ejecutar la función original
+        await asyncFn();
+        
+        // Determinar resultado basándose en el último toast capturado
+        // Si no hay toast o es success/info = success visual
+        // Si es error/warning = error visual
+        const isError = _lastToastResult === 'error';
+        
+        // Pequeño delay para que el botón vuelva a su estado normal primero
+        setTimeout(() => {
+            btn.classList.remove('btn-pulse');
+            applyButtonFeedback(btn, isError ? 'error' : 'success', 
+                               isError ? errorDuration : successDuration);
+        }, 100);
+        
+    } catch (error) {
+        // Si hay throw explícito, mostrar error
+        btn.classList.remove('btn-pulse');
+        applyButtonFeedback(btn, 'error', errorDuration);
+        
+        // Debug log solo si está habilitado
+        if (window.IDE_DEBUG) {
+            console.debug('[UI-Feedback] Error capturado:', error.message);
+        }
+    }
+}
+
 /**
  * Inicializa los event listeners
  */
 function initEventListeners() {
-    // Botones principales
-    document.getElementById('btnCompile').addEventListener('click', verifyCode);
-    document.getElementById('btnUpload').addEventListener('click', uploadCode);
+    // Botones principales con feedback visual
+    const btnCompile = document.getElementById('btnCompile');
+    const btnUpload = document.getElementById('btnUpload');
+    
+    if (btnCompile) {
+        btnCompile.addEventListener('click', () => withButtonFeedback(btnCompile, verifyCode));
+    }
+    if (btnUpload) {
+        btnUpload.addEventListener('click', () => withButtonFeedback(btnUpload, uploadCode, { errorDuration: 2000 }));
+    }
     document.getElementById('btnRefreshPorts').addEventListener('click', refreshPorts);
     document.getElementById('btnAddPort').addEventListener('click', requestSerialPort); // Abre diálogo Web Serial
     
@@ -1747,6 +1857,11 @@ function clearConsole() {
 }
 
 function showToast(message, type = 'info') {
+    // Capturar el tipo para el sistema de feedback visual (P1.2)
+    if (typeof _captureToastResult === 'function') {
+        _captureToastResult(type);
+    }
+    
     const container = document.getElementById('toastContainer');
     const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
     
