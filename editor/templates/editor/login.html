@@ -189,17 +189,33 @@
             </div>
         {% endif %}
         
+        {% if form.errors %}
+            <div class="messages">
+                {% if form.non_field_errors %}
+                    {% for error in form.non_field_errors %}
+                        <div class="message error">{{ error }}</div>
+                    {% endfor %}
+                {% else %}
+                    <div class="message error">Usuario o contraseña incorrectos. Por favor, verifica tus credenciales.</div>
+                {% endif %}
+            </div>
+        {% endif %}
+        
         <form method="post">
             {% csrf_token %}
             <div class="form-group">
-                <label for="username">Usuario</label>
-                <input type="text" id="username" name="username" required autofocus>
+                <label for="id_username">Usuario</label>
+                <input type="text" id="id_username" name="username" value="{{ form.username.value|default:'' }}" required autofocus>
             </div>
             
             <div class="form-group">
-                <label for="password">Contraseña</label>
-                <input type="password" id="password" name="password" required>
+                <label for="id_password">Contraseña</label>
+                <input type="password" id="id_password" name="password" required>
             </div>
+            
+            {% if next %}
+                <input type="hidden" name="next" value="{{ next }}">
+            {% endif %}
             
             <button type="submit" class="btn-login">Iniciar Sesión</button>
         </form>

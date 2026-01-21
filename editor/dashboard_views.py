@@ -30,6 +30,10 @@ def dashboard_redirect(request):
     if user.is_superuser:
         return redirect('admin_dashboard')
     
+    # Staff users (is_staff=True) también van al admin dashboard
+    if user.is_staff:
+        return redirect('admin_dashboard')
+    
     # Obtener rol del usuario
     role = UserRoleHelper.get_user_role(user)
     
@@ -40,8 +44,9 @@ def dashboard_redirect(request):
     institutions = UserRoleHelper.get_user_institutions(user)
     
     if not institutions.exists():
-        messages.warning(request, 'No tienes acceso a ninguna institución.')
-        return redirect('login')
+        # No tiene instituciones asignadas, mostrar mensaje pero ir al IDE básico
+        messages.warning(request, 'No tienes acceso a ninguna institución. Puedes usar el IDE básico.')
+        return redirect('editor:index')
     
     # Si solo tiene una institución, redirigir directamente
     if institutions.count() == 1:

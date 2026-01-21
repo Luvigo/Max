@@ -12,8 +12,8 @@ from . import error_views
 app_name = 'editor'
 
 urlpatterns = [
-    # Autenticación
-    path('login/', auth_views.student_login, name='login'),
+    # Autenticación (comentado - se usa la vista de Django en arduino_ide/urls.py)
+    # path('login/', auth_views.student_login, name='login'),
     path('admin-login/', auth_views.admin_login, name='admin_login'),
     
     # Vista principal
