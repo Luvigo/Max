@@ -6,21 +6,22 @@ The `urlpatterns` list routes URLs to views. For more information please see:
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
 
 from editor import dashboard_views
 from editor import agent_views
 from editor import error_views
+from editor import auth_views
 
 urlpatterns = [
     # Admin de Django
     path('admin/', admin.site.urls),
     
-    # Autenticación global
-    path('login/', auth_views.LoginView.as_view(template_name='editor/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    # Autenticación global (vista personalizada)
+    # Los admins deben usar /admin/login/, los usuarios normales usan /login/
+    path('login/', auth_views.user_login, name='login'),
+    path('logout/', auth_views.user_logout, name='logout'),
     
     # Dashboard principal (redirige según rol)
     path('dashboard/', dashboard_views.dashboard_redirect, name='dashboard'),
