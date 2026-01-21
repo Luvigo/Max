@@ -34,22 +34,12 @@
                 <span>Panel Admin</span>
             </a>
             
-            <a href="{% url 'editor:institutions_list' %}" class="nav-item {% if 'institution' in request.resolver_match.url_name %}active{% endif %}">
-                <i class="fas fa-building"></i>
-                <span>Instituciones</span>
-            </a>
-            
-            <a href="#" class="nav-item">
-                <i class="fas fa-users-cog"></i>
-                <span>Usuarios</span>
-            </a>
-            
-            <a href="{% url 'editor:admin_agents_list' %}" class="nav-item {% if 'agent' in request.resolver_match.url_name and 'admin' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/admin-panel/agents/" class="nav-item">
                 <i class="fas fa-server"></i>
                 <span>Agents Locales</span>
             </a>
             
-            <a href="{% url 'editor:admin_errors_list' %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'admin' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/admin-panel/errors/" class="nav-item">
                 <i class="fas fa-exclamation-triangle"></i>
                 <span>Errores</span>
             </a>
@@ -61,39 +51,31 @@
         </div>
         {% endif %}
         
+        {% if institution %}
         {% if user_role == 'admin' or user_role == 'institution' %}
         <!-- Gestión Institución -->
         <div class="nav-section">
-            <div class="nav-section-title">{% if institution %}{{ institution.name|truncatechars:20 }}{% else %}Institución{% endif %}</div>
+            <div class="nav-section-title">{{ institution.name|truncatechars:20 }}</div>
             
-            {% if institution %}
             <a href="{% url 'institution_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'institution_dashboard' %}active{% endif %}">
                 <i class="fas fa-tachometer-alt"></i>
                 <span>Dashboard</span>
             </a>
-            {% endif %}
             
-            <a href="{% url 'editor:courses_list' %}" class="nav-item {% if 'course' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/i/{{ institution.slug }}/institution/courses/" class="nav-item {% if 'course' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="fas fa-graduation-cap"></i>
                 <span>Cursos</span>
             </a>
             
-            <a href="{% url 'editor:students_list' %}" class="nav-item {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
-                <i class="fas fa-user-graduate"></i>
-                <span>Estudiantes</span>
-            </a>
-            
-            {% if institution %}
-            <a href="{% url 'editor:institution_agents_list' institution_slug=institution.slug %}" class="nav-item {% if 'agent' in request.resolver_match.url_name and 'institution' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/i/{{ institution.slug }}/institution/agents/" class="nav-item">
                 <i class="fas fa-server"></i>
                 <span>Agents Locales</span>
             </a>
             
-            <a href="{% url 'editor:institution_errors_list' institution_slug=institution.slug %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'institution' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/i/{{ institution.slug }}/institution/errors/" class="nav-item">
                 <i class="fas fa-exclamation-triangle"></i>
                 <span>Errores</span>
             </a>
-            {% endif %}
         </div>
         {% endif %}
         
@@ -102,29 +84,20 @@
         <div class="nav-section">
             <div class="nav-section-title">Mi Área</div>
             
-            {% if institution %}
             <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'tutor_dashboard' %}active{% endif %}">
                 <i class="fas fa-chalkboard-teacher"></i>
                 <span>Mi Dashboard</span>
             </a>
-            {% endif %}
             
-            <a href="#" class="nav-item">
+            <a href="/i/{{ institution.slug }}/tutor/courses/" class="nav-item">
                 <i class="fas fa-book-open"></i>
                 <span>Mis Cursos</span>
             </a>
             
-            <a href="#" class="nav-item">
-                <i class="fas fa-users"></i>
-                <span>Mis Estudiantes</span>
-            </a>
-            
-            {% if institution %}
-            <a href="{% url 'editor:tutor_errors_list' institution_slug=institution.slug %}" class="nav-item {% if 'error' in request.resolver_match.url_name and 'tutor' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="/i/{{ institution.slug }}/tutor/errors/" class="nav-item">
                 <i class="fas fa-exclamation-triangle"></i>
                 <span>Errores</span>
             </a>
-            {% endif %}
         </div>
         {% endif %}
         
@@ -133,18 +106,17 @@
         <div class="nav-section">
             <div class="nav-section-title">Mi Área</div>
             
-            {% if institution %}
             <a href="{% url 'student_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
                 <i class="fas fa-user"></i>
                 <span>Mi Dashboard</span>
             </a>
-            {% endif %}
             
-            <a href="{% url 'editor:student_projects' %}" class="nav-item {% if request.resolver_match.url_name == 'student_projects' %}active{% endif %}">
+            <a href="/i/{{ institution.slug }}/student/courses/" class="nav-item">
                 <i class="fas fa-folder-open"></i>
-                <span>Mis Proyectos</span>
+                <span>Mis Cursos</span>
             </a>
         </div>
+        {% endif %}
         {% endif %}
         
         <!-- Ayuda -->
