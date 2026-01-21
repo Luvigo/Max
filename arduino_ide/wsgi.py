@@ -8,6 +8,7 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
 """
 
 import os
+import sys
 
 from django.core.wsgi import get_wsgi_application
 
@@ -19,9 +20,23 @@ application = get_wsgi_application()
 # Crear usuarios de prueba automáticamente al iniciar (para Render/producción)
 def create_initial_users():
     """Crea usuarios de prueba si no existen"""
+    import django
+    from django.db import connection
+    
+    # Verificar que Django está listo y la BD está disponible
+    try:
+        # Intentar hacer una query simple para verificar conexión
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception as e:
+        print(f"[WSGI] Base de datos no disponible: {e}")
+        return
+    
     try:
         from django.contrib.auth.models import User
         from editor.models import Institution, Membership, Course, Student, Enrollment, TeachingAssignment
+        
+        print("[WSGI] Verificando/creando datos iniciales...")
         
         # Crear usuario admin si no existe
         if not User.objects.filter(username='admin').exists():
@@ -71,16 +86,25 @@ def create_initial_users():
                 user.set_password('test123')
                 user.save()
                 print(f"[WSGI] Usuario {username} creado")
+            else:
+                # Si existe pero no tiene password usable, resetear
+                if not user.has_usable_password():
+                    user.set_password('test123')
+                    user.save()
+                    print(f"[WSGI] Password reseteado para {username}")
             
             # Crear membresía si tiene rol
-            if role and not Membership.objects.filter(user=user, institution=institution).exists():
-                Membership.objects.create(
+            if role:
+                membership, m_created = Membership.objects.get_or_create(
                     user=user,
                     institution=institution,
-                    role=role,
-                    is_active=True
+                    defaults={
+                        'role': role,
+                        'is_active': True
+                    }
                 )
-                print(f"[WSGI] Membresía de {username} creada")
+                if m_created:
+                    print(f"[WSGI] Membresía de {username} creada")
         
         # Crear curso de prueba
         tutor_user = User.objects.filter(username='test_tutor').first()
@@ -117,14 +141,17 @@ def create_initial_users():
                     defaults={'status': 'active'}
                 )
         
-        print("[WSGI] Datos iniciales verificados/creados correctamente")
+        print("[WSGI] ✅ Datos iniciales verificados/creados correctamente")
         
     except Exception as e:
+        import traceback
         print(f"[WSGI] Error creando usuarios iniciales: {e}")
+        traceback.print_exc()
 
 
-# Ejecutar creación de usuarios al iniciar
-try:
-    create_initial_users()
-except Exception as e:
-    print(f"[WSGI] Error en inicialización: {e}")
+# Ejecutar creación de usuarios al iniciar (solo en producción)
+if os.environ.get('RENDER') or os.environ.get('AUTO_CREATE_USERS'):
+    try:
+        create_initial_users()
+    except Exception as e:
+        print(f"[WSGI] Error en inicialización: {e}")
