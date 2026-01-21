@@ -60,19 +60,111 @@
         color: var(--color-warning, #d29922);
     }
     
+    .badge-inprogress {
+        background: rgba(234, 179, 8, 0.15);
+        color: #eab308;
+    }
+    
     .badge-submitted {
-        background: var(--color-success-glow, rgba(63, 185, 80, 0.15));
-        color: var(--color-success, #3fb950);
+        background: var(--color-primary-glow, rgba(88, 166, 255, 0.15));
+        color: var(--color-primary, #58a6ff);
     }
     
     .badge-graded {
-        background: var(--color-primary-glow, rgba(88, 166, 255, 0.15));
-        color: var(--color-primary, #58a6ff);
+        background: var(--color-success-glow, rgba(63, 185, 80, 0.15));
+        color: var(--color-success, #3fb950);
     }
     
     .badge-readonly {
         background: var(--color-danger-glow, rgba(248, 81, 73, 0.15));
         color: var(--color-danger, #f85149);
+    }
+    
+    /* Modal de confirmación de entrega */
+    .submit-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+    
+    .submit-modal-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    
+    .submit-modal {
+        background: var(--color-bg-secondary, #161b22);
+        border: 1px solid var(--color-border, #30363d);
+        border-radius: 12px;
+        width: 90%;
+        max-width: 450px;
+        padding: 24px;
+        transform: scale(0.9);
+        transition: transform 0.3s;
+    }
+    
+    .submit-modal-overlay.active .submit-modal {
+        transform: scale(1);
+    }
+    
+    .submit-modal h3 {
+        margin: 0 0 16px 0;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .submit-modal p {
+        color: var(--color-text-muted, #8b949e);
+        margin: 0 0 20px 0;
+        line-height: 1.5;
+    }
+    
+    .submit-modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+    
+    .submit-modal .btn-cancel {
+        background: transparent;
+        border: 1px solid var(--color-border, #30363d);
+        color: var(--color-text-muted, #8b949e);
+    }
+    
+    .submit-modal .btn-confirm {
+        background: var(--color-success, #238636);
+        color: white;
+    }
+    
+    .submit-status-message {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        display: none;
+    }
+    
+    .submit-status-message.show {
+        display: block;
+    }
+    
+    .submit-status-message.success {
+        background: rgba(46, 160, 67, 0.15);
+        color: #3fb950;
+    }
+    
+    .submit-status-message.error {
+        background: rgba(248, 81, 73, 0.15);
+        color: #f85149;
     }
     
     .alert-readonly {
@@ -105,25 +197,28 @@
             </div>
         </div>
         <div class="activity-context-right">
+            <!-- Badge de estado pedagógico -->
+            <span class="activity-badge" id="submissionStatusBadge">
             {% if last_submission %}
-            {% if last_submission.status == 'submitted' %}
-            <span class="activity-badge badge-submitted">Entregada</span>
-            {% elif last_submission.status == 'graded' %}
-            <span class="activity-badge badge-graded">Calificada</span>
+                {% if last_submission.status == 'graded' %}
+                <span class="badge-graded">🟢 Calificada</span>
+                {% elif last_submission.status == 'submitted' %}
+                <span class="badge-submitted">🔵 Entregada</span>
+                {% else %}
+                <span class="badge-inprogress">🟡 En progreso</span>
+                {% endif %}
             {% else %}
-            <span class="activity-badge badge-pending">Pendiente</span>
+                <span class="badge-inprogress">🟡 En progreso</span>
             {% endif %}
-            {% else %}
-            <span class="activity-badge badge-pending">Sin entregar</span>
-            {% endif %}
+            </span>
             
             {% if is_frozen or is_read_only %}
-            <span class="activity-badge badge-readonly">Solo Lectura</span>
+            <span class="activity-badge badge-readonly">🔒 Solo Lectura</span>
             {% endif %}
             
             {% if can_submit and not is_frozen %}
             <button class="btn btn-success btn-sm" id="btnSubmitActivity">
-                📤 Entregar Actividad
+                📤 Entregar
             </button>
             {% endif %}
         </div>
@@ -259,45 +354,158 @@
     <!-- El toolbox se carga desde el template base o desde un archivo separado -->
 </xml>
 
+<!-- Modal de confirmación de entrega -->
+<div class="submit-modal-overlay" id="submitModalOverlay">
+    <div class="submit-modal">
+        <h3>📤 Confirmar Entrega</h3>
+        <p>
+            ¿Estás seguro de que quieres entregar esta actividad?
+            {% if not activity.allow_resubmit %}
+            <br><strong>⚠️ Nota:</strong> Esta actividad no permite re-entregas. Una vez entregada, no podrás editarla.
+            {% else %}
+            <br>Podrás volver a entregar si lo necesitas.
+            {% endif %}
+        </p>
+        <div class="submit-status-message" id="submitStatusMessage"></div>
+        <div class="submit-modal-actions">
+            <button class="btn btn-cancel" id="btnCancelSubmit">Cancelar</button>
+            <button class="btn btn-confirm" id="btnConfirmSubmit">
+                <span id="btnConfirmSubmitText">Entregar</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
     // Configuración del IDE con contexto de actividad
     const IDE_CONFIG = {
         projectId: '{{ project.id }}',
         activityId: '{{ activity.id }}',
         institutionSlug: '{{ institution.slug }}',
+        courseId: '{{ activity.course.id }}',
         isReadOnly: {{ is_read_only|yesno:"true,false" }},
         isFrozen: {{ is_frozen|yesno:"true,false" }},
         canSubmit: {{ can_submit|yesno:"true,false" }},
+        allowResubmit: {{ activity.allow_resubmit|yesno:"true,false" }},
         autosaveEnabled: !{{ is_read_only|yesno:"true,false" }},
         autosaveInterval: 30000, // 30 segundos
+        submitUrl: '{% url "editor:student_activity_submit" institution_slug=institution.slug activity_id=activity.id %}',
+        csrfToken: '{{ csrf_token }}'
     };
     
     // Inicializar Blockly con el proyecto
     const blocklyXml = {{ project.blockly_xml|default:"''"|safe }};
     
-    // Si hay un botón de submit, agregar handler
+    // Funciones del modal de entrega
+    function openSubmitModal() {
+        document.getElementById('submitModalOverlay').classList.add('active');
+        document.getElementById('submitStatusMessage').className = 'submit-status-message';
+        document.getElementById('submitStatusMessage').textContent = '';
+        document.getElementById('btnConfirmSubmit').disabled = false;
+        document.getElementById('btnConfirmSubmitText').textContent = 'Entregar';
+    }
+    
+    function closeSubmitModal() {
+        document.getElementById('submitModalOverlay').classList.remove('active');
+    }
+    
+    async function performSubmit() {
+        const btn = document.getElementById('btnConfirmSubmit');
+        const btnText = document.getElementById('btnConfirmSubmitText');
+        const statusMsg = document.getElementById('submitStatusMessage');
+        
+        btn.disabled = true;
+        btnText.innerHTML = '<span class="mini-spinner"></span> Entregando...';
+        statusMsg.className = 'submit-status-message';
+        
+        try {
+            // Crear FormData con el project_id
+            const formData = new FormData();
+            formData.append('project_id', IDE_CONFIG.projectId);
+            
+            const response = await fetch(IDE_CONFIG.submitUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': IDE_CONFIG.csrfToken
+                },
+                body: formData
+            });
+            
+            if (response.redirected) {
+                // Éxito - la vista redirige
+                statusMsg.className = 'submit-status-message show success';
+                statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
+                btnText.textContent = '✓ Entregado';
+                
+                // Actualizar badge
+                updateSubmissionBadge('submitted');
+                
+                // Esperar un momento y recargar
+                setTimeout(() => {
+                    window.location.href = response.url;
+                }, 1500);
+            } else if (!response.ok) {
+                throw new Error('Error en la entrega');
+            } else {
+                // Éxito sin redirect
+                statusMsg.className = 'submit-status-message show success';
+                statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
+                btnText.textContent = '✓ Entregado';
+                updateSubmissionBadge('submitted');
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+        } catch (error) {
+            statusMsg.className = 'submit-status-message show error';
+            statusMsg.textContent = '✗ Error al entregar: ' + (error.message || 'Intenta de nuevo');
+            btn.disabled = false;
+            btnText.textContent = 'Reintentar';
+        }
+    }
+    
+    function updateSubmissionBadge(status) {
+        const badge = document.getElementById('submissionStatusBadge');
+        if (badge) {
+            if (status === 'submitted') {
+                badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
+            } else if (status === 'graded') {
+                badge.innerHTML = '<span class="badge-graded">🟢 Calificada</span>';
+            } else {
+                badge.innerHTML = '<span class="badge-inprogress">🟡 En progreso</span>';
+            }
+        }
+        
+        // Deshabilitar botón de entregar si ya entregó
+        if (status === 'submitted' || status === 'graded') {
+            const submitBtn = document.getElementById('btnSubmitActivity');
+            if (submitBtn && !IDE_CONFIG.allowResubmit) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
+            }
+        }
+    }
+    
+    // Event listeners del modal
     {% if can_submit and not is_frozen %}
-    document.getElementById('btnSubmitActivity')?.addEventListener('click', function() {
-        // Verificar que el Agent esté online antes de permitir submit
-        checkAgentStatus('{{ institution.slug }}').then(function(isOnline) {
-            if (!isOnline) {
-                alert('⚠️ El Agent está offline. No puedes entregar sin el Agent activo.');
-                return;
-            }
-            if (confirm('¿Estás seguro de que quieres entregar esta actividad? No podrás editarla después.')) {
-                window.location.href = '{% url "editor:student_activity_submit" institution_slug=institution.slug activity_id=activity.id %}?project_id=' + IDE_CONFIG.projectId;
-            }
-        });
+    document.getElementById('btnSubmitActivity')?.addEventListener('click', openSubmitModal);
+    document.getElementById('btnCancelSubmit')?.addEventListener('click', closeSubmitModal);
+    document.getElementById('btnConfirmSubmit')?.addEventListener('click', performSubmit);
+    document.getElementById('submitModalOverlay')?.addEventListener('click', function(e) {
+        if (e.target === this) closeSubmitModal();
     });
     {% endif %}
     
     // Deshabilitar botones de compilar/subir si Agent está offline
-    checkAgentStatus('{{ institution.slug }}').then(function(isOnline) {
-        if (!isOnline) {
-            document.getElementById('btnCompile')?.setAttribute('disabled', 'true');
-            document.getElementById('btnUpload')?.setAttribute('disabled', 'true');
-        }
-    });
+    if (typeof checkAgentStatus === 'function') {
+        checkAgentStatus('{{ institution.slug }}').then(function(isOnline) {
+            if (!isOnline) {
+                document.getElementById('btnCompile')?.setAttribute('disabled', 'true');
+                document.getElementById('btnUpload')?.setAttribute('disabled', 'true');
+            }
+        });
+    }
 </script>
 
 <!-- Scripts del IDE -->

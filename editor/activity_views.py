@@ -510,3 +510,85 @@ def student_submission_feedback(request, institution_slug, submission_id):
         'rubric': submission.activity.rubric if hasattr(submission.activity, 'rubric') else None,
     }
     return render(request, 'editor/activity/student/submission_feedback.html', context)
+
+
+# ============================================
+# APIs DE ESTADO (P3.1)
+# ============================================
+
+@login_required
+@require_http_methods(["GET"])
+def api_submission_status(request, institution_slug, activity_id):
+    """
+    API para obtener el estado de submission del estudiante actual.
+    GET /api/activities/<activity_id>/my-submission-status/
+    """
+    try:
+        institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+        activity = get_object_or_404(Activity, id=activity_id)
+        
+        # Verificar que la actividad pertenece a la institución
+        if activity.institution != institution:
+            return JsonResponse({'error': 'Actividad no encontrada'}, status=404)
+        
+        # Verificar que el estudiante está matriculado
+        is_enrolled = Enrollment.objects.filter(
+            course=activity.course,
+            student=request.user,
+            status='active'
+        ).exists()
+        
+        is_admin = UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution)
+        
+        if not is_enrolled and not is_admin:
+            return JsonResponse({'error': 'No tienes acceso a esta actividad'}, status=403)
+        
+        # Obtener última submission
+        submission = Submission.objects.filter(
+            activity=activity,
+            student=request.user
+        ).order_by('-attempt').first()
+        
+        # Determinar estado
+        if submission:
+            status = submission.status  # pending, submitted, graded
+            submitted_at = submission.submitted_at.isoformat() if submission.submitted_at else None
+            attempt = submission.attempt
+        else:
+            status = 'in_progress'
+            submitted_at = None
+            attempt = 0
+        
+        # Determinar si puede entregar
+        can_deliver = (
+            activity.status == 'published' and
+            not activity.is_closed() and
+            not activity.is_deadline_passed() and
+            (
+                not submission or 
+                submission.status == 'pending' or
+                (submission.status in ['submitted', 'graded'] and activity.allow_resubmit)
+            )
+        )
+        
+        # Determinar si es solo lectura
+        is_readonly = (
+            activity.is_closed() or
+            activity.is_deadline_passed() or
+            (submission and submission.status in ['submitted', 'graded'] and not activity.allow_resubmit)
+        )
+        
+        return JsonResponse({
+            'status': status,
+            'submitted_at': submitted_at,
+            'attempt': attempt,
+            'can_deliver': can_deliver,
+            'is_readonly': is_readonly,
+            'allow_resubmit': activity.allow_resubmit,
+            'deadline': activity.deadline.isoformat() if activity.deadline else None,
+            'is_deadline_passed': activity.is_deadline_passed(),
+            'activity_status': activity.status,
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

@@ -93,6 +93,7 @@ urlpatterns = [
     path('student/courses/<int:course_id>/activities/', activity_views.student_activities_list, name='student_activities_list'),
     path('student/activities/<str:activity_id>/', activity_views.student_activity_detail, name='student_activity_detail'),
     path('student/activities/<str:activity_id>/submit/', activity_views.student_activity_submit, name='student_activity_submit'),
+    path('student/activities/<str:activity_id>/status/', activity_views.api_submission_status, name='api_submission_status'),
     path('student/submissions/<str:submission_id>/feedback/', activity_views.student_submission_feedback, name='student_submission_feedback'),
     
     # ============================================

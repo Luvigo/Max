@@ -1,0 +1,56 @@
+@startuml
+title Módulo 3: Flujo pedagógico en IDE (P3.1)
+
+left to right direction
+actor Admin
+actor "Institución" as Inst
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 3: Flujo pedagógico en IDE" {
+  usecase "Ver estado del trabajo" as UC_Status
+  usecase "Trabajar en IDE" as UC_Work
+  usecase "Entregar actividad" as UC_Submit
+  usecase "Ver entregas (Tutor)" as UC_TutorView
+  usecase "Ver detalle entrega (Tutor)" as UC_TutorDetail
+  usecase "Calificar entrega" as UC_Grade
+
+  usecase "ERROR: No asignado" as E_NotAssigned
+  usecase "ERROR: Fuera de fecha" as E_Deadline
+  usecase "ERROR: Ya entregado" as E_Already
+  usecase "ERROR: Permisos" as E_Perm
+}
+
+Estudiante --> UC_Status
+Estudiante --> UC_Work
+Estudiante --> UC_Submit
+
+Tutor --> UC_TutorView
+Tutor --> UC_TutorDetail
+Tutor --> UC_Grade
+
+Admin --> UC_TutorView
+Inst --> UC_TutorView
+
+UC_Submit ..> E_NotAssigned : <<extend>>
+UC_Submit ..> E_Deadline : <<extend>>
+UC_Submit ..> E_Already : <<extend>>
+UC_Submit ..> E_Perm : <<extend>>
+
+note right of UC_Status
+  Estados:
+  🟡 En progreso (in_progress/pending)
+  🔵 Entregada (submitted)
+  🟢 Calificada (graded)
+end note
+
+note right of UC_Submit
+  POST /student/activities/<id>/submit/
+  - Valida permisos
+  - Valida deadline
+  - Valida re-entrega
+  - Crea Submission
+  - Congela workspace si no re-entrega
+end note
+
+@enduml
