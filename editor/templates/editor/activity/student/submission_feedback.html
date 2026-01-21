@@ -9,7 +9,7 @@
         <h1><i class="fas fa-comment"></i> Feedback</h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'editor:student_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'student_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:student_activity_detail' institution_slug=institution.slug activity_id=activity.id %}">{{ activity.title }}</a></li>
                 <li class="breadcrumb-item active">Feedback</li>

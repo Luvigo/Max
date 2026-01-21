@@ -10,7 +10,7 @@ import random
 
 from editor.models import (
     Institution, Membership, Course, Enrollment, TeachingAssignment,
-    Activity, Student, UserRoleHelper
+    Activity, Student, UserRoleHelper, IDEProject, ActivityWorkspace
 )
 
 
@@ -50,7 +50,10 @@ class Command(BaseCommand):
         self.enroll_students(courses, student_users)
         
         # 5. Crear Actividades
-        self.create_activities(courses, count=2)
+        activities = self.create_activities(courses, count=2)
+        
+        # 6. Crear workspaces para estudiantes (para probar el botón Entregar)
+        self.create_student_workspaces(institution, student_users, activities)
         
         self.stdout.write(self.style.SUCCESS('\n=== Datos de prueba creados exitosamente ==='))
         self.print_summary(institution, admin_user, institution_user, tutor_user, student_users, courses)
@@ -294,6 +297,7 @@ class Command(BaseCommand):
         ]
         
         created_count = 0
+        activities = []
         
         for course in courses:
             for i in range(count):
@@ -320,9 +324,56 @@ class Command(BaseCommand):
                         activity.published_at = timezone.now()
                         activity.save()
                     self.stdout.write(self.style.SUCCESS(f'✓ Actividad creada: {activity.title} (Curso: {course.name})'))
+                
+                activities.append(activity)
         
         if created_count > 0:
             self.stdout.write(self.style.SUCCESS(f'✓ Total actividades creadas: {created_count}'))
+        
+        return activities
+    
+    def create_student_workspaces(self, institution, students, activities):
+        """Crea workspaces para que los estudiantes puedan trabajar en actividades"""
+        created_count = 0
+        
+        # Solo actividades publicadas
+        published_activities = [a for a in activities if a.status == 'published']
+        
+        for activity in published_activities:
+            # Obtener estudiantes matriculados en el curso de la actividad
+            enrolled_students = Enrollment.objects.filter(
+                course=activity.course,
+                status='active'
+            ).values_list('student', flat=True)
+            
+            for student in students:
+                if student.id in enrolled_students:
+                    # Crear proyecto IDE
+                    project, created = IDEProject.objects.get_or_create(
+                        owner=student,
+                        institution=institution,
+                        name=f'{activity.title} - {student.first_name}',
+                        defaults={
+                            'blockly_xml': '',
+                            'arduino_code': '',
+                        }
+                    )
+                    
+                    # Crear workspace de actividad
+                    workspace, ws_created = ActivityWorkspace.objects.get_or_create(
+                        activity=activity,
+                        student=student,
+                        defaults={
+                            'project': project,
+                            'status': 'in_progress',
+                        }
+                    )
+                    
+                    if ws_created:
+                        created_count += 1
+        
+        if created_count > 0:
+            self.stdout.write(self.style.SUCCESS(f'✓ {created_count} workspaces de actividad creados'))
 
     def print_summary(self, institution, admin_user, institution_user, tutor_user, student_users, courses):
         """Imprime resumen de los datos creados"""

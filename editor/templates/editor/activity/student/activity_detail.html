@@ -9,7 +9,7 @@
         <h1><i class="fas fa-tasks"></i> {{ activity.title }}</h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'editor:student_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'student_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:student_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
                 <li class="breadcrumb-item active">{{ activity.title }}</li>

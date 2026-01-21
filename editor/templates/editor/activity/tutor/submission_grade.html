@@ -9,7 +9,7 @@
         <h1><i class="fas fa-check-circle"></i> Calificar Entrega</h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'tutor_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}">{{ activity.title }}</a></li>
                 <li class="breadcrumb-item active">Calificar</li>

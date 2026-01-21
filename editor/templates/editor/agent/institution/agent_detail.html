@@ -9,7 +9,7 @@
         <h1><i class="fas fa-server"></i> {{ agent.hostname }}</h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'editor:institution_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'institution_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:institution_agents_list' institution_slug=institution.slug %}">Agents</a></li>
                 <li class="breadcrumb-item active">{{ agent.hostname }}</li>
             </ol>

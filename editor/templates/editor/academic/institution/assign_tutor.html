@@ -9,7 +9,7 @@
         <h1><i class="fas fa-user-plus"></i> Asignar Tutor</h1>
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'editor:institution_dashboard' institution.slug %}">{{ institution.name }}</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'institution_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:institution_courses_list' institution_slug=institution.slug %}">Cursos</a></li>
                 <li class="breadcrumb-item"><a href="{% url 'editor:institution_course_detail' institution_slug=institution.slug course_id=course.id %}">{{ course.name }}</a></li>
                 <li class="breadcrumb-item active">Asignar Tutor</li>

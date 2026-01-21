@@ -187,7 +187,7 @@
     <div class="activity-context">
         <div class="activity-context-left">
             <div class="activity-context-breadcrumb">
-                <a href="{% url 'editor:student_dashboard' institution.slug %}">{{ institution.name }}</a>
+                <a href="{% url 'student_dashboard' slug=institution.slug %}">{{ institution.name }}</a>
                 <span>/</span>
                 <a href="{% url 'editor:student_courses_list' institution_slug=institution.slug %}">Cursos</a>
                 <span>/</span>
