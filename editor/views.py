@@ -411,23 +411,28 @@ def reset_arduino_dtr(port, log_func=None):
 
 def index(request):
     """Vista principal del IDE."""
+    # IMPORTANTE: Requiere autenticación
+    # Si no está autenticado, redirigir al login
+    if not request.user.is_authenticated:
+        return redirect('login')
+    
     # Permitir acceso directo al editor si viene con parámetro 'editor=true' o desde un enlace explícito
     # Solo redirigir automáticamente si viene de la raíz sin intención explícita
     force_editor = request.GET.get('editor') == 'true'
     
     # Si el usuario está autenticado y NO viene explícitamente al editor, redirigir a su dashboard
-    if request.user.is_authenticated and not force_editor:
+    if not force_editor:
         try:
             if request.user.student_profile:
                 # Solo redirigir si viene de la raíz sin parámetros
                 if not request.GET and request.path == '/':
-                    return redirect('editor:student_dashboard')
+                    return redirect('dashboard')
         except:
             pass
         # Si es admin y viene de la raíz, redirigir a admin dashboard
         if request.user.is_staff or request.user.is_superuser:
             if not request.GET and request.path == '/':
-                return redirect('editor:admin_dashboard')
+                return redirect('dashboard')
     
     # Mostrar el editor (todos pueden acceder si vienen explícitamente)
     project_id = request.GET.get('project_id')
@@ -435,7 +440,7 @@ def index(request):
     project_xml = ''
     project_code = ''
     
-    if project_id and request.user.is_authenticated:
+    if project_id:
         try:
             from .models import Project
             student = request.user.student_profile
