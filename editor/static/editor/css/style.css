@@ -1256,6 +1256,63 @@ kbd {
 }
 
 /* ============================================
+   AUTO-SAVE INDICATOR (P2.4)
+   ============================================ */
+
+.autosave-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.3s ease, color 0.3s ease;
+    pointer-events: none;
+    margin-left: auto;
+}
+
+.autosave-indicator.saving {
+    opacity: 0.8;
+    color: var(--text-secondary);
+}
+
+.autosave-indicator.success {
+    opacity: 1;
+    color: var(--accent-green);
+}
+
+.autosave-indicator.error {
+    opacity: 1;
+    color: var(--accent-red);
+}
+
+.autosave-indicator.idle {
+    opacity: 0;
+}
+
+/* Versión fixed para fallback */
+.autosave-indicator-fixed {
+    position: fixed;
+    top: 12px;
+    right: 200px;
+    z-index: 100;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+}
+
+/* Mini spinner para el indicador */
+.autosave-indicator .mini-spinner {
+    width: 12px;
+    height: 12px;
+    border-width: 2px;
+}
+
+/* ============================================
    UTILITIES
    ============================================ */
 

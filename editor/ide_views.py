@@ -217,9 +217,17 @@ def tutor_submission_ide_readonly(request, institution_slug, submission_id):
 def api_ide_autosave(request):
     """API para autosave del IDE"""
     try:
-        project_id = request.POST.get('project_id')
-        blockly_xml = request.POST.get('blockly_xml', '')
-        arduino_code = request.POST.get('arduino_code', '')
+        # Soportar tanto POST form data como JSON
+        if request.content_type == 'application/json':
+            import json
+            data = json.loads(request.body)
+            project_id = data.get('project_id')
+            blockly_xml = data.get('xml_content') or data.get('blockly_xml', '')
+            arduino_code = data.get('arduino_code', '')
+        else:
+            project_id = request.POST.get('project_id')
+            blockly_xml = request.POST.get('blockly_xml', '')
+            arduino_code = request.POST.get('arduino_code', '')
         
         if not project_id:
             return JsonResponse({'ok': False, 'error': 'project_id requerido'}, status=400)

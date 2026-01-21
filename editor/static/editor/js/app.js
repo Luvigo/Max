@@ -717,6 +717,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initBlockly();
     initEventListeners();
     
+    // Inicializar auto-guardado silencioso (P2.4)
+    initAutoSave();
+    
     // Inicializar diagnósticos
     updateDiagnostics();
     
@@ -849,6 +852,8 @@ function initBlockly() {
             event.type === Blockly.Events.BLOCK_MOVE) {
             updateCode();
             updateBlockCount();
+            // Marcar como modificado para auto-guardado (P2.4)
+            markWorkspaceDirty();
         }
     });
     
@@ -928,6 +933,270 @@ function addInitialBlocks() {
     const dom = Blockly.utils.xml.textToDom(xml);
     Blockly.Xml.domToWorkspace(dom, workspace);
     updateCode();
+}
+
+// ============================================
+// AUTO-SAVE SYSTEM (P2.4 - Guardado automático silencioso)
+// ============================================
+
+const AUTO_SAVE_INTERVAL_MS = 25000; // 25 segundos
+const AUTO_SAVE_INDICATOR_DURATION = 1200; // 1.2s mostrar "Guardado ✓"
+
+let _autoSaveDirty = false;
+let _autoSaveLastXml = null;
+let _autoSaveInProgress = false;
+
+/**
+ * Obtiene la clave de localStorage para el borrador actual
+ */
+function getAutoSaveKey() {
+    const userId = document.querySelector('meta[name="user-id"]')?.content || 'anon';
+    const institutionSlug = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.institutionSlug : 
+                           (document.querySelector('.app-container')?.dataset?.institutionSlug || 'global');
+    const activityId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.activityId : 'general';
+    const projectId = typeof IDE_CONFIG !== 'undefined' ? IDE_CONFIG.projectId : currentProjectId || 'draft';
+    
+    return `maxide:draft:${userId}:${institutionSlug}:${activityId}:${projectId}`;
+}
+
+/**
+ * Verifica si el IDE está en modo solo lectura
+ */
+function isReadOnlyMode() {
+    if (typeof IDE_CONFIG !== 'undefined') {
+        return IDE_CONFIG.isReadOnly === true || IDE_CONFIG.isFrozen === true;
+    }
+    return false;
+}
+
+/**
+ * Serializa el workspace actual a XML
+ */
+function serializeWorkspace() {
+    if (!workspace) return null;
+    try {
+        const xml = Blockly.Xml.workspaceToDom(workspace);
+        return Blockly.Xml.domToText(xml);
+    } catch (e) {
+        if (window.IDE_DEBUG) console.debug('[AutoSave] Error serializando workspace:', e);
+        return null;
+    }
+}
+
+/**
+ * Muestra el indicador de auto-guardado
+ */
+function showAutoSaveIndicator(state, message) {
+    let indicator = document.getElementById('autosaveIndicator');
+    
+    // Crear indicador si no existe
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'autosaveIndicator';
+        indicator.className = 'autosave-indicator';
+        
+        // Intentar insertarlo en el header del IDE
+        const header = document.querySelector('.header') || document.querySelector('.workspace-header');
+        if (header) {
+            header.appendChild(indicator);
+        } else {
+            // Fallback: insertarlo en el body con posición fixed
+            indicator.classList.add('autosave-indicator-fixed');
+            document.body.appendChild(indicator);
+        }
+    }
+    
+    // Actualizar contenido y estado
+    indicator.className = 'autosave-indicator ' + state;
+    indicator.innerHTML = message;
+    
+    // Si es éxito, ocultar después de un tiempo
+    if (state === 'success') {
+        setTimeout(() => {
+            indicator.className = 'autosave-indicator idle';
+            indicator.innerHTML = '';
+        }, AUTO_SAVE_INDICATOR_DURATION);
+    }
+}
+
+/**
+ * Guarda el workspace de forma silenciosa
+ * @param {string} reason - Razón del guardado ('interval', 'beforeunload', 'manual')
+ */
+async function autoSaveNow(reason = 'interval') {
+    // Guards: no guardar si no aplica
+    if (!workspace) return;
+    if (isReadOnlyMode()) return;
+    if (!_autoSaveDirty) return;
+    if (_autoSaveInProgress) return;
+    
+    const xmlText = serializeWorkspace();
+    if (!xmlText) return;
+    
+    // Si el XML no cambió, no guardar
+    if (xmlText === _autoSaveLastXml) {
+        _autoSaveDirty = false;
+        return;
+    }
+    
+    _autoSaveInProgress = true;
+    
+    if (window.IDE_DEBUG) console.debug(`[AutoSave] Guardando (${reason})...`);
+    
+    // Mostrar indicador solo si no es beforeunload
+    if (reason !== 'beforeunload') {
+        showAutoSaveIndicator('saving', '<span class="mini-spinner"></span> Guardando...');
+    }
+    
+    let savedToServer = false;
+    
+    // Intentar guardar al servidor si hay proyecto y API disponible
+    if (currentProjectId && typeof IDE_CONFIG !== 'undefined' && IDE_CONFIG.autosaveEnabled !== false) {
+        try {
+            const response = await fetch('/api/ide/autosave/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    project_id: currentProjectId,
+                    xml_content: xmlText,
+                    arduino_code: arduinoGenerator.workspaceToCode(workspace)
+                })
+            });
+            
+            if (response.ok) {
+                savedToServer = true;
+                if (window.IDE_DEBUG) console.debug('[AutoSave] ✓ Guardado en servidor');
+            }
+        } catch (e) {
+            if (window.IDE_DEBUG) console.debug('[AutoSave] Error guardando en servidor:', e.message);
+        }
+    }
+    
+    // Fallback: guardar en localStorage
+    try {
+        const key = getAutoSaveKey();
+        const draft = {
+            xml: xmlText,
+            timestamp: Date.now(),
+            savedToServer: savedToServer
+        };
+        localStorage.setItem(key, JSON.stringify(draft));
+        
+        if (window.IDE_DEBUG && !savedToServer) {
+            console.debug('[AutoSave] ✓ Guardado en localStorage:', key);
+        }
+    } catch (e) {
+        if (window.IDE_DEBUG) console.debug('[AutoSave] Error guardando en localStorage:', e.message);
+    }
+    
+    // Actualizar estado
+    _autoSaveLastXml = xmlText;
+    _autoSaveDirty = false;
+    _autoSaveInProgress = false;
+    
+    // Mostrar éxito
+    if (reason !== 'beforeunload') {
+        showAutoSaveIndicator('success', '✓ Guardado');
+    }
+}
+
+/**
+ * Marca el workspace como modificado
+ */
+function markWorkspaceDirty() {
+    if (!isReadOnlyMode()) {
+        _autoSaveDirty = true;
+    }
+}
+
+/**
+ * Inicializa el sistema de auto-guardado
+ */
+function initAutoSave() {
+    // Guard: evitar múltiples inicializaciones
+    if (window.__MAXIDE_AUTOSAVE_STARTED) return;
+    window.__MAXIDE_AUTOSAVE_STARTED = true;
+    
+    if (window.IDE_DEBUG) console.debug('[AutoSave] Inicializando sistema de auto-guardado...');
+    
+    // Intervalo de auto-guardado
+    setInterval(() => {
+        autoSaveNow('interval');
+    }, AUTO_SAVE_INTERVAL_MS);
+    
+    // Guardar antes de cerrar pestaña
+    window.addEventListener('beforeunload', () => {
+        try {
+            // Sincrónico para beforeunload - usar localStorage directamente
+            if (_autoSaveDirty && workspace && !isReadOnlyMode()) {
+                const xmlText = serializeWorkspace();
+                if (xmlText && xmlText !== _autoSaveLastXml) {
+                    const key = getAutoSaveKey();
+                    const draft = {
+                        xml: xmlText,
+                        timestamp: Date.now(),
+                        savedToServer: false
+                    };
+                    localStorage.setItem(key, JSON.stringify(draft));
+                }
+            }
+        } catch (e) {
+            // Silencioso en beforeunload
+        }
+    });
+    
+    // Intentar restaurar borrador si no hay proyecto cargado
+    setTimeout(() => {
+        tryRestoreDraft();
+    }, 500);
+    
+    if (window.IDE_DEBUG) console.debug('[AutoSave] Sistema inicializado. Intervalo:', AUTO_SAVE_INTERVAL_MS, 'ms');
+}
+
+/**
+ * Intenta restaurar un borrador guardado
+ */
+function tryRestoreDraft() {
+    // No restaurar si hay proyecto cargado desde servidor/template
+    if (typeof blocklyXml !== 'undefined' && blocklyXml && blocklyXml.trim()) {
+        return;
+    }
+    
+    try {
+        const key = getAutoSaveKey();
+        const draftJson = localStorage.getItem(key);
+        
+        if (draftJson) {
+            const draft = JSON.parse(draftJson);
+            
+            // Verificar que el borrador no sea muy viejo (24 horas)
+            const maxAge = 24 * 60 * 60 * 1000;
+            if (Date.now() - draft.timestamp > maxAge) {
+                localStorage.removeItem(key);
+                return;
+            }
+            
+            // Verificar que hay contenido
+            if (draft.xml && draft.xml.trim()) {
+                // Restaurar automáticamente
+                const xml = Blockly.utils.xml.textToDom(draft.xml);
+                workspace.clear();
+                Blockly.Xml.domToWorkspace(xml, workspace);
+                updateCode();
+                
+                _autoSaveLastXml = draft.xml;
+                _autoSaveDirty = false;
+                
+                logToConsole('Borrador restaurado automáticamente', 'info');
+                showAutoSaveIndicator('success', '✓ Borrador restaurado');
+            }
+        }
+    } catch (e) {
+        if (window.IDE_DEBUG) console.debug('[AutoSave] Error restaurando borrador:', e);
+    }
 }
 
 // ============================================
