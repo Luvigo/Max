@@ -947,9 +947,9 @@ Blockly.Blocks['max_init_garra'] = {
             .appendField(new Blockly.FieldNumber(11, 0, 13), "PIN");
         this.appendDummyInput()
             .appendField("   Cerrada:")
-            .appendField(new Blockly.FieldNumber(0, 0, 180), "CERRADA")
+            .appendField(new Blockly.FieldNumber(140, 0, 180), "CERRADA")
             .appendField("°  Abierta:")
-            .appendField(new Blockly.FieldNumber(90, 0, 180), "ABIERTA")
+            .appendField(new Blockly.FieldNumber(40, 0, 180), "ABIERTA")
             .appendField("°");
         this.setPreviousStatement(true, null);
         this.setNextStatement(true, null);
@@ -1011,30 +1011,6 @@ Blockly.Blocks['max_atras_var'] = {
 Blockly.Blocks['max_izquierda'] = {
     init: function() {
         this.appendDummyInput()
-            .appendField("⬅️ Girar izquierda velocidad")
-            .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL");
-        this.setPreviousStatement(true, null);
-        this.setNextStatement(true, null);
-        this.setColour(120);
-        this.setTooltip("Gira el carrito hacia la izquierda. Velocidad: 0-90");
-    }
-};
-
-Blockly.Blocks['max_izquierda_var'] = {
-    init: function() {
-        this.appendValueInput("VEL")
-            .setCheck("Number")
-            .appendField("⬅️ Girar izquierda velocidad");
-        this.setPreviousStatement(true, null);
-        this.setNextStatement(true, null);
-        this.setColour(120);
-        this.setTooltip("Gira el carrito hacia la izquierda con velocidad variable (0-90)");
-    }
-};
-
-Blockly.Blocks['max_derecha'] = {
-    init: function() {
-        this.appendDummyInput()
             .appendField("➡️ Girar derecha velocidad")
             .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL");
         this.setPreviousStatement(true, null);
@@ -1044,7 +1020,7 @@ Blockly.Blocks['max_derecha'] = {
     }
 };
 
-Blockly.Blocks['max_derecha_var'] = {
+Blockly.Blocks['max_izquierda_var'] = {
     init: function() {
         this.appendValueInput("VEL")
             .setCheck("Number")
@@ -1053,6 +1029,30 @@ Blockly.Blocks['max_derecha_var'] = {
         this.setNextStatement(true, null);
         this.setColour(120);
         this.setTooltip("Gira el carrito hacia la derecha con velocidad variable (0-90)");
+    }
+};
+
+Blockly.Blocks['max_derecha'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("⬅️ Girar izquierda velocidad")
+            .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la izquierda. Velocidad: 0-90");
+    }
+};
+
+Blockly.Blocks['max_derecha_var'] = {
+    init: function() {
+        this.appendValueInput("VEL")
+            .setCheck("Number")
+            .appendField("⬅️ Girar izquierda velocidad");
+        this.setPreviousStatement(true, null);
+        this.setNextStatement(true, null);
+        this.setColour(120);
+        this.setTooltip("Gira el carrito hacia la izquierda con velocidad variable (0-90)");
     }
 };
 
@@ -1295,8 +1295,8 @@ Blockly.Blocks['max_girar_tiempo'] = {
         this.appendDummyInput()
             .appendField("↪️ Girar a la")
             .appendField(new Blockly.FieldDropdown([
-                ["izquierda", "izquierda"],
-                ["derecha", "derecha"]
+                ["izquierda", "derecha"],
+                ["derecha", "izquierda"]
             ]), "DIR")
             .appendField("velocidad")
             .appendField(new Blockly.FieldNumber(25, 0, 90), "VEL")

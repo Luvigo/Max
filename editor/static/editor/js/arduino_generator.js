@@ -508,13 +508,13 @@ void atras(int vel) {
   servoDer.write(STOP_DER - vel);
 }
 
-void izquierda(int vel) {
+void derecha(int vel) {
   vel = constrain(vel, 0, 90);
   servoIzq.write(STOP_IZQ + vel);
   servoDer.write(STOP_DER + vel);
 }
 
-void derecha(int vel) {
+void izquierda(int vel) {
   vel = constrain(vel, 0, 90);
   servoIzq.write(STOP_IZQ - vel);
   servoDer.write(STOP_DER - vel);
@@ -631,13 +631,13 @@ void atras(int vel) {
   servoDer.write(STOP_DER - vel);
 }
 
-void izquierda(int vel) {
+void derecha(int vel) {
   vel = constrain(vel, 0, 90);
   servoIzq.write(STOP_IZQ + vel);
   servoDer.write(STOP_DER + vel);
 }
 
-void derecha(int vel) {
+void izquierda(int vel) {
   vel = constrain(vel, 0, 90);
   servoIzq.write(STOP_IZQ - vel);
   servoDer.write(STOP_DER - vel);
@@ -680,25 +680,25 @@ arduinoGenerator.forBlock['max_atras_var'] = function(block) {
 arduinoGenerator.forBlock['max_izquierda'] = function(block) {
     ensureMovementFunctions();
     const vel = block.getFieldValue('VEL');
-    return `  izquierda(${vel});\n`;
+    return `  derecha(${vel});\n`;
 };
 
 arduinoGenerator.forBlock['max_izquierda_var'] = function(block) {
     ensureMovementFunctions();
     const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '25';
-    return `  izquierda(${vel});\n`;
+    return `  derecha(${vel});\n`;
 };
 
 arduinoGenerator.forBlock['max_derecha'] = function(block) {
     ensureMovementFunctions();
     const vel = block.getFieldValue('VEL');
-    return `  derecha(${vel});\n`;
+    return `  izquierda(${vel});\n`;
 };
 
 arduinoGenerator.forBlock['max_derecha_var'] = function(block) {
     ensureMovementFunctions();
     const vel = arduinoGenerator.valueToCode(block, 'VEL', arduinoGenerator.ORDER_ATOMIC) || '25';
-    return `  derecha(${vel});\n`;
+    return `  izquierda(${vel});\n`;
 };
 
 arduinoGenerator.forBlock['max_detener'] = function(block) {
