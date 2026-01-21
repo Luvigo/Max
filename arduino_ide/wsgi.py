@@ -149,9 +149,11 @@ def create_initial_users():
         traceback.print_exc()
 
 
-# Ejecutar creación de usuarios al iniciar (solo en producción)
-if os.environ.get('RENDER') or os.environ.get('AUTO_CREATE_USERS'):
-    try:
-        create_initial_users()
-    except Exception as e:
-        print(f"[WSGI] Error en inicialización: {e}")
+# Ejecutar creación de usuarios al iniciar
+# Siempre intentar crear porque es idempotente (usa get_or_create)
+try:
+    create_initial_users()
+except Exception as e:
+    import traceback
+    print(f"[WSGI] Error en inicialización: {e}")
+    traceback.print_exc()
