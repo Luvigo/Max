@@ -477,15 +477,197 @@ class TutorProfile(models.Model):
         ).update(is_active=True)
 
 
+# ============================================
+# MÓDULO 4: GRUPOS Y ESTUDIANTES
+# ============================================
+
+class StudentGroup(models.Model):
+    """
+    MÓDULO 4: Grupo de Estudiantes
+    
+    El tutor gestiona grupos desde la plataforma (templates).
+    El admin supervisa desde Django Admin (/admin/).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    institution = models.ForeignKey(
+        'Institution',
+        on_delete=models.CASCADE,
+        related_name='student_groups',
+        verbose_name="Institución"
+    )
+    tutor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='managed_groups',
+        verbose_name="Tutor",
+        help_text="Tutor responsable del grupo"
+    )
+    
+    # Información del grupo
+    name = models.CharField(max_length=100, verbose_name="Nombre del Grupo")
+    code = models.CharField(
+        max_length=20,
+        verbose_name="Código",
+        help_text="Código único del grupo (ej: G1-2026)"
+    )
+    description = models.TextField(blank=True, verbose_name="Descripción")
+    
+    # Período
+    academic_year = models.CharField(max_length=20, verbose_name="Año Académico")
+    semester = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Semestre/Período",
+        help_text="Ej: Primer Semestre, Segundo Trimestre"
+    )
+    
+    # Estado
+    STATUS_CHOICES = [
+        ('active', 'Activo'),
+        ('inactive', 'Inactivo'),
+        ('archived', 'Archivado'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='active',
+        verbose_name="Estado"
+    )
+    
+    # Capacidad
+    max_students = models.PositiveIntegerField(
+        default=30,
+        verbose_name="Máximo de Estudiantes"
+    )
+    
+    # Auditoría
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='groups_created',
+        verbose_name="Creado por"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última Actualización")
+    
+    class Meta:
+        verbose_name = "Grupo de Estudiantes"
+        verbose_name_plural = "Grupos de Estudiantes"
+        ordering = ['institution', 'academic_year', 'name']
+        unique_together = ['institution', 'code']
+    
+    def __str__(self):
+        return f"{self.name} ({self.code}) - {self.institution.name}"
+    
+    @property
+    def is_active(self):
+        return self.status == 'active'
+    
+    def get_students_count(self):
+        """Obtener número de estudiantes en el grupo"""
+        return self.students.filter(is_active=True).count()
+    
+    def get_available_slots(self):
+        """Obtener espacios disponibles"""
+        return max(0, self.max_students - self.get_students_count())
+    
+    def is_full(self):
+        """Verificar si el grupo está lleno"""
+        return self.get_students_count() >= self.max_students
+    
+    def get_students(self):
+        """Obtener estudiantes activos del grupo"""
+        return self.students.filter(is_active=True).select_related('user')
+
+
 class Student(models.Model):
-    """Perfil de Estudiante"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile', verbose_name="Usuario")
-    student_id = models.CharField(max_length=50, unique=True, verbose_name="ID de Estudiante")
-    course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True, related_name='students', verbose_name="Curso")
-    phone = models.CharField(max_length=20, blank=True, verbose_name="Teléfono")
+    """
+    MÓDULO 4: Perfil de Estudiante (extendido)
+    
+    El tutor gestiona estudiantes desde la plataforma (templates).
+    El admin supervisa desde Django Admin (/admin/).
+    """
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='student_profile',
+        verbose_name="Usuario"
+    )
+    student_id = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name="ID de Estudiante",
+        help_text="Matrícula o código único"
+    )
+    
+    # Relaciones institucionales
+    institution = models.ForeignKey(
+        'Institution',
+        on_delete=models.CASCADE,
+        related_name='students_direct',
+        verbose_name="Institución",
+        null=True,
+        blank=True
+    )
+    group = models.ForeignKey(
+        StudentGroup,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        verbose_name="Grupo"
+    )
+    tutor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_students',
+        verbose_name="Tutor Asignado"
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students',
+        verbose_name="Curso"
+    )
+    
+    # Información personal
+    phone = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+    emergency_contact = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Contacto de Emergencia"
+    )
+    emergency_phone = models.CharField(
+        max_length=30,
+        blank=True,
+        verbose_name="Teléfono de Emergencia"
+    )
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Notas",
+        help_text="Notas internas sobre el estudiante"
+    )
+    
+    # Estado
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    
+    # Auditoría
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='students_created',
+        verbose_name="Creado por"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True, verbose_name="Activo")
     
     class Meta:
         verbose_name = "Estudiante"
@@ -499,11 +681,38 @@ class Student(models.Model):
         return self.projects.filter(is_active=True).count()
     
     @property
-    def institution(self):
-        """Obtener institución del estudiante vía curso"""
+    def full_name(self):
+        return self.user.get_full_name() or self.user.username
+    
+    @property
+    def email(self):
+        return self.user.email
+    
+    def get_institution(self):
+        """Obtener institución del estudiante"""
+        if self.institution:
+            return self.institution
+        if self.group:
+            return self.group.institution
         if self.course:
             return self.course.institution
         return None
+    
+    def get_tutor(self):
+        """Obtener tutor del estudiante"""
+        if self.tutor:
+            return self.tutor
+        if self.group:
+            return self.group.tutor
+        return None
+    
+    def get_group_name(self):
+        """Obtener nombre del grupo"""
+        return self.group.name if self.group else "Sin grupo"
+    
+    def can_login(self):
+        """Verificar si el estudiante puede hacer login"""
+        return self.is_active and self.user.is_active
 
 
 class Project(models.Model):

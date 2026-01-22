@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django import forms
 from .models import (
     Institution, Membership, Course, Enrollment, TeachingAssignment, 
-    TutorProfile, Student, Project,
+    TutorProfile, StudentGroup, Student, Project,
     Activity, Submission, Rubric, Feedback,
     IDEProject, ProjectSnapshot, ActivityWorkspace,
     AgentInstance,
@@ -420,21 +420,161 @@ class CustomUserAdmin(BaseUserAdmin):
     get_student_profile.short_description = 'ID Estudiante'
 
 
+# ============================================
+# MÓDULO 4: GRUPOS Y ESTUDIANTES (Admin Supervisión)
+# ============================================
+
+@admin.register(StudentGroup)
+class StudentGroupAdmin(admin.ModelAdmin):
+    """
+    MÓDULO 4: Admin de Grupos de Estudiantes
+    
+    El admin supervisa grupos desde aquí.
+    El tutor gestiona grupos desde la plataforma (templates).
+    """
+    list_display = [
+        'name', 'code', 'institution', 'tutor', 'academic_year', 
+        'status', 'get_students_count', 'max_students', 'get_available_slots'
+    ]
+    list_filter = ['status', 'institution', 'academic_year', 'tutor', 'created_at']
+    search_fields = [
+        'name', 'code', 'institution__name', 
+        'tutor__username', 'tutor__first_name', 'tutor__last_name'
+    ]
+    readonly_fields = ['created_at', 'updated_at', 'created_by', 'get_students_count', 'get_available_slots']
+    raw_id_fields = ['institution', 'tutor', 'created_by']
+    ordering = ['institution', '-academic_year', 'name']
+    list_per_page = 25
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Institución y Tutor', {
+            'fields': ('institution', 'tutor'),
+            'description': 'El grupo pertenece a una institución y es gestionado por un tutor'
+        }),
+        ('Información del Grupo', {
+            'fields': ('name', 'code', 'description')
+        }),
+        ('Período Académico', {
+            'fields': ('academic_year', 'semester')
+        }),
+        ('Configuración', {
+            'fields': ('status', 'max_students')
+        }),
+        ('Estadísticas', {
+            'fields': ('get_students_count', 'get_available_slots'),
+            'classes': ('collapse',)
+        }),
+        ('Auditoría', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_students_count(self, obj):
+        return obj.get_students_count()
+    get_students_count.short_description = 'Estudiantes'
+    
+    def get_available_slots(self, obj):
+        return obj.get_available_slots()
+    get_available_slots.short_description = 'Espacios Disp.'
+    
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        obj.save()
+    
+    actions = ['activate_groups', 'deactivate_groups', 'archive_groups']
+    
+    @admin.action(description='Activar grupos seleccionados')
+    def activate_groups(self, request, queryset):
+        queryset.update(status='active')
+        self.message_user(request, f'{queryset.count()} grupo(s) activado(s).')
+    
+    @admin.action(description='Desactivar grupos seleccionados')
+    def deactivate_groups(self, request, queryset):
+        queryset.update(status='inactive')
+        self.message_user(request, f'{queryset.count()} grupo(s) desactivado(s).')
+    
+    @admin.action(description='Archivar grupos seleccionados')
+    def archive_groups(self, request, queryset):
+        queryset.update(status='archived')
+        self.message_user(request, f'{queryset.count()} grupo(s) archivado(s).')
+
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ['student_id', 'user', 'course', 'get_institution', 'is_active', 'get_projects_count']
-    list_filter = ['course__institution', 'course', 'is_active', 'created_at']
-    search_fields = ['student_id', 'user__username', 'user__first_name', 'user__last_name']
-    readonly_fields = ['created_at', 'updated_at', 'get_projects_count']
-    raw_id_fields = ['user', 'course']
+    """
+    MÓDULO 4: Admin de Estudiantes (Supervisión)
     
-    def get_institution(self, obj):
-        return obj.institution.name if obj.institution else "-"
-    get_institution.short_description = 'Institución'
+    El admin supervisa estudiantes desde aquí.
+    El tutor gestiona estudiantes desde la plataforma (templates).
+    """
+    list_display = [
+        'student_id', 'user', 'get_full_name', 'institution', 'group', 
+        'tutor', 'course', 'is_active', 'get_projects_count'
+    ]
+    list_filter = ['is_active', 'institution', 'group', 'tutor', 'course', 'created_at']
+    search_fields = [
+        'student_id', 'user__username', 'user__email',
+        'user__first_name', 'user__last_name',
+        'institution__name', 'group__name'
+    ]
+    readonly_fields = ['created_at', 'updated_at', 'created_by', 'get_projects_count']
+    raw_id_fields = ['user', 'institution', 'group', 'tutor', 'course', 'created_by']
+    ordering = ['institution', 'group', 'student_id']
+    list_per_page = 25
+    
+    fieldsets = (
+        ('Usuario', {
+            'fields': ('user', 'student_id'),
+            'description': 'Información del usuario asociado'
+        }),
+        ('Asignaciones', {
+            'fields': ('institution', 'group', 'tutor', 'course'),
+            'description': 'Asignación a institución, grupo, tutor y curso'
+        }),
+        ('Información de Contacto', {
+            'fields': ('phone', 'emergency_contact', 'emergency_phone')
+        }),
+        ('Estado y Notas', {
+            'fields': ('is_active', 'notes')
+        }),
+        ('Estadísticas', {
+            'fields': ('get_projects_count',),
+            'classes': ('collapse',)
+        }),
+        ('Auditoría', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_full_name(self, obj):
+        return obj.full_name
+    get_full_name.short_description = 'Nombre'
+    get_full_name.admin_order_field = 'user__last_name'
     
     def get_projects_count(self, obj):
         return obj.get_projects_count()
     get_projects_count.short_description = 'Proyectos'
+    
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        obj.save()
+    
+    actions = ['activate_students', 'deactivate_students']
+    
+    @admin.action(description='Activar estudiantes seleccionados')
+    def activate_students(self, request, queryset):
+        queryset.update(is_active=True)
+        self.message_user(request, f'{queryset.count()} estudiante(s) activado(s).')
+    
+    @admin.action(description='Desactivar estudiantes seleccionados')
+    def deactivate_students(self, request, queryset):
+        queryset.update(is_active=False)
+        self.message_user(request, f'{queryset.count()} estudiante(s) desactivado(s).')
 
 
 @admin.register(Project)

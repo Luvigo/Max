@@ -10,6 +10,7 @@ from . import agent_views
 from . import error_views
 from . import institution_views
 from . import tutor_views
+from . import group_views
 
 app_name = 'editor'
 
@@ -90,14 +91,35 @@ urlpatterns = [
     path('tutor/profile/', tutor_views.tutor_profile, name='tutor_profile'),
     path('api/tutor/status/', tutor_views.check_tutor_status, name='api_tutor_status'),
     
-    # Vistas de Tutor
+    # Vistas de Tutor - Cursos
     path('tutor/courses/', academic_views.tutor_courses_list, name='tutor_courses_list'),
     path('tutor/courses/new/', academic_views.tutor_course_create, name='tutor_course_create'),
     path('tutor/courses/<int:course_id>/roster/', academic_views.tutor_course_roster, name='tutor_course_roster'),
     path('tutor/courses/<int:course_id>/enroll/', academic_views.tutor_enroll_student, name='tutor_enroll_student'),
-    path('tutor/students/new/', academic_views.tutor_student_create, name='tutor_student_create'),
     
-    # Vistas de Estudiante
+    # ============================================
+    # MÓDULO 4: Grupos y Estudiantes
+    # Tutor gestiona; Admin supervisa en Django Admin (/admin/)
+    # ============================================
+    
+    # Grupos (Tutor)
+    path('tutor/groups/', group_views.tutor_groups_list, name='tutor_groups_list'),
+    path('tutor/groups/new/', group_views.tutor_group_create, name='tutor_group_create'),
+    path('tutor/groups/<uuid:group_id>/', group_views.tutor_group_detail, name='tutor_group_detail'),
+    path('tutor/groups/<uuid:group_id>/edit/', group_views.tutor_group_edit, name='tutor_group_edit'),
+    path('tutor/groups/<uuid:group_id>/delete/', group_views.tutor_group_delete, name='tutor_group_delete'),
+    
+    # Estudiantes (Tutor)
+    path('tutor/students/', group_views.tutor_students_list, name='tutor_students_list'),
+    path('tutor/students/new/', group_views.tutor_student_create, name='tutor_student_create_new'),
+    path('tutor/students/<int:student_id>/', group_views.tutor_student_detail, name='tutor_student_detail'),
+    path('tutor/students/<int:student_id>/edit/', group_views.tutor_student_edit, name='tutor_student_edit'),
+    path('api/tutor/assign-group/', group_views.tutor_assign_student_to_group, name='tutor_assign_student_to_group'),
+    
+    # Mi Contexto (Estudiante)
+    path('student/my-info/', group_views.student_my_context, name='student_my_context'),
+    
+    # Vistas de Estudiante - Cursos
     path('student/courses/', academic_views.student_courses_list, name='student_courses_list'),
     
     # ============================================

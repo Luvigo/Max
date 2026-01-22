@@ -1,83 +1,166 @@
 @startuml
-!theme cerulean
-title Módulo 4: Diagrama de Clases - IDE y Workspaces
+title Módulo 4: Diagrama de Clases - Grupos y Estudiantes
 
-skinparam classAttributeIconSize 0
-
-package "django.contrib.auth" <<Database>> {
+package "Django Auth" {
     class User {
         +id: int
         +username: str
         +email: str
+        +first_name: str
+        +last_name: str
     }
 }
 
-package "editor.models" <<Database>> {
-    
-    class Activity {
-        +id: UUID
-        +title: str
-        +allow_resubmit: bool
-    }
-    
-    class Submission {
-        +id: UUID
-        +activity: FK(Activity)
-        +student: FK(User)
-        +artifact_ref: JSON
-        +status: enum
-    }
-    
-    class IDEProject {
-        +id: UUID
-        +owner: FK(User)
-        +institution: FK(Institution)
-        +name: str
-        +blockly_xml: text
-        +arduino_code: text
-        +created_at: datetime
-        +updated_at: datetime
-        --
-        +is_frozen(): bool
-        +get_last_modified(): str
-    }
-    
-    class ProjectSnapshot {
-        +id: UUID
-        +project: FK(IDEProject)
-        +label: str
-        +blockly_xml: text
-        +arduino_code: text
-        +created_at: datetime
-    }
-    
-    class ActivityWorkspace {
-        +id: UUID
-        +activity: FK(Activity)
-        +student: FK(User)
-        +project: FK(IDEProject)
-        +status: enum(in_progress, frozen)
-        +frozen_at: datetime
-        +created_at: datetime
-        --
-        +is_frozen(): bool
-        +freeze(): void
-        +unfreeze(): void
-    }
-    
+package "Modelos Institucionales" {
     class Institution {
         +id: UUID
         +name: str
+        +slug: str
+    }
+}
+
+package "Módulo 4: Grupos y Estudiantes" {
+    class StudentGroup {
+        +id: UUID
+        +institution: FK(Institution)
+        +tutor: FK(User)
+        --
+        **Info del Grupo**
+        +name: str
+        +code: str
+        +description: str
+        --
+        **Período**
+        +academic_year: str
+        +semester: str
+        --
+        **Configuración**
+        +status: str ['active', 'inactive', 'archived']
+        +max_students: int
+        --
+        **Auditoría**
+        +created_by: FK(User)
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +is_active: bool (property)
+        +get_students_count(): int
+        +get_available_slots(): int
+        +is_full(): bool
+        +get_students(): QuerySet
+    }
+    
+    class Student {
+        +id: int (auto)
+        +user: FK(User) <<OneToOne>>
+        +student_id: str (unique)
+        --
+        **Relaciones**
+        +institution: FK(Institution)
+        +group: FK(StudentGroup)
+        +tutor: FK(User)
+        +course: FK(Course)
+        --
+        **Contacto**
+        +phone: str
+        +emergency_contact: str
+        +emergency_phone: str
+        +notes: str
+        --
+        **Estado**
+        +is_active: bool
+        --
+        **Auditoría**
+        +created_by: FK(User)
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +full_name: str (property)
+        +email: str (property)
+        +get_institution(): Institution
+        +get_tutor(): User
+        +get_group_name(): str
+        +can_login(): bool
+    }
+}
+
+package "Vistas del Tutor" {
+    class "group_views.py" <<module>> {
+        **Grupos**
+        +tutor_groups_list()
+        +tutor_group_create()
+        +tutor_group_detail()
+        +tutor_group_edit()
+        +tutor_group_delete()
+        --
+        **Estudiantes**
+        +tutor_students_list()
+        +tutor_student_create()
+        +tutor_student_detail()
+        +tutor_student_edit()
+        +tutor_assign_student_to_group()
+    }
+}
+
+package "Vistas del Estudiante" {
+    class "student context" <<view>> {
+        +student_my_context()
+    }
+}
+
+package "Django Admin" {
+    class StudentGroupAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +actions: list
+        --
+        +activate_groups()
+        +deactivate_groups()
+        +archive_groups()
+    }
+    
+    class StudentAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +actions: list
+        --
+        +activate_students()
+        +deactivate_students()
     }
 }
 
 ' Relaciones
-Activity ||--o{ ActivityWorkspace : "tiene"
-Activity ||--o{ Submission : "recibe"
-User ||--o{ IDEProject : "posee"
-User ||--o{ ActivityWorkspace : "trabaja en"
-IDEProject ||--o{ ProjectSnapshot : "tiene"
-IDEProject ||--o{ ActivityWorkspace : "usado en"
-Submission --> IDEProject : "referencia en artifact_ref"
+User "1" -- "0..1" Student : student_profile
+Institution "1" -- "*" StudentGroup
+Institution "1" -- "*" Student : students_direct
+User "1" -- "*" StudentGroup : managed_groups (tutor)
+User "1" -- "*" Student : assigned_students (tutor)
+StudentGroup "1" -- "*" Student : students
 
+"group_views.py" --> StudentGroup
+"group_views.py" --> Student
+"student context" --> Student
+StudentGroupAdmin --> StudentGroup
+StudentAdmin --> Student
+
+note bottom of StudentGroup
+  **Segregación por Tutor:**
+  El tutor solo puede ver/editar
+  los grupos donde es tutor.
+  
+  Constraint: institution + code UNIQUE
+end note
+
+note right of Student
+  **Relaciones flexibles:**
+  - Puede tener institución directa
+  - Puede pertenecer a un grupo
+  - Puede tener tutor asignado
+  - Puede estar en un curso
+  
+  get_institution() busca en orden:
+  1. institution directa
+  2. group.institution
+  3. course.institution
+end note
 @enduml

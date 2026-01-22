@@ -98,6 +98,16 @@
                 <i class="fas fa-book-open"></i>
                 <span>Mis Cursos</span>
             </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/groups/" class="nav-item {% if 'group' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Mis Grupos</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/students/" class="nav-item {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-user-graduate"></i>
+                <span>Mis Estudiantes</span>
+            </a>
         </div>
         
         <div class="nav-section">
@@ -108,14 +118,19 @@
                 <span>Crear Curso</span>
             </a>
             
-            <a href="/i/{{ institution.slug }}/tutor/activities/new/" class="nav-item">
-                <i class="fas fa-clipboard-list"></i>
-                <span>Crear Actividad</span>
+            <a href="/i/{{ institution.slug }}/tutor/groups/new/" class="nav-item">
+                <i class="fas fa-layer-group"></i>
+                <span>Crear Grupo</span>
             </a>
             
             <a href="/i/{{ institution.slug }}/tutor/students/new/" class="nav-item">
                 <i class="fas fa-user-plus"></i>
                 <span>Crear Estudiante</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/activities/new/" class="nav-item">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Crear Actividad</span>
             </a>
             
             <a href="/i/{{ institution.slug }}/tutor/errors/" class="nav-item">
@@ -135,8 +150,13 @@
                 <span>Mi Dashboard</span>
             </a>
             
+            <a href="/i/{{ institution.slug }}/student/my-info/" class="nav-item {% if request.resolver_match.url_name == 'student_my_context' %}active{% endif %}">
+                <i class="fas fa-id-card"></i>
+                <span>Mi Información</span>
+            </a>
+            
             <a href="/i/{{ institution.slug }}/student/courses/" class="nav-item">
-                <i class="fas fa-folder-open"></i>
+                <i class="fas fa-book"></i>
                 <span>Mis Cursos</span>
             </a>
         </div>

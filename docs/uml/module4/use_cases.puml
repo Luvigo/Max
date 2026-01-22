@@ -1,29 +1,92 @@
 @startuml
+title Módulo 4: Grupos y Estudiantes (Tutor UI; Admin via Django Admin)
 left to right direction
+
+actor Admin
 actor Tutor
 actor Estudiante
 
-rectangle "Módulo 4: IDE + Workspaces" {
-  usecase "Abrir IDE de Actividad" as UC_OpenIDE
-  usecase "Autosave Workspace" as UC_Autosave
-  usecase "Crear Snapshot" as UC_Snapshot
-  usecase "Congelar Workspace" as UC_Freeze
-  usecase "Sandbox Tutor" as UC_TutorSandbox
-  usecase "Ver IDE Read-only (Tutor)" as UC_ViewRO
-
-  usecase "ERROR: XML corrupto" as E_XML
-  usecase "ERROR: Conflicto 2 pestañas" as E_Conflict
-  usecase "ERROR: Editar frozen" as E_ReadOnly
+rectangle "Módulo 4: Gestión de Grupos y Estudiantes" {
+  ' Tutor Use Cases
+  usecase "Crear grupo" as UC_CreateGroup
+  usecase "Editar grupo" as UC_EditGroup
+  usecase "Archivar/Eliminar grupo" as UC_DeleteGroup
+  usecase "Ver lista de grupos" as UC_ListGroups
+  usecase "Ver detalle de grupo" as UC_GroupDetail
+  
+  usecase "Crear estudiante" as UC_CreateStudent
+  usecase "Editar estudiante" as UC_EditStudent
+  usecase "Ver lista de estudiantes" as UC_ListStudents
+  usecase "Asignar estudiante a grupo" as UC_AssignGroup
+  
+  ' Student Use Cases
+  usecase "Ver mi información" as UC_ViewMyInfo
+  usecase "Ver mi grupo" as UC_ViewMyGroup
+  usecase "Ver mi tutor" as UC_ViewMyTutor
+  usecase "Ver compañeros" as UC_ViewClassmates
+  
+  ' Admin Use Cases
+  usecase "Supervisar grupos\n(Django Admin)" as UC_AdminGroups
+  usecase "Supervisar estudiantes\n(Django Admin)" as UC_AdminStudents
+  
+  ' Errors
+  usecase "ERROR: Acceso fuera de scope" as E_Scope
+  usecase "ERROR: Grupo lleno" as E_GroupFull
+  usecase "ERROR: Duplicado" as E_Duplicate
+  usecase "ERROR: Acceso denegado" as E_403
 }
 
-Estudiante --> UC_OpenIDE
-Estudiante --> UC_Autosave
-Estudiante --> UC_Snapshot
+' Tutor connections
+Tutor --> UC_CreateGroup
+Tutor --> UC_EditGroup
+Tutor --> UC_DeleteGroup
+Tutor --> UC_ListGroups
+Tutor --> UC_GroupDetail
+Tutor --> UC_CreateStudent
+Tutor --> UC_EditStudent
+Tutor --> UC_ListStudents
+Tutor --> UC_AssignGroup
 
-Tutor --> UC_TutorSandbox
-Tutor --> UC_ViewRO
+' Student connections
+Estudiante --> UC_ViewMyInfo
+Estudiante --> UC_ViewMyGroup
+Estudiante --> UC_ViewMyTutor
+Estudiante --> UC_ViewClassmates
 
-UC_Autosave ..> E_Conflict : <<extend>>
-UC_OpenIDE ..> E_XML : <<extend>>
-UC_OpenIDE ..> E_ReadOnly : <<extend>>
+' Admin connections
+Admin --> UC_AdminGroups : "Solo /admin/"
+Admin --> UC_AdminStudents : "Solo /admin/"
+
+' Error extensions
+UC_CreateGroup ..> E_Duplicate : <<extend>>
+UC_AssignGroup ..> E_GroupFull : <<extend>>
+UC_AssignGroup ..> E_Scope : <<extend>>
+UC_EditStudent ..> E_Scope : <<extend>>
+UC_ViewMyInfo ..> E_403 : <<extend>>
+
+note right of Tutor
+  **Rutas del Tutor:**
+  /i/<slug>/tutor/groups/
+  /i/<slug>/tutor/groups/new/
+  /i/<slug>/tutor/groups/<id>/
+  /i/<slug>/tutor/students/
+  /i/<slug>/tutor/students/new/
+end note
+
+note right of Estudiante
+  **Rutas del Estudiante:**
+  /i/<slug>/student/my-info/
+  
+  El estudiante solo puede
+  ver su propia información.
+end note
+
+note bottom of Admin
+  **Admin supervisa en Django Admin:**
+  /admin/editor/studentgroup/
+  /admin/editor/student/
+  
+  NO hay templates de admin
+  para grupos/estudiantes.
+end note
 @enduml

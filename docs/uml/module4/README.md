@@ -1,59 +1,73 @@
-# Módulo 4: Integración MAX-IDE con Workspaces
+# Modulo 4: Grupos y Estudiantes
 
-## Descripción
+## Descripcion
+El tutor gestiona grupos y estudiantes desde la plataforma (templates).
+El admin supervisa desde Django Admin (/admin/).
 
-Este módulo integra el MAX-IDE directamente en el contexto de actividades, permitiendo a los estudiantes trabajar en sus proyectos desde la actividad y a los tutores revisar entregas en modo read-only o usar un sandbox para probar actividades.
+## Regla Clave
+- Tutor: CRUD completo de grupos y estudiantes en templates.
+- Admin: Solo supervisa desde Django Admin, NO hay templates de admin.
+- Estudiante: Solo vista read-only de su contexto.
 
-## Componentes
+## Modelos
 
-### Modelos
+### StudentGroup
+- id: UUID
+- institution: FK(Institution)
+- tutor: FK(User)
+- name, code, description
+- academic_year, semester
+- status: active/inactive/archived
+- max_students: int
+- created_by: FK(User)
 
-- **IDEProject**: Proyecto del IDE con owner, institution, blockly_xml, arduino_code
-- **ProjectSnapshot**: Instantáneas del proyecto para versionado
-- **ActivityWorkspace**: Relación entre actividad, estudiante y proyecto con control de estado (frozen/in_progress)
+### Student (extendido)
+- user: OneToOne(User)
+- student_id: str (unico)
+- institution: FK(Institution)
+- group: FK(StudentGroup)
+- tutor: FK(User)
+- course: FK(Course)
+- phone, emergency_contact, emergency_phone
+- notes, is_active
+- created_by: FK(User)
 
-### Vistas
+## URLs del Tutor
 
-#### Estudiante
-- Abrir IDE desde actividad con contexto completo
-- Autosave automático del workspace
-- Botón de entregar integrado
-- Workspace se congela automáticamente después de entregar (si no se permite re-entrega)
+### Grupos
+- /i/slug/tutor/groups/ - Lista
+- /i/slug/tutor/groups/new/ - Crear
+- /i/slug/tutor/groups/id/ - Detalle
+- /i/slug/tutor/groups/id/edit/ - Editar
+- /i/slug/tutor/groups/id/delete/ - Eliminar
 
-#### Tutor
-- Sandbox para probar actividades antes de publicarlas
-- Ver IDE en modo read-only de entregas de estudiantes
+### Estudiantes
+- /i/slug/tutor/students/ - Lista
+- /i/slug/tutor/students/new/ - Crear
+- /i/slug/tutor/students/id/ - Detalle
+- /i/slug/tutor/students/id/edit/ - Editar
 
-### APIs
+## URLs del Estudiante
+- /i/slug/student/my-info/ - Ver mi informacion
 
-- `api_ide_autosave`: Autosave automático con prevención de conflictos
-- `api_ide_create_snapshot`: Crear snapshots del proyecto
-- `api_ide_load_project`: Cargar proyecto del IDE
+## Segregacion de Datos
 
-### Seguridad
+### Tutor
+- Solo ve/edita grupos donde tutor=request.user
+- Solo ve/edita estudiantes donde tutor=request.user O group__tutor=request.user
 
-- **Cross-tenant protection**: Todos los proyectos verifican pertenencia a institución
-- **Read-only enforcement**: Workspaces frozen no pueden editarse
-- **Concurrency control**: Prevención de conflictos con transacciones
-- **Permission checks**: Solo el owner puede editar su proyecto
+### Estudiante
+- Solo ve su propia informacion
+- Ve datos de su grupo y tutor
 
-### Estados y Reglas
+## Django Admin
+- StudentGroupAdmin con filtros por institucion, tutor, estado
+- StudentAdmin con filtros por institucion, grupo, tutor
 
-- **In Progress**: Workspace activo, se puede editar
-- **Frozen**: Workspace congelado (read-only) cuando:
-  - Se entregó y no se permite re-entrega
-  - La actividad está cerrada
-  - Pasó el deadline
-  
-- **Sandbox**: Proyecto del tutor para probar actividades (siempre editable)
-
-### Validaciones
-
-- XML corrupto: Manejo de errores y fallback
-- Conflicto de guardado: Prevención con transacciones y unique constraints
-- Edición en modo read-only: Bloqueado en frontend y backend
-
-## Diagramas UML
-
-- `use_cases.puml`: Casos de uso del módulo
-- `class_diagram.puml`: Diagrama de clases
+## Archivos
+- editor/models.py: StudentGroup, Student
+- editor/admin.py: StudentGroupAdmin, StudentAdmin
+- editor/group_views.py: Vistas
+- editor/urls.py: Rutas
+- editor/templates/editor/tutor/ - Templates tutor
+- editor/templates/editor/student/my_context.html - Template estudiante
