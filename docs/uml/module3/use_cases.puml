@@ -1,34 +1,62 @@
 @startuml
+title Módulo 3: Tutores (CRUD en Django Admin)
 left to right direction
+
+actor Admin
 actor Tutor
-actor Estudiante
 
-rectangle "Módulo 3: Actividades y Entregas" {
-  usecase "Crear Actividad" as UC_CreateAct
-  usecase "Publicar Actividad" as UC_PublishAct
-  usecase "Ver Actividades" as UC_ViewAct
-  usecase "Entregar Actividad" as UC_Submit
-  usecase "Calificar Entrega" as UC_Grade
-  usecase "Ver Feedback" as UC_ViewFeedback
-
-  usecase "ERROR: No publicada" as E_NotPublished
-  usecase "ERROR: Fuera de plazo" as E_Deadline
-  usecase "ERROR: Re-entrega bloqueada" as E_NoResubmit
-  usecase "ERROR: Entrega vacía" as E_Empty
-  usecase "ERROR: Doble envío" as E_DoubleSubmit
+rectangle "Módulo 3: Gestión de Tutores" {
+  usecase "Crear tutor\n(User + TutorProfile + Membership)" as UC_CreateTutor
+  usecase "Editar perfil tutor" as UC_EditTutor
+  usecase "Activar/Desactivar tutor" as UC_ToggleTutor
+  usecase "Asignar institución" as UC_AssignInst
+  usecase "Ver listado de tutores" as UC_ListTutors
+  
+  usecase "Ver mi perfil\n(Read-Only)" as UC_ViewProfile
+  usecase "Ver mis cursos" as UC_ViewCourses
+  usecase "Ver mis estadísticas" as UC_ViewStats
+  
+  usecase "ERROR: Email duplicado" as E_Dupe
+  usecase "ERROR: Tutor inactivo" as E_Inactive
+  usecase "ERROR: Falta institución" as E_NoInst
+  usecase "ERROR: Acceso denegado" as E_403
 }
 
-Tutor --> UC_CreateAct
-Tutor --> UC_PublishAct
-Tutor --> UC_Grade
+Admin --> UC_CreateTutor : "Solo en /admin/"
+Admin --> UC_EditTutor
+Admin --> UC_ToggleTutor
+Admin --> UC_AssignInst
+Admin --> UC_ListTutors
 
-Estudiante --> UC_ViewAct
-Estudiante --> UC_Submit
-Estudiante --> UC_ViewFeedback
+Tutor --> UC_ViewProfile : "Read-Only"
+Tutor --> UC_ViewCourses
+Tutor --> UC_ViewStats
 
-UC_Submit ..> E_NotPublished : <<extend>>
-UC_Submit ..> E_Deadline : <<extend>>
-UC_Submit ..> E_NoResubmit : <<extend>>
-UC_Submit ..> E_Empty : <<extend>>
-UC_Submit ..> E_DoubleSubmit : <<extend>>
+UC_CreateTutor ..> E_Dupe : <<extend>>
+UC_CreateTutor ..> E_NoInst : <<extend>>
+UC_ViewProfile ..> E_Inactive : <<extend>>
+UC_ViewProfile ..> E_403 : <<extend>>
+
+note right of UC_CreateTutor
+  **REGLA CLAVE:**
+  Todo CRUD de TutorProfile
+  vive en Django Admin.
+  NO hay rutas tipo
+  /admin-panel/tutors
+end note
+
+note bottom of UC_ViewProfile
+  Ruta: /i/<slug>/tutor/profile/
+  Template: tutor/profile.html
+  Decorator: @tutor_required
+  
+  **Solo lectura**
+  Para editar, contactar admin.
+end note
+
+note right of E_Inactive
+  Si TutorProfile.status != 'active'
+  o Membership.is_active = False,
+  se bloquea acceso a vistas /tutor/
+end note
 @enduml

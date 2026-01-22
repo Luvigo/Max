@@ -89,6 +89,11 @@
                 <span>Mi Dashboard</span>
             </a>
             
+            <a href="/i/{{ institution.slug }}/tutor/profile/" class="nav-item {% if request.resolver_match.url_name == 'tutor_profile' %}active{% endif %}">
+                <i class="fas fa-user-tie"></i>
+                <span>Mi Perfil</span>
+            </a>
+            
             <a href="/i/{{ institution.slug }}/tutor/courses/" class="nav-item">
                 <i class="fas fa-book-open"></i>
                 <span>Mis Cursos</span>

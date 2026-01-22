@@ -306,6 +306,177 @@ class TeachingAssignment(models.Model):
         return self.course.institution
 
 
+# ============================================
+# MÓDULO 3: PERFIL DE TUTOR
+# ============================================
+
+class TutorProfile(models.Model):
+    """
+    MÓDULO 3: Perfil de Tutor
+    
+    El admin gestiona tutores EXCLUSIVAMENTE desde Django Admin (/admin/).
+    NO hay rutas/templates tipo /admin-panel/tutors.
+    El tutor solo tiene vista read-only de su perfil.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='tutor_profile', 
+        verbose_name="Usuario"
+    )
+    institution = models.ForeignKey(
+        'Institution', 
+        on_delete=models.CASCADE, 
+        related_name='tutors',
+        verbose_name="Institución"
+    )
+    
+    # Identificación
+    employee_id = models.CharField(
+        max_length=50, 
+        blank=True, 
+        verbose_name="ID de Empleado",
+        help_text="Número de empleado o identificador interno"
+    )
+    
+    # Información profesional
+    title = models.CharField(
+        max_length=100, 
+        blank=True, 
+        verbose_name="Título",
+        help_text="Ej: Profesor, Ing., Lic., Dr."
+    )
+    specialization = models.CharField(
+        max_length=200, 
+        blank=True, 
+        verbose_name="Especialización",
+        help_text="Área de especialización o materia"
+    )
+    bio = models.TextField(
+        blank=True, 
+        verbose_name="Biografía",
+        help_text="Breve descripción profesional"
+    )
+    
+    # Contacto
+    phone = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+    office = models.CharField(
+        max_length=100, 
+        blank=True, 
+        verbose_name="Oficina",
+        help_text="Ubicación de oficina o cubículo"
+    )
+    
+    # Estado
+    STATUS_CHOICES = [
+        ('active', 'Activo'),
+        ('inactive', 'Inactivo'),
+        ('on_leave', 'Licencia'),
+        ('suspended', 'Suspendido'),
+    ]
+    status = models.CharField(
+        max_length=20, 
+        choices=STATUS_CHOICES, 
+        default='active', 
+        verbose_name="Estado"
+    )
+    
+    # Auditoría
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tutors_created',
+        verbose_name="Creado por",
+        help_text="Administrador que creó el perfil"
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Última Actualización")
+    
+    class Meta:
+        verbose_name = "Perfil de Tutor"
+        verbose_name_plural = "Perfiles de Tutores"
+        ordering = ['institution', 'user__last_name', 'user__first_name']
+        unique_together = ['user', 'institution']
+    
+    def __str__(self):
+        name = self.user.get_full_name() or self.user.username
+        title = f"{self.title} " if self.title else ""
+        return f"{title}{name} ({self.institution.name})"
+    
+    @property
+    def is_active(self):
+        """Verificar si el tutor está activo"""
+        return self.status == 'active'
+    
+    @property
+    def full_name(self):
+        """Obtener nombre completo con título"""
+        name = self.user.get_full_name() or self.user.username
+        return f"{self.title} {name}".strip() if self.title else name
+    
+    @property
+    def email(self):
+        """Obtener email del usuario"""
+        return self.user.email
+    
+    def get_courses_count(self):
+        """Obtener número de cursos asignados activos"""
+        return TeachingAssignment.objects.filter(
+            tutor=self.user,
+            course__institution=self.institution,
+            status='active'
+        ).count()
+    
+    def get_students_count(self):
+        """Obtener número total de estudiantes en sus cursos"""
+        assignments = TeachingAssignment.objects.filter(
+            tutor=self.user,
+            course__institution=self.institution,
+            status='active'
+        )
+        total = 0
+        for assignment in assignments:
+            total += assignment.course.get_students_count()
+        return total
+    
+    def get_courses(self):
+        """Obtener cursos asignados"""
+        return Course.objects.filter(
+            teaching_assignments__tutor=self.user,
+            teaching_assignments__status='active',
+            institution=self.institution
+        ).distinct()
+    
+    def can_login(self):
+        """Verificar si el tutor puede hacer login"""
+        return self.status == 'active' and self.user.is_active
+    
+    def deactivate(self, reason=''):
+        """Desactivar tutor"""
+        self.status = 'inactive'
+        self.save()
+        # También desactivar membresía
+        Membership.objects.filter(
+            user=self.user,
+            institution=self.institution,
+            role='tutor'
+        ).update(is_active=False)
+    
+    def activate(self):
+        """Activar tutor"""
+        self.status = 'active'
+        self.save()
+        # También activar membresía
+        Membership.objects.filter(
+            user=self.user,
+            institution=self.institution,
+            role='tutor'
+        ).update(is_active=True)
+
+
 class Student(models.Model):
     """Perfil de Estudiante"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile', verbose_name="Usuario")

@@ -9,6 +9,7 @@ from . import ide_views
 from . import agent_views
 from . import error_views
 from . import institution_views
+from . import tutor_views
 
 app_name = 'editor'
 
@@ -80,6 +81,14 @@ urlpatterns = [
     path('institution/courses/<int:course_id>/assign-tutor/', academic_views.institution_course_assign_tutor, name='institution_course_assign_tutor'),
     path('institution/courses/<int:course_id>/enroll/', academic_views.institution_enroll_student, name='institution_enroll_student'),
     path('institution/enrollments/import-csv/', academic_views.institution_import_csv, name='institution_import_csv'),
+    
+    # ============================================
+    # MÓDULO 3: Perfil de Tutor (solo lectura)
+    # CRUD de TutorProfile vive en Django Admin (/admin/)
+    # ============================================
+    
+    path('tutor/profile/', tutor_views.tutor_profile, name='tutor_profile'),
+    path('api/tutor/status/', tutor_views.check_tutor_status, name='api_tutor_status'),
     
     # Vistas de Tutor
     path('tutor/courses/', academic_views.tutor_courses_list, name='tutor_courses_list'),

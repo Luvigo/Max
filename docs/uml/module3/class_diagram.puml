@@ -1,86 +1,136 @@
 @startuml
-!theme cerulean
-title Módulo 3: Diagrama de Clases - Actividades y Entregas
+title Módulo 3: Diagrama de Clases - Gestión de Tutores
 
-skinparam classAttributeIconSize 0
-
-package "django.contrib.auth" <<Database>> {
+package "Django Auth" {
     class User {
         +id: int
         +username: str
         +email: str
+        +password: str
+        +first_name: str
+        +last_name: str
+        +is_active: bool
     }
 }
 
-package "editor.models" <<Database>> {
-    
-    class Course {
-        +id: int
-        +name: str
-        +code: str
-    }
-    
-    class Activity {
+package "Modelos de Tutor" {
+    class TutorProfile {
         +id: UUID
-        +course: FK(Course)
+        +user: FK(User) <<OneToOne>>
+        +institution: FK(Institution)
+        --
+        **Identificación**
+        +employee_id: str
+        --
+        **Info Profesional**
         +title: str
-        +objective: str
-        +instructions: str
-        +deadline: datetime
-        +status: enum(draft, published, closed)
-        +allow_resubmit: bool
-        +published_at: datetime
-        +created_at: datetime
+        +specialization: str
+        +bio: str
         --
-        +is_published(): bool
-        +is_closed(): bool
-        +is_deadline_passed(): bool
-        +get_submissions_count(): int
-        +get_pending_submissions_count(): int
+        **Contacto**
+        +phone: str
+        +office: str
+        --
+        **Estado**
+        +status: str ['active', 'inactive', 'on_leave', 'suspended']
+        --
+        **Auditoría**
+        +created_by: FK(User)
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +is_active: bool (property)
+        +full_name: str (property)
+        +email: str (property)
+        +get_courses_count(): int
+        +get_students_count(): int
+        +get_courses(): QuerySet
+        +can_login(): bool
+        +activate()
+        +deactivate()
     }
     
-    class Submission {
-        +id: UUID
-        +activity: FK(Activity)
-        +student: FK(User)
-        +status: enum(pending, submitted, graded)
-        +attempt: int
-        +artifact_ref: JSON
-        +submitted_at: datetime
-        +created_at: datetime
-        --
-        +can_resubmit(): bool
-        +get_latest_feedback(): Feedback
+    class Membership {
+        +user: FK(User)
+        +institution: FK(Institution)
+        +role: str ['tutor', ...]
+        +is_active: bool
     }
     
-    class Rubric {
-        +id: UUID
-        +activity: FK(Activity) {1:1}
-        +criteria: JSON
-        +created_at: datetime
-        --
-        +get_total_max_score(): int
-    }
-    
-    class Feedback {
-        +id: UUID
-        +submission: FK(Submission)
+    class TeachingAssignment {
+        +course: FK(Course)
         +tutor: FK(User)
-        +score: decimal
-        +comments: str
-        +rubric_breakdown: JSON
-        +created_at: datetime
-        --
-        +get_percentage_score(): float
+        +status: str
     }
 }
 
-' Relaciones
-Course ||--o{ Activity : "tiene"
-Activity ||--o{ Submission : "recibe"
-Activity ||--|| Rubric : "tiene"
-Submission ||--o{ Feedback : "tiene"
-User ||--o{ Submission : "entrega"
-User ||--o{ Feedback : "califica"
+package "Django Admin" {
+    class TutorProfileAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +search_fields: list
+        +fieldsets: tuple
+        +add_fieldsets: tuple
+        --
+        +save_model()
+        +activate_tutors()
+        +deactivate_tutors()
+        +suspend_tutors()
+    }
+    
+    class TutorProfileCreationForm <<Form>> {
+        +username: CharField
+        +email: EmailField
+        +password: CharField
+        +first_name: CharField
+        +last_name: CharField
+        --
+        +clean_username()
+        +clean_email()
+    }
+}
 
+package "Vistas" {
+    class "tutor_views.py" <<module>> {
+        +tutor_profile(request, slug)
+        +check_tutor_status(request, slug)
+    }
+}
+
+package "Middleware" {
+    class TenantMiddleware {
+        +tutor_profile: TutorProfile
+        +tutor_active: bool
+        --
+        +_check_tutor_profile()
+        +_is_exempt_path()
+    }
+}
+
+User "1" -- "0..1" TutorProfile : tutor_profile
+TutorProfile "*" -- "1" Institution
+TutorProfile -- Membership : sincroniza estado
+User "1" -- "*" TeachingAssignment : tutor
+
+TutorProfileAdmin --> TutorProfile : "CRUD en /admin/"
+TutorProfileAdmin --> TutorProfileCreationForm : usa para crear
+"tutor_views.py" --> TutorProfile : "Read-Only"
+TenantMiddleware --> TutorProfile : verifica estado
+
+note bottom of TutorProfileAdmin
+  **Acciones disponibles:**
+  - activate_tutors
+  - deactivate_tutors
+  - suspend_tutors
+  
+  **Al crear:**
+  1. Crea User
+  2. Crea TutorProfile
+  3. Crea Membership (rol=tutor)
+end note
+
+note right of TenantMiddleware
+  Bloquea acceso a /tutor/*
+  si TutorProfile.status != 'active'
+end note
 @enduml

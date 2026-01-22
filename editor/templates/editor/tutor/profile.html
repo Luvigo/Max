@@ -1,0 +1,352 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mi Perfil - Tutor{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-user-tie"></i>
+            Mi Perfil de Tutor
+        </h1>
+        <p class="page-subtitle">Vista de solo lectura - {{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Alerta de solo lectura -->
+    <div class="alert alert-info animate-in" style="margin-bottom: 20px;">
+        <i class="fas fa-info-circle"></i>
+        <span>Esta vista es de <strong>solo lectura</strong>. Para modificar tu información, contacta al administrador de tu institución.</span>
+    </div>
+    
+    <!-- Información del Perfil -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-id-card" style="color: var(--color-primary);"></i>
+                Información Personal
+            </h3>
+            {% if tutor_profile %}
+            <span class="badge {% if tutor_profile.status == 'active' %}badge-success{% elif tutor_profile.status == 'inactive' %}badge-danger{% else %}badge-warning{% endif %}">
+                {{ tutor_profile.get_status_display }}
+            </span>
+            {% else %}
+            <span class="badge badge-info">Activo</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="profile-grid">
+                <div class="profile-avatar">
+                    <div class="avatar-circle">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                </div>
+                <div class="profile-info">
+                    <h2 class="profile-name">
+                        {% if tutor_profile and tutor_profile.title %}{{ tutor_profile.title }} {% endif %}
+                        {{ request.user.get_full_name|default:request.user.username }}
+                    </h2>
+                    
+                    <div class="profile-details">
+                        <div class="detail-item">
+                            <i class="fas fa-envelope"></i>
+                            <span>{{ request.user.email|default:"Sin email" }}</span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <i class="fas fa-university"></i>
+                            <span>{{ institution.name }}</span>
+                        </div>
+                        
+                        {% if tutor_profile %}
+                        {% if tutor_profile.employee_id %}
+                        <div class="detail-item">
+                            <i class="fas fa-id-badge"></i>
+                            <span>ID: {{ tutor_profile.employee_id }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if tutor_profile.phone %}
+                        <div class="detail-item">
+                            <i class="fas fa-phone"></i>
+                            <span>{{ tutor_profile.phone }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if tutor_profile.office %}
+                        <div class="detail-item">
+                            <i class="fas fa-door-open"></i>
+                            <span>{{ tutor_profile.office }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        {% if tutor_profile.specialization %}
+                        <div class="detail-item">
+                            <i class="fas fa-graduation-cap"></i>
+                            <span>{{ tutor_profile.specialization }}</span>
+                        </div>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    
+                    {% if tutor_profile and tutor_profile.bio %}
+                    <div class="profile-bio">
+                        <h4>Biografía</h4>
+                        <p>{{ tutor_profile.bio }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Estadísticas -->
+    <div class="stats-grid" style="margin-top: 20px;">
+        <div class="stat-card animate-in" style="animation-delay: 0.1s;">
+            <div class="stat-icon" style="background: var(--color-primary-glow);">
+                <i class="fas fa-book" style="color: var(--color-primary);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.courses_count }}</div>
+                <div class="stat-label">Cursos Asignados</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.2s;">
+            <div class="stat-icon" style="background: var(--color-success-glow);">
+                <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.students_count }}</div>
+                <div class="stat-label">Total Estudiantes</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Cursos Asignados -->
+    <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.3s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-chalkboard" style="color: var(--color-warning);"></i>
+                Mis Cursos Asignados
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if teaching_assignments %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Código</th>
+                        <th>Nivel</th>
+                        <th>Año</th>
+                        <th>Estudiantes</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in teaching_assignments %}
+                    <tr>
+                        <td><strong>{{ assignment.course.name }}</strong></td>
+                        <td><span class="badge badge-secondary">{{ assignment.course.code }}</span></td>
+                        <td>{{ assignment.course.grade_level|default:"-" }}</td>
+                        <td>{{ assignment.course.academic_year }}</td>
+                        <td>
+                            <span class="badge badge-info">{{ assignment.course.get_students_count }}</span>
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:tutor_course_roster' institution_slug=institution.slug course_id=assignment.course.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Estudiantes">
+                                <i class="fas fa-users"></i>
+                            </a>
+                            <a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=assignment.course.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Actividades">
+                                <i class="fas fa-tasks"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No tienes cursos asignados actualmente.</p>
+                <p class="text-muted">Contacta al administrador para que te asigne cursos.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Información de la Cuenta -->
+    <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.4s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-cog" style="color: var(--color-text-muted);"></i>
+                Información de la Cuenta
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="account-info">
+                <div class="info-row">
+                    <span class="info-label">Usuario:</span>
+                    <span>{{ request.user.username }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email:</span>
+                    <span>{{ request.user.email|default:"Sin email" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Miembro desde:</span>
+                    <span>{{ membership.created_at|date:"d/m/Y" }}</span>
+                </div>
+                {% if tutor_profile %}
+                <div class="info-row">
+                    <span class="info-label">Perfil creado:</span>
+                    <span>{{ tutor_profile.created_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Última actualización:</span>
+                    <span>{{ tutor_profile.updated_at|date:"d/m/Y H:i" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .alert-info {
+        background: rgba(88, 166, 255, 0.1);
+        border: 1px solid rgba(88, 166, 255, 0.3);
+        color: #58a6ff;
+        padding: 12px 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .profile-grid {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+    }
+    
+    .profile-avatar {
+        flex-shrink: 0;
+    }
+    
+    .avatar-circle {
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 40px;
+        color: white;
+    }
+    
+    .profile-info {
+        flex: 1;
+    }
+    
+    .profile-name {
+        margin: 0 0 16px 0;
+        font-size: 1.5rem;
+        color: var(--color-text);
+    }
+    
+    .profile-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+    }
+    
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--color-text-muted);
+    }
+    
+    .detail-item i {
+        width: 20px;
+        text-align: center;
+        color: var(--color-primary);
+    }
+    
+    .profile-bio {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--color-border, #30363d);
+    }
+    
+    .profile-bio h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .profile-bio p {
+        margin: 0;
+        line-height: 1.6;
+    }
+    
+    .account-info {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .info-row {
+        display: flex;
+        gap: 16px;
+    }
+    
+    .info-label {
+        font-weight: 500;
+        color: var(--color-text-muted);
+        min-width: 150px;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--color-text-muted);
+    }
+    
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    
+    @media (max-width: 768px) {
+        .profile-grid {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .profile-details {
+            justify-items: center;
+        }
+        
+        .info-row {
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .info-label {
+            min-width: auto;
+        }
+    }
+</style>
+{% endblock %}

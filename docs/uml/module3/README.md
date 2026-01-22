@@ -1,48 +1,137 @@
-# Módulo 3: Actividades, Entregas, Rúbricas y Feedback
+# Módulo 3: Gestión de Tutores
 
 ## Descripción
+El admin gestiona tutores EXCLUSIVAMENTE desde Django Admin (`/admin/`).
+NO hay rutas/templates tipo `/admin-panel/tutors`.
 
-Este módulo implementa el sistema completo de actividades y entregas con soporte multi-tenant, permitiendo a los tutores crear y gestionar actividades, y a los estudiantes entregar sus trabajos y recibir feedback.
+## ⚠️ Regla Clave
+**Todo CRUD de TutorProfile se hace desde Django Admin.** El tutor solo tiene vista read-only de su perfil.
 
-## Componentes
+## Modelo TutorProfile
 
-### Modelos
+### Campos Principales
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `user` | OneToOne(User) | Usuario asociado |
+| `institution` | FK(Institution) | Institución del tutor |
+| `employee_id` | str | ID de empleado (opcional) |
+| `title` | str | Título (Lic., Ing., Dr., etc.) |
+| `specialization` | str | Área de especialización |
+| `bio` | str | Biografía profesional |
+| `phone` | str | Teléfono |
+| `office` | str | Oficina/Cubículo |
+| `status` | str | active/inactive/on_leave/suspended |
+| `created_by` | FK(User) | Admin que creó el perfil |
 
-- **Activity**: Actividad con estados (draft, published, closed), deadline y opción de re-entrega
-- **Submission**: Entrega de estudiante con control de intentos y estados (pending, submitted, graded)
-- **Rubric**: Rúbrica de evaluación con criterios en JSON
-- **Feedback**: Calificación y comentarios del tutor con desglose por rúbrica
+### Estados
+| Estado | Descripción | Puede Login |
+|--------|-------------|-------------|
+| `active` | Activo | ✓ |
+| `inactive` | Inactivo | ✗ |
+| `on_leave` | Licencia | ✗ |
+| `suspended` | Suspendido | ✗ |
 
-### Vistas
+### Métodos
+```python
+tutor.is_active           # Property: status == 'active'
+tutor.full_name           # Con título
+tutor.email               # Del user
+tutor.get_courses_count() # Cursos asignados activos
+tutor.get_students_count() # Total estudiantes
+tutor.get_courses()       # QuerySet de cursos
+tutor.can_login()         # status=='active' AND user.is_active
+tutor.activate()          # Activar tutor y membership
+tutor.deactivate()        # Desactivar tutor y membership
+```
 
-#### Tutor
-- Lista de actividades del curso
-- Crear/Editar actividad
-- Publicar actividad
-- Ver entregas de una actividad
-- Calificar entrega
+## Django Admin
 
-#### Estudiante
-- Ver actividades del curso
-- Ver detalle de actividad
-- Entregar actividad
-- Ver feedback de entrega
+### TutorProfileAdmin
+```python
+list_display = ['full_name', 'user', 'institution', 'title', 'specialization', 'status', 'courses_count', 'students_count']
+list_filter = ['status', 'institution', 'created_at']
+search_fields = ['user__username', 'user__email', 'employee_id', 'institution__name', 'specialization']
+```
 
-### Seguridad
+### Crear Tutor (desde Admin)
+1. Ir a `/admin/editor/tutorprofile/add/`
+2. Llenar datos del usuario (username, email, password)
+3. Seleccionar institución
+4. Llenar información profesional
+5. Guardar
 
-- **Cross-tenant protection**: Todas las operaciones verifican pertenencia a la institución
-- **Role-based access**: Solo tutores pueden crear/calificar, solo estudiantes pueden entregar
-- **Concurrencia**: Prevención de doble submit con unique constraints y transacciones
-- **Validaciones**: Verificación de estado publicado, deadline, re-entrega permitida
+**Automáticamente se crea:**
+- User con los datos proporcionados
+- TutorProfile vinculado al User
+- Membership con rol='tutor'
 
-## Validaciones
+### Acciones
+| Acción | Descripción |
+|--------|-------------|
+| `activate_tutors` | Activa tutores seleccionados |
+| `deactivate_tutors` | Desactiva tutores seleccionados |
+| `suspend_tutors` | Suspende tutores seleccionados |
 
-- Actividad debe estar publicada para entregar
-- No puede entregar si pasó el deadline
-- Re-entrega solo si está permitida
-- Prevención de doble submit (unique constraint + transaction)
+## Vista Read-Only del Tutor
+
+### URL
+```
+/i/<slug>/tutor/profile/
+```
+
+### Template
+`editor/templates/editor/tutor/profile.html`
+
+### Contenido
+- Información personal (solo lectura)
+- Estadísticas (cursos, estudiantes)
+- Lista de cursos asignados
+- Información de la cuenta
+
+### Decorador
+```python
+@login_required
+@tutor_required
+def tutor_profile(request, institution_slug):
+    ...
+```
+
+## Bloqueo de Tutores Inactivos
+
+### Middleware
+El `TenantMiddleware` verifica el estado del tutor:
+
+1. Si `TutorProfile.status != 'active'`
+2. Si `Membership.is_active = False`
+
+→ Se bloquea acceso a rutas `/tutor/*`
+→ Se muestra mensaje de error
+→ Se redirige al dashboard
+
+### Rutas Exentas
+- `/login/`
+- `/logout/`
+- `/admin/`
+- `/static/`
+- `/api/agent/`
+
+## Permisos
+
+| Actor | Acción | Permitido |
+|-------|--------|-----------|
+| Admin | CRUD TutorProfile | ✓ (en /admin/) |
+| Admin | Activar/Desactivar | ✓ |
+| Tutor | Ver su perfil | ✓ (read-only) |
+| Tutor | Editar su perfil | ✗ |
+| Student | Ver perfil tutor | ✗ |
 
 ## Diagramas UML
-
-- `use_cases.puml`: Casos de uso del módulo
+- `use_cases.puml`: Casos de uso
 - `class_diagram.puml`: Diagrama de clases
+
+## Archivos Relacionados
+- `editor/models.py`: TutorProfile
+- `editor/admin.py`: TutorProfileAdmin
+- `editor/tutor_views.py`: Vista de perfil
+- `editor/middleware.py`: Verificación de estado
+- `editor/templates/editor/tutor/profile.html`: Template

@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
+from django import forms
 from .models import (
-    Institution, Membership, Course, Enrollment, TeachingAssignment, Student, Project,
+    Institution, Membership, Course, Enrollment, TeachingAssignment, 
+    TutorProfile, Student, Project,
     Activity, Submission, Rubric, Feedback,
     IDEProject, ProjectSnapshot, ActivityWorkspace,
     AgentInstance,
@@ -177,6 +179,205 @@ class TeachingAssignmentAdmin(admin.ModelAdmin):
     get_institution.short_description = 'Institución'
 
 
+# ============================================
+# MÓDULO 3: TUTOR PROFILE ADMIN
+# ============================================
+
+class TutorProfileCreationForm(forms.ModelForm):
+    """Formulario para crear TutorProfile con creación automática de User y Membership"""
+    username = forms.CharField(max_length=150, help_text="Nombre de usuario para login")
+    email = forms.EmailField(help_text="Email del tutor (también para login)")
+    password = forms.CharField(widget=forms.PasswordInput, help_text="Contraseña inicial")
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+    
+    class Meta:
+        model = TutorProfile
+        fields = ['institution', 'employee_id', 'title', 'specialization', 'bio', 'phone', 'office', 'status']
+    
+    def clean_username(self):
+        username = self.cleaned_data['username']
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Ya existe un usuario con este nombre de usuario.")
+        return username
+    
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Ya existe un usuario con este email.")
+        return email
+
+
+@admin.register(TutorProfile)
+class TutorProfileAdmin(admin.ModelAdmin):
+    """
+    MÓDULO 3: Admin de Perfiles de Tutor
+    
+    Todo el CRUD de tutores se hace EXCLUSIVAMENTE desde aquí.
+    NO hay rutas/templates tipo /admin-panel/tutors.
+    """
+    list_display = [
+        'get_full_name', 'user', 'institution', 'title', 'specialization',
+        'status', 'get_courses_count', 'get_students_count', 'created_at'
+    ]
+    list_filter = ['status', 'institution', 'created_at']
+    search_fields = [
+        'user__username', 'user__email', 'user__first_name', 'user__last_name',
+        'employee_id', 'institution__name', 'specialization'
+    ]
+    readonly_fields = [
+        'created_at', 'updated_at', 'created_by', 
+        'get_courses_count', 'get_students_count', 'get_email'
+    ]
+    raw_id_fields = ['user', 'institution']
+    ordering = ['institution', 'user__last_name']
+    list_per_page = 25
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Usuario', {
+            'fields': ('user', 'get_email'),
+            'description': 'Información del usuario asociado'
+        }),
+        ('Institución', {
+            'fields': ('institution',),
+        }),
+        ('Información Profesional', {
+            'fields': ('employee_id', 'title', 'specialization', 'bio')
+        }),
+        ('Contacto', {
+            'fields': ('phone', 'office')
+        }),
+        ('Estado', {
+            'fields': ('status',),
+            'description': 'Un tutor inactivo no podrá acceder al sistema'
+        }),
+        ('Estadísticas', {
+            'fields': ('get_courses_count', 'get_students_count'),
+            'classes': ('collapse',)
+        }),
+        ('Auditoría', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    add_fieldsets = (
+        ('Crear Usuario', {
+            'fields': ('username', 'email', 'password', 'first_name', 'last_name'),
+            'description': 'Se creará un nuevo usuario con rol de Tutor'
+        }),
+        ('Institución', {
+            'fields': ('institution',),
+        }),
+        ('Información Profesional', {
+            'fields': ('employee_id', 'title', 'specialization', 'bio')
+        }),
+        ('Contacto', {
+            'fields': ('phone', 'office')
+        }),
+        ('Estado', {
+            'fields': ('status',),
+        }),
+    )
+    
+    def get_fieldsets(self, request, obj=None):
+        if not obj:
+            return self.add_fieldsets
+        return super().get_fieldsets(request, obj)
+    
+    def get_form(self, request, obj=None, **kwargs):
+        if not obj:
+            kwargs['form'] = TutorProfileCreationForm
+        return super().get_form(request, obj, **kwargs)
+    
+    def get_full_name(self, obj):
+        return obj.full_name
+    get_full_name.short_description = 'Nombre'
+    get_full_name.admin_order_field = 'user__last_name'
+    
+    def get_email(self, obj):
+        return obj.user.email
+    get_email.short_description = 'Email'
+    
+    def get_courses_count(self, obj):
+        return obj.get_courses_count()
+    get_courses_count.short_description = 'Cursos'
+    
+    def get_students_count(self, obj):
+        return obj.get_students_count()
+    get_students_count.short_description = 'Estudiantes'
+    
+    def save_model(self, request, obj, form, change):
+        if not change:  # Creación
+            # Crear usuario
+            user = User.objects.create_user(
+                username=form.cleaned_data['username'],
+                email=form.cleaned_data['email'],
+                password=form.cleaned_data['password'],
+                first_name=form.cleaned_data.get('first_name', ''),
+                last_name=form.cleaned_data.get('last_name', ''),
+            )
+            obj.user = user
+            obj.created_by = request.user
+            
+            # Guardar el perfil
+            obj.save()
+            
+            # Crear Membership con rol tutor
+            Membership.objects.get_or_create(
+                user=user,
+                institution=obj.institution,
+                defaults={
+                    'role': 'tutor',
+                    'is_active': obj.status == 'active'
+                }
+            )
+        else:
+            obj.save()
+            # Sincronizar estado con Membership
+            Membership.objects.filter(
+                user=obj.user,
+                institution=obj.institution,
+                role='tutor'
+            ).update(is_active=obj.status == 'active')
+    
+    actions = ['activate_tutors', 'deactivate_tutors', 'suspend_tutors']
+    
+    @admin.action(description='Activar tutores seleccionados')
+    def activate_tutors(self, request, queryset):
+        for tutor in queryset:
+            tutor.activate()
+        self.message_user(request, f'{queryset.count()} tutor(es) activado(s).')
+    
+    @admin.action(description='Desactivar tutores seleccionados')
+    def deactivate_tutors(self, request, queryset):
+        for tutor in queryset:
+            tutor.deactivate()
+        self.message_user(request, f'{queryset.count()} tutor(es) desactivado(s).')
+    
+    @admin.action(description='Suspender tutores seleccionados')
+    def suspend_tutors(self, request, queryset):
+        queryset.update(status='suspended')
+        for tutor in queryset:
+            Membership.objects.filter(
+                user=tutor.user,
+                institution=tutor.institution,
+                role='tutor'
+            ).update(is_active=False)
+        self.message_user(request, f'{queryset.count()} tutor(es) suspendido(s).')
+
+
+class TutorProfileInline(admin.StackedInline):
+    """Inline para ver/editar TutorProfile desde el User admin"""
+    model = TutorProfile
+    can_delete = False
+    verbose_name_plural = 'Perfil de Tutor'
+    fk_name = 'user'
+    extra = 0
+    readonly_fields = ['created_at', 'updated_at', 'created_by']
+
+
 class MembershipInline(admin.TabularInline):
     model = Membership
     extra = 1
@@ -191,8 +392,8 @@ class StudentInline(admin.StackedInline):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (MembershipInline, StudentInline,)
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_roles', 'get_student_profile')
+    inlines = (MembershipInline, TutorProfileInline, StudentInline,)
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'get_roles', 'get_tutor_profile', 'get_student_profile')
     
     def get_roles(self, obj):
         memberships = Membership.objects.filter(user=obj, is_active=True)
@@ -205,6 +406,12 @@ class CustomUserAdmin(BaseUserAdmin):
             roles.append(f"...+{memberships.count() - 3}")
         return ", ".join(roles)
     get_roles.short_description = 'Roles'
+    
+    def get_tutor_profile(self, obj):
+        if hasattr(obj, 'tutor_profile'):
+            return f"✓ {obj.tutor_profile.institution.name[:15]}"
+        return "-"
+    get_tutor_profile.short_description = 'Tutor'
     
     def get_student_profile(self, obj):
         if hasattr(obj, 'student_profile'):
