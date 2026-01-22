@@ -1,83 +1,79 @@
-# Módulo 5: Agent Local Institucional
+# Modulo 5: Actividades y Entregas por Grupo
 
-## Descripción
+## Descripcion
+- Tutor gestiona actividades desde templates
+- Estudiante ve actividades de su grupo y entrega desde IDE
+- Admin supervisa desde Django Admin (/admin/)
 
-Este módulo convierte el Agent Local en un componente institucional serio con monitoreo, control y UX clara. **NO modifica la lógica de compilación ni subida del Agent existente**.
+## Modelos
 
-## Objetivo
+### Activity (extendido)
+- id: UUID
+- group: FK(StudentGroup) - actividad para un grupo
+- course: FK(Course) - actividad para un curso (legacy)
+- created_by: FK(User) - tutor creador
+- title, objective, instructions
+- deadline: datetime
+- status: draft/published/closed
+- allow_resubmit, allow_late_submit: bool
+- max_score: decimal
 
-1. Saber qué Agents existen
-2. A qué institución pertenecen
-3. Si están online/offline
-4. Qué versión usan
-5. Mostrar su estado en el IDE
-6. Dar herramientas de diagnóstico y soporte
+### Submission (extendido)
+- id: UUID
+- activity: FK(Activity)
+- student: FK(User)
+- status: pending/in_progress/submitted/graded/returned
+- attempt: int
+- xml_content, arduino_code: text
+- notes: text
+- score: decimal
+- is_late, is_read_only: bool
+- graded_by: FK(User)
+- submitted_at, graded_at: datetime
 
-## Componentes
+## URLs del Tutor
 
-### Modelo
+### Actividades por Grupo
+- /i/slug/tutor/groups/id/activities/ - Lista
+- /i/slug/tutor/groups/id/activities/new/ - Crear
+- /i/slug/tutor/groups/id/activities/id/edit/ - Editar
 
-- **AgentInstance**: Instancia de Agent Local registrada con:
-  - institution (FK)
-  - hostname, os, agent_version
-  - status (ONLINE | OFFLINE | ERROR)
-  - last_seen, meta (JSON)
+### Entregas
+- /i/slug/tutor/activities/id/submissions/ - Lista de entregas
+- /i/slug/tutor/submissions/id/ - Detalle
+- /i/slug/tutor/submissions/id/grade/ - Calificar
 
-### APIs (solo control, no ejecución)
+## URLs del Estudiante
+- /i/slug/student/activities/ - Ver actividades de mi grupo
+- /i/slug/student/activities/id/ - Detalle de actividad
+- /i/slug/student/activities/id/ide/ - IDE para trabajar
 
-- `POST /api/agent/register/`: Registrar Agent
-- `POST /api/agent/heartbeat/`: Enviar heartbeat periódico
-- `GET /api/agent/list/`: Listar Agents
-- `GET /api/agent/<id>/`: Estado de un Agent
-- `GET /api/agent/check/`: Verificar Agent desde IDE
+## APIs
+- POST /i/slug/api/activity/id/submit/ - Entregar actividad
+- POST /i/slug/api/activity/id/save/ - Guardar progreso (autosave)
 
-### Vistas
+## Flujo de Entrega
+1. Estudiante abre IDE -> crea Submission (in_progress)
+2. Autosave guarda xml_content cada 3 segundos
+3. Boton Entregar -> submit() -> status=submitted, is_read_only=True
+4. IDE pasa a modo solo lectura
+5. Tutor califica -> grade() -> status=graded
 
-#### Admin
-- Lista global de Agents
-- Detalle de Agent
-- Estadísticas (online/offline/error)
+## Validaciones (can_submit)
+- Actividad publicada
+- Actividad no cerrada
+- Dentro de fecha limite (o allow_late_submit)
+- Estudiante pertenece al grupo
+- No ha entregado antes (o allow_resubmit)
 
-#### Institución
-- Lista de Agents propios
-- Detalle de Agent
-- Diagnóstico básico
+## Django Admin
+- ActivityAdmin: filtros por grupo/curso/institucion, acciones publish/close/draft
+- SubmissionAdmin: filtros por estado/fecha, acciones mark_as_graded/submitted
 
-### Integración en IDE
-
-- Banner dinámico de estado del Agent
-- Botón "Verificar conexión"
-- Botón "Guía instalación"
-- NO permite subir si Agent está OFFLINE
-
-## Seguridad
-
-- Token institucional para registro
-- Cross-tenant protection: Institución solo ve sus Agents
-- Verificación periódica de estado basada en last_seen
-
-## Reglas
-
-- El Agent se registra una sola vez (unique: institution + hostname)
-- Luego envía heartbeat cada X segundos
-- Si last_seen > 2 minutos → OFFLINE automático
-- Admin ve todos los Agents
-- Institución ve solo los suyos
-
-## Restricciones
-
-❌ NO modificar:
-- Lógica de compilación
-- Lógica de subida
-- Protocolo serial
-
-✅ SOLO:
-- Monitoreo
-- Control
-- UX
-- Estructura institucional
-
-## Diagramas UML
-
-- `use_cases.puml`: Casos de uso del módulo
-- `class_diagram.puml`: Diagrama de clases
+## Archivos
+- editor/models.py: Activity, Submission (extendidos)
+- editor/admin.py: ActivityAdmin, SubmissionAdmin
+- editor/activity_group_views.py: Vistas
+- editor/urls.py: Rutas
+- editor/templates/editor/activity/tutor/ - Templates tutor
+- editor/templates/editor/activity/student/ - Templates estudiante

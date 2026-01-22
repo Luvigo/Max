@@ -746,13 +746,47 @@ class Project(models.Model):
 
 
 # ============================================
-# MÓDULO 3: ACTIVIDADES Y ENTREGAS
+# MÓDULO 5: ACTIVIDADES Y ENTREGAS (extendido para grupos)
 # ============================================
 
 class Activity(models.Model):
-    """Actividad o tarea asignada a un curso"""
+    """
+    MÓDULO 5: Actividad asignada a un curso o grupo
+    
+    - Tutor crea actividades desde templates
+    - Estudiante ve actividades de su grupo/curso
+    - Admin supervisa desde Django Admin
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='activities', verbose_name="Curso")
+    
+    # Puede ser para un curso O para un grupo específico
+    course = models.ForeignKey(
+        Course, 
+        on_delete=models.CASCADE, 
+        related_name='activities', 
+        verbose_name="Curso",
+        null=True,
+        blank=True
+    )
+    group = models.ForeignKey(
+        'StudentGroup',
+        on_delete=models.CASCADE,
+        related_name='activities',
+        verbose_name="Grupo",
+        null=True,
+        blank=True,
+        help_text="Si se especifica grupo, la actividad solo es visible para ese grupo"
+    )
+    
+    # Tutor creador
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='activities_created',
+        verbose_name="Creado por"
+    )
     
     title = models.CharField(max_length=200, verbose_name="Título")
     objective = models.TextField(blank=True, verbose_name="Objetivo")
@@ -766,6 +800,15 @@ class Activity(models.Model):
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', verbose_name="Estado")
     allow_resubmit = models.BooleanField(default=False, verbose_name="Permitir Re-entrega")
+    allow_late_submit = models.BooleanField(default=False, verbose_name="Permitir Entrega Tardía")
+    
+    # Puntuación
+    max_score = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        default=100,
+        verbose_name="Puntuación Máxima"
+    )
     
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
     updated_at = models.DateTimeField(auto_now=True)
@@ -777,16 +820,29 @@ class Activity(models.Model):
         ordering = ['-deadline', '-created_at']
         indexes = [
             models.Index(fields=['course', 'status']),
+            models.Index(fields=['group', 'status']),
             models.Index(fields=['deadline']),
         ]
     
     def __str__(self):
-        return f"{self.title} - {self.course.name}"
+        target = self.group.name if self.group else (self.course.name if self.course else "Sin asignar")
+        return f"{self.title} - {target}"
     
     @property
     def institution(self):
-        """Obtener institución del curso"""
-        return self.course.institution
+        """Obtener institución"""
+        if self.group:
+            return self.group.institution
+        if self.course:
+            return self.course.institution
+        return None
+    
+    @property
+    def tutor(self):
+        """Obtener tutor responsable"""
+        if self.group:
+            return self.group.tutor
+        return self.created_by
     
     def is_published(self):
         """Verificar si la actividad está publicada"""
@@ -802,6 +858,45 @@ class Activity(models.Model):
             return False
         return timezone.now() > self.deadline
     
+    def can_submit(self, student_user):
+        """Verificar si un estudiante puede entregar"""
+        # Verificar que está publicada
+        if not self.is_published():
+            return False, "La actividad no está publicada."
+        
+        # Verificar que no está cerrada
+        if self.is_closed():
+            return False, "La actividad está cerrada."
+        
+        # Verificar deadline
+        if self.is_deadline_passed() and not self.allow_late_submit:
+            return False, "La fecha límite ha pasado."
+        
+        # Verificar que el estudiante pertenece al grupo/curso
+        try:
+            student_profile = Student.objects.get(user=student_user)
+            
+            if self.group:
+                if student_profile.group != self.group:
+                    return False, "No perteneces al grupo de esta actividad."
+            elif self.course:
+                if student_profile.course != self.course:
+                    return False, "No estás inscrito en el curso de esta actividad."
+        except Student.DoesNotExist:
+            return False, "No tienes perfil de estudiante."
+        
+        # Verificar si ya entregó y no permite re-entrega
+        existing = Submission.objects.filter(
+            activity=self,
+            student=student_user,
+            status__in=['submitted', 'graded']
+        ).exists()
+        
+        if existing and not self.allow_resubmit:
+            return False, "Ya entregaste y no se permite re-entrega."
+        
+        return True, "OK"
+    
     def get_submissions_count(self):
         """Obtener número de entregas"""
         return self.submissions.filter(status__in=['submitted', 'graded']).count()
@@ -809,26 +904,71 @@ class Activity(models.Model):
     def get_pending_submissions_count(self):
         """Obtener número de entregas pendientes de calificar"""
         return self.submissions.filter(status='submitted').count()
+    
+    def get_target_students_count(self):
+        """Obtener número de estudiantes objetivo"""
+        if self.group:
+            return self.group.get_students_count()
+        if self.course:
+            return self.course.get_students_count()
+        return 0
 
 
 class Submission(models.Model):
-    """Entrega de un estudiante para una actividad"""
+    """
+    MÓDULO 5: Entrega de un estudiante para una actividad
+    
+    - Estudiante entrega desde el botón en el IDE
+    - Tutor revisa entregas desde templates
+    - Admin supervisa desde Django Admin
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     activity = models.ForeignKey(Activity, on_delete=models.CASCADE, related_name='submissions', verbose_name="Actividad")
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='submissions', verbose_name="Estudiante")
     
     STATUS_CHOICES = [
         ('pending', 'Pendiente'),
+        ('in_progress', 'En Progreso'),
         ('submitted', 'Entregada'),
         ('graded', 'Calificada'),
+        ('returned', 'Devuelta'),
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Estado")
     
     attempt = models.IntegerField(default=1, verbose_name="Intento")
+    
+    # Contenido de la entrega
     artifact_ref = models.JSONField(default=dict, blank=True, verbose_name="Referencia al Artefacto")
-    # artifact_ref puede contener: {"project_id": 123, "xml_content": "...", "arduino_code": "..."}
+    # artifact_ref contiene: {"project_id": 123, "xml_content": "...", "arduino_code": "..."}
+    
+    xml_content = models.TextField(blank=True, verbose_name="Contenido XML (Blockly)")
+    arduino_code = models.TextField(blank=True, verbose_name="Código Arduino")
+    notes = models.TextField(blank=True, verbose_name="Notas del Estudiante")
+    
+    # Calificación
+    score = models.DecimalField(
+        max_digits=5, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        verbose_name="Calificación"
+    )
+    
+    # Flags
+    is_late = models.BooleanField(default=False, verbose_name="Entrega Tardía")
+    is_read_only = models.BooleanField(default=False, verbose_name="Solo Lectura")
     
     submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Entrega")
+    graded_at = models.DateTimeField(null=True, blank=True, verbose_name="Fecha de Calificación")
+    graded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='submissions_graded',
+        verbose_name="Calificado por"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -850,19 +990,52 @@ class Submission(models.Model):
         """Obtener institución de la actividad"""
         return self.activity.institution
     
+    @property
+    def student_name(self):
+        """Obtener nombre del estudiante"""
+        return self.student.get_full_name() or self.student.username
+    
+    def submit(self, xml_content='', arduino_code='', notes=''):
+        """Marcar como entregada"""
+        self.xml_content = xml_content
+        self.arduino_code = arduino_code
+        self.notes = notes
+        self.status = 'submitted'
+        self.submitted_at = timezone.now()
+        self.is_late = self.activity.is_deadline_passed()
+        self.is_read_only = True  # Una vez entregado, se vuelve read-only
+        self.save()
+    
     def can_resubmit(self):
         """Verificar si puede re-entregar"""
         if not self.activity.allow_resubmit:
             return False
         if self.activity.is_closed():
             return False
-        if self.activity.is_deadline_passed():
+        if self.activity.is_deadline_passed() and not self.activity.allow_late_submit:
             return False
         return True
     
     def get_latest_feedback(self):
         """Obtener el feedback más reciente"""
         return self.feedbacks.order_by('-created_at').first()
+    
+    def grade(self, score, graded_by, feedback_comments=''):
+        """Calificar la entrega"""
+        self.score = score
+        self.status = 'graded'
+        self.graded_at = timezone.now()
+        self.graded_by = graded_by
+        self.save()
+        
+        # Crear feedback si hay comentarios
+        if feedback_comments:
+            Feedback.objects.create(
+                submission=self,
+                tutor=graded_by,
+                score=score,
+                comments=feedback_comments
+            )
 
 
 class Rubric(models.Model):

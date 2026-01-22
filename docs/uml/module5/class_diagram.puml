@@ -1,39 +1,165 @@
 @startuml
-!theme cerulean
-title Módulo 5: Diagrama de Clases - Agent Local Institucional
+title Modulo 5: Diagrama de Clases - Actividades y Entregas
 
-skinparam classAttributeIconSize 0
+package "Modelos Base" {
+    class User
+    class StudentGroup
+    class Student
+    class Course
+}
 
-package "editor.models" <<Database>> {
-    
-    class Institution {
+package "Modulo 5: Actividades y Entregas" {
+    class Activity {
         +id: UUID
-        +name: str
-        +slug: str
-    }
-    
-    class AgentInstance {
-        +id: UUID
-        +institution: FK(Institution)
-        +hostname: str
-        +os: str
-        +agent_version: str
-        +ide_version_compatible: str
-        +status: enum(online, offline, error)
-        +last_seen: datetime
-        +meta: JSON
+        +group: FK(StudentGroup)
+        +course: FK(Course)
+        +created_by: FK(User)
+        --
+        **Info**
+        +title: str
+        +objective: str
+        +instructions: str
+        +deadline: datetime
+        --
+        **Config**
+        +status: str [draft, published, closed]
+        +allow_resubmit: bool
+        +allow_late_submit: bool
+        +max_score: decimal
+        --
+        **Fechas**
+        +published_at: datetime
         +created_at: datetime
         +updated_at: datetime
         --
-        +is_online(): bool
-        +update_heartbeat(): void
-        +mark_offline(): void
-        +mark_error(): void
-        +get_info(): dict
+        +institution: property
+        +tutor: property
+        +is_published(): bool
+        +is_closed(): bool
+        +is_deadline_passed(): bool
+        +can_submit(user): tuple
+        +get_submissions_count(): int
+        +get_target_students_count(): int
+    }
+    
+    class Submission {
+        +id: UUID
+        +activity: FK(Activity)
+        +student: FK(User)
+        --
+        **Estado**
+        +status: str [pending, in_progress, submitted, graded, returned]
+        +attempt: int
+        +is_late: bool
+        +is_read_only: bool
+        --
+        **Contenido**
+        +xml_content: text
+        +arduino_code: text
+        +notes: text
+        --
+        **Calificacion**
+        +score: decimal
+        +graded_at: datetime
+        +graded_by: FK(User)
+        --
+        **Fechas**
+        +submitted_at: datetime
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +institution: property
+        +student_name: property
+        +submit(xml, code, notes)
+        +can_resubmit(): bool
+        +grade(score, graded_by, comments)
+        +get_latest_feedback(): Feedback
+    }
+    
+    class Feedback {
+        +submission: FK(Submission)
+        +tutor: FK(User)
+        +score: decimal
+        +comments: text
+    }
+}
+
+package "Vistas" {
+    class "activity_group_views.py" <<module>> {
+        **Tutor**
+        +tutor_group_activities_list()
+        +tutor_group_activity_create()
+        +tutor_group_activity_edit()
+        +tutor_activity_submissions()
+        +tutor_submission_detail()
+        +tutor_submission_grade()
+        --
+        **Estudiante**
+        +student_group_activities()
+        +student_activity_detail()
+        +student_activity_ide()
+        --
+        **APIs**
+        +api_submit_activity()
+        +api_save_activity_progress()
+    }
+}
+
+package "Django Admin" {
+    class ActivityAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +actions: list
+        --
+        +publish_activities()
+        +close_activities()
+        +draft_activities()
+    }
+    
+    class SubmissionAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +actions: list
+        --
+        +mark_as_graded()
+        +mark_as_submitted()
+        +reset_to_in_progress()
     }
 }
 
 ' Relaciones
-Institution ||--o{ AgentInstance : "tiene"
+Activity "*" -- "0..1" StudentGroup : group
+Activity "*" -- "0..1" Course : course
+Activity "*" -- "1" User : created_by
+Submission "*" -- "1" Activity
+Submission "*" -- "1" User : student
+Submission "*" -- "0..1" User : graded_by
+Feedback "*" -- "1" Submission
+Feedback "*" -- "1" User : tutor
 
+"activity_group_views.py" --> Activity
+"activity_group_views.py" --> Submission
+ActivityAdmin --> Activity
+SubmissionAdmin --> Submission
+
+note bottom of Activity
+  **Actividad puede ser para:**
+  - Un grupo especifico (group FK)
+  - Un curso completo (course FK)
+  
+  can_submit() verifica:
+  1. Publicada
+  2. No cerrada
+  3. Deadline (si allow_late_submit)
+  4. Pertenece al grupo/curso
+  5. No re-entrega si no permitida
+end note
+
+note right of Submission
+  **Flujo de entrega:**
+  1. Estudiante abre IDE -> crea Submission (in_progress)
+  2. Autosave guarda xml_content
+  3. Boton Entregar -> submit() -> status=submitted, is_read_only=True
+  4. Tutor califica -> grade() -> status=graded
+end note
 @enduml

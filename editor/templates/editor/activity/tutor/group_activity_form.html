@@ -1,0 +1,170 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{% if edit_mode %}Editar{% else %}Nueva{% endif %} Actividad{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-clipboard-list"></i>
+            {% if edit_mode %}Editar Actividad{% else %}Nueva Actividad{% endif %}
+        </h1>
+        <p class="page-subtitle">{{ group.name }} - {{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <div class="card animate-in">
+        <div class="card-body">
+            <form method="post" class="form-grid">
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4><i class="fas fa-info-circle"></i> Información General</h4>
+                    
+                    <div class="form-group">
+                        <label for="title">Título *</label>
+                        <input type="text" id="title" name="title" required
+                               value="{% if activity %}{{ activity.title }}{% endif %}"
+                               placeholder="Ej: Proyecto LED con Arduino">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objective">Objetivo</label>
+                        <textarea id="objective" name="objective" rows="2"
+                                  placeholder="Objetivo de aprendizaje...">{% if activity %}{{ activity.objective }}{% endif %}</textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="instructions">Instrucciones *</label>
+                        <textarea id="instructions" name="instructions" rows="5" required
+                                  placeholder="Instrucciones detalladas para los estudiantes...">{% if activity %}{{ activity.instructions }}{% endif %}</textarea>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4><i class="fas fa-cog"></i> Configuración</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deadline">Fecha Límite</label>
+                            <input type="datetime-local" id="deadline" name="deadline"
+                                   value="{% if activity.deadline %}{{ activity.deadline|date:'Y-m-d' }}T{{ activity.deadline|time:'H:i' }}{% endif %}">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="max_score">Puntuación Máxima</label>
+                            <input type="number" id="max_score" name="max_score" min="1" max="1000"
+                                   value="{% if activity %}{{ activity.max_score }}{% else %}100{% endif %}">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="status">Estado</label>
+                            <select id="status" name="status">
+                                <option value="draft" {% if activity.status == 'draft' %}selected{% endif %}>Borrador</option>
+                                <option value="published" {% if activity.status == 'published' %}selected{% endif %}>Publicada</option>
+                                <option value="closed" {% if activity.status == 'closed' %}selected{% endif %}>Cerrada</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="allow_resubmit" name="allow_resubmit"
+                                   {% if activity.allow_resubmit %}checked{% endif %}>
+                            <label for="allow_resubmit">Permitir re-entrega</label>
+                        </div>
+                        
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="allow_late_submit" name="allow_late_submit"
+                                   {% if activity.allow_late_submit %}checked{% endif %}>
+                            <label for="allow_late_submit">Permitir entrega tardía</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'editor:tutor_group_activities_list' institution_slug=institution.slug group_id=group.id %}" class="btn btn-ghost">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        {% if edit_mode %}Guardar Cambios{% else %}Crear Actividad{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .form-section {
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--color-border);
+    }
+    .form-section h4 {
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-section h4 i {
+        color: var(--color-primary);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+    .form-group label {
+        font-weight: 500;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+        font-size: 14px;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-glow);
+    }
+    .checkbox-group {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding-top: 20px;
+    }
+</style>
+{% endblock %}

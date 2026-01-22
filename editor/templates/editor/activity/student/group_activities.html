@@ -1,0 +1,177 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mis Actividades{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-tasks"></i>
+            Mis Actividades
+        </h1>
+        <p class="page-subtitle">{% if group %}{{ group.name }} - {% endif %}{{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    {% if not group %}
+    <div class="alert alert-warning animate-in">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>No estás asignado a ningún grupo. Contacta a tu tutor.</span>
+    </div>
+    {% elif not activities_with_submissions %}
+    <div class="card animate-in">
+        <div class="card-body">
+            <div class="empty-state">
+                <i class="fas fa-clipboard-check"></i>
+                <h3>No hay actividades</h3>
+                <p>Tu tutor aún no ha publicado actividades para tu grupo.</p>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="activities-grid">
+        {% for item in activities_with_submissions %}
+        {% with activity=item.activity submission=item.submission can_submit=item.can_submit %}
+        <div class="card animate-in activity-card" style="animation-delay: {{ forloop.counter0|divisibleby:10 }}s;">
+            <div class="card-header">
+                <h3 class="card-title">{{ activity.title }}</h3>
+                {% if submission %}
+                <span class="badge {% if submission.status == 'submitted' %}badge-info{% elif submission.status == 'graded' %}badge-success{% elif submission.status == 'in_progress' %}badge-warning{% else %}badge-secondary{% endif %}">
+                    {{ submission.get_status_display }}
+                </span>
+                {% else %}
+                <span class="badge badge-danger">Sin Entregar</span>
+                {% endif %}
+            </div>
+            
+            <div class="card-body">
+                {% if activity.objective %}
+                <p class="activity-objective">{{ activity.objective|truncatewords:15 }}</p>
+                {% endif %}
+                
+                <div class="activity-meta">
+                    {% if activity.deadline %}
+                    <div class="meta-item {% if activity.is_deadline_passed %}text-danger{% endif %}">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Límite: {{ activity.deadline|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    {% if activity.is_deadline_passed %}
+                    <div class="meta-item text-danger">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>Fecha límite pasada</span>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                    
+                    <div class="meta-item">
+                        <i class="fas fa-star"></i>
+                        <span>Máximo: {{ activity.max_score }} puntos</span>
+                    </div>
+                    
+                    {% if submission and submission.score is not None %}
+                    <div class="meta-item score-display">
+                        <i class="fas fa-trophy"></i>
+                        <span><strong>{{ submission.score }}/{{ activity.max_score }}</strong></span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card-footer">
+                {% if can_submit %}
+                <a href="{% url 'editor:student_activity_ide_view' institution_slug=institution.slug activity_id=activity.id %}" 
+                   class="btn btn-sm btn-primary">
+                    <i class="fas fa-code"></i> Abrir IDE
+                </a>
+                {% elif submission.is_read_only %}
+                <a href="{% url 'editor:student_activity_ide_view' institution_slug=institution.slug activity_id=activity.id %}" 
+                   class="btn btn-sm btn-secondary">
+                    <i class="fas fa-eye"></i> Ver Entrega
+                </a>
+                {% endif %}
+                
+                <a href="{% url 'editor:student_activity_detail_view' institution_slug=institution.slug activity_id=activity.id %}" 
+                   class="btn btn-sm btn-ghost">
+                    <i class="fas fa-info-circle"></i> Detalles
+                </a>
+            </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .alert-warning {
+        background: rgba(227, 179, 65, 0.1);
+        border: 1px solid rgba(227, 179, 65, 0.3);
+        color: #e3b341;
+        padding: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .activities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    .activity-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .activity-card .card-title {
+        font-size: 16px;
+        margin: 0;
+    }
+    .activity-objective {
+        color: var(--color-text-muted);
+        font-size: 14px;
+        margin: 0 0 16px 0;
+    }
+    .activity-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+    .meta-item i {
+        width: 16px;
+    }
+    .score-display {
+        color: var(--color-success);
+        font-size: 14px;
+    }
+    .card-footer {
+        padding: 12px 16px;
+        border-top: 1px solid var(--color-border);
+        display: flex;
+        gap: 8px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .text-danger {
+        color: #f85149 !important;
+    }
+</style>
+{% endblock %}

@@ -612,24 +612,49 @@ class ProjectAdmin(admin.ModelAdmin):
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
 
+# ============================================
+# MÓDULO 5: ACTIVIDADES Y ENTREGAS (Admin Supervisión)
+# ============================================
+
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):
-    list_display = ['title', 'course', 'status', 'deadline', 'allow_resubmit', 'published_at', 'created_at']
-    list_filter = ['status', 'allow_resubmit', 'deadline', 'created_at', 'course__institution']
-    search_fields = ['title', 'objective', 'instructions', 'course__name']
-    readonly_fields = ['created_at', 'updated_at', 'published_at', 'get_submissions_count', 'get_pending_submissions_count']
-    raw_id_fields = ['course']
+    """
+    MÓDULO 5: Admin de Actividades
+    
+    Admin supervisa actividades desde aquí.
+    Tutor gestiona desde la plataforma (templates).
+    """
+    list_display = [
+        'title', 'get_target', 'get_tutor', 'status', 'deadline', 
+        'max_score', 'allow_resubmit', 'get_submissions_count', 'created_at'
+    ]
+    list_filter = [
+        'status', 'allow_resubmit', 'allow_late_submit', 
+        'group__institution', 'course__institution', 'created_at'
+    ]
+    search_fields = ['title', 'objective', 'instructions', 'group__name', 'course__name']
+    readonly_fields = [
+        'created_at', 'updated_at', 'published_at', 
+        'get_submissions_count', 'get_pending_submissions_count', 'get_target_students_count'
+    ]
+    raw_id_fields = ['course', 'group', 'created_by']
     date_hierarchy = 'deadline'
+    ordering = ['-created_at']
+    list_per_page = 25
     
     fieldsets = (
+        ('Asignación', {
+            'fields': ('group', 'course', 'created_by'),
+            'description': 'La actividad puede ser para un grupo O para un curso'
+        }),
         ('Información General', {
-            'fields': ('course', 'title', 'objective', 'instructions')
+            'fields': ('title', 'objective', 'instructions')
         }),
         ('Configuración', {
-            'fields': ('deadline', 'status', 'allow_resubmit')
+            'fields': ('deadline', 'max_score', 'status', 'allow_resubmit', 'allow_late_submit')
         }),
         ('Estadísticas', {
-            'fields': ('get_submissions_count', 'get_pending_submissions_count'),
+            'fields': ('get_target_students_count', 'get_submissions_count', 'get_pending_submissions_count'),
             'classes': ('collapse',)
         }),
         ('Fechas', {
@@ -638,6 +663,21 @@ class ActivityAdmin(admin.ModelAdmin):
         }),
     )
     
+    def get_target(self, obj):
+        if obj.group:
+            return f"Grupo: {obj.group.name}"
+        if obj.course:
+            return f"Curso: {obj.course.name}"
+        return "-"
+    get_target.short_description = 'Destino'
+    
+    def get_tutor(self, obj):
+        tutor = obj.tutor
+        if tutor:
+            return tutor.get_full_name() or tutor.username
+        return "-"
+    get_tutor.short_description = 'Tutor'
+    
     def get_submissions_count(self, obj):
         return obj.get_submissions_count()
     get_submissions_count.short_description = 'Entregas'
@@ -645,20 +685,103 @@ class ActivityAdmin(admin.ModelAdmin):
     def get_pending_submissions_count(self, obj):
         return obj.get_pending_submissions_count()
     get_pending_submissions_count.short_description = 'Pendientes'
+    
+    def get_target_students_count(self, obj):
+        return obj.get_target_students_count()
+    get_target_students_count.short_description = 'Estudiantes'
+    
+    actions = ['publish_activities', 'close_activities', 'draft_activities']
+    
+    @admin.action(description='Publicar actividades seleccionadas')
+    def publish_activities(self, request, queryset):
+        from django.utils import timezone
+        queryset.filter(status='draft').update(status='published', published_at=timezone.now())
+        self.message_user(request, f'{queryset.count()} actividad(es) publicada(s).')
+    
+    @admin.action(description='Cerrar actividades seleccionadas')
+    def close_activities(self, request, queryset):
+        queryset.update(status='closed')
+        self.message_user(request, f'{queryset.count()} actividad(es) cerrada(s).')
+    
+    @admin.action(description='Pasar a borrador actividades seleccionadas')
+    def draft_activities(self, request, queryset):
+        queryset.update(status='draft')
+        self.message_user(request, f'{queryset.count()} actividad(es) pasada(s) a borrador.')
 
 
 @admin.register(Submission)
 class SubmissionAdmin(admin.ModelAdmin):
-    list_display = ['student', 'activity', 'attempt', 'status', 'submitted_at', 'get_institution']
-    list_filter = ['status', 'submitted_at', 'created_at', 'activity__course__institution']
-    search_fields = ['student__username', 'student__email', 'activity__title']
-    readonly_fields = ['created_at', 'updated_at', 'submitted_at']
-    raw_id_fields = ['activity', 'student']
+    """
+    MÓDULO 5: Admin de Entregas
+    
+    Admin supervisa entregas desde aquí.
+    Tutor califica desde la plataforma (templates).
+    """
+    list_display = [
+        'get_student_name', 'activity', 'attempt', 'status', 
+        'score', 'is_late', 'submitted_at', 'graded_at', 'get_institution'
+    ]
+    list_filter = [
+        'status', 'is_late', 'submitted_at', 'graded_at',
+        'activity__group__institution', 'activity__course__institution'
+    ]
+    search_fields = [
+        'student__username', 'student__email', 'student__first_name', 'student__last_name',
+        'activity__title', 'activity__group__name'
+    ]
+    readonly_fields = [
+        'created_at', 'updated_at', 'submitted_at', 'graded_at', 'is_late', 'is_read_only'
+    ]
+    raw_id_fields = ['activity', 'student', 'graded_by']
     date_hierarchy = 'submitted_at'
+    ordering = ['-submitted_at', '-created_at']
+    list_per_page = 25
+    
+    fieldsets = (
+        ('Información', {
+            'fields': ('activity', 'student', 'attempt')
+        }),
+        ('Estado', {
+            'fields': ('status', 'is_late', 'is_read_only')
+        }),
+        ('Contenido', {
+            'fields': ('xml_content', 'arduino_code', 'notes'),
+            'classes': ('collapse',)
+        }),
+        ('Calificación', {
+            'fields': ('score', 'graded_by', 'graded_at')
+        }),
+        ('Fechas', {
+            'fields': ('submitted_at', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_student_name(self, obj):
+        return obj.student_name
+    get_student_name.short_description = 'Estudiante'
+    get_student_name.admin_order_field = 'student__last_name'
     
     def get_institution(self, obj):
         return obj.institution.name if obj.institution else "-"
     get_institution.short_description = 'Institución'
+    
+    actions = ['mark_as_graded', 'mark_as_submitted', 'reset_to_in_progress']
+    
+    @admin.action(description='Marcar como calificadas')
+    def mark_as_graded(self, request, queryset):
+        queryset.update(status='graded')
+        self.message_user(request, f'{queryset.count()} entrega(s) marcada(s) como calificada(s).')
+    
+    @admin.action(description='Marcar como entregadas')
+    def mark_as_submitted(self, request, queryset):
+        queryset.update(status='submitted')
+        self.message_user(request, f'{queryset.count()} entrega(s) marcada(s) como entregada(s).')
+    
+    @admin.action(description='Resetear a en progreso')
+    def reset_to_in_progress(self, request, queryset):
+        queryset.update(status='in_progress', is_read_only=False)
+        self.message_user(request, f'{queryset.count()} entrega(s) reseteada(s).')
 
 
 @admin.register(Rubric)

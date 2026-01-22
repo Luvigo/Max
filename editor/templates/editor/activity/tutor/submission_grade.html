@@ -1,84 +1,189 @@
 {% extends 'base_dashboard.html' %}
 {% load static %}
 
-{% block title %}Calificar Entrega - {{ submission.student.username }}{% endblock %}
+{% block title %}Calificar - {{ submission.student_name }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1><i class="fas fa-check-circle"></i> Calificar Entrega</h1>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'tutor_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}">{{ activity.title }}</a></li>
-                <li class="breadcrumb-item active">Calificar</li>
-            </ol>
-        </nav>
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-star"></i>
+            Calificar Entrega
+        </h1>
+        <p class="page-subtitle">{{ activity.title }} - {{ submission.student_name }}</p>
     </div>
 </div>
 
-{% include 'partials/alerts.html' %}
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
+<div class="content-body">
+    <div class="grid-2">
+        <!-- Formulario de Calificación -->
+        <div class="card animate-in">
             <div class="card-header">
-                <h3>Calificar Entrega</h3>
+                <h3 class="card-title">Calificación</h3>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <strong>Estudiante:</strong> {{ submission.student.get_full_name|default:submission.student.username }}
-                    <br><strong>Email:</strong> {{ submission.student.email }}
-                    <br><strong>Intento:</strong> {{ submission.attempt }}
-                    <br><strong>Fecha de Entrega:</strong> {{ submission.submitted_at|date:"d/m/Y H:i" }}
-                </div>
-                
                 <form method="post">
                     {% csrf_token %}
                     
                     <div class="form-group">
-                        <label for="{{ form.score.id_for_label }}">{{ form.score.label }}</label>
-                        {{ form.score }}
-                        {% if form.score.errors %}
-                        <div class="text-danger">{{ form.score.errors }}</div>
-                        {% endif %}
-                        {% if rubric %}
-                        <small class="form-text text-muted">Puntaje máximo: {{ rubric.get_total_max_score }}</small>
-                        {% endif %}
+                        <label for="score">Puntuación (máximo: {{ activity.max_score }})</label>
+                        <input type="number" id="score" name="score" 
+                               min="0" max="{{ activity.max_score }}" step="0.5"
+                               value="{{ submission.score|default:'' }}" required>
                     </div>
                     
                     <div class="form-group">
-                        <label for="{{ form.comments.id_for_label }}">{{ form.comments.label }}</label>
-                        {{ form.comments }}
-                        {% if form.comments.errors %}
-                        <div class="text-danger">{{ form.comments.errors }}</div>
-                        {% endif %}
+                        <label for="comments">Comentarios / Feedback</label>
+                        <textarea id="comments" name="comments" rows="6"
+                                  placeholder="Escribe tu feedback para el estudiante..."></textarea>
                     </div>
                     
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Guardar Calificación
-                        </button>
-                        <a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-secondary">
+                        <a href="{% url 'editor:tutor_submission_detail' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-ghost">
                             Cancelar
                         </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-check"></i> Guardar Calificación
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card">
+        
+        <!-- Vista Previa del Código -->
+        <div class="card animate-in" style="animation-delay: 0.1s;">
             <div class="card-header">
-                <h3>Actividad</h3>
+                <h3 class="card-title">
+                    <i class="fas fa-code"></i> Código del Estudiante
+                </h3>
             </div>
             <div class="card-body">
-                <p><strong>{{ activity.title }}</strong></p>
-                <p>{{ activity.objective|truncatewords:20 }}</p>
+                {% if submission.arduino_code %}
+                <pre class="code-block">{{ submission.arduino_code }}</pre>
+                {% else %}
+                <p class="text-muted">No hay código disponible.</p>
+                {% endif %}
             </div>
         </div>
     </div>
+    
+    <!-- Info de la Entrega -->
+    <div class="card animate-in" style="animation-delay: 0.2s; margin-top: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">Información de la Entrega</h3>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Estudiante</span>
+                    <span class="info-value">{{ submission.student_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email</span>
+                    <span class="info-value">{{ submission.student.email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Intento</span>
+                    <span class="info-value">#{{ submission.attempt }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Fecha de Entrega</span>
+                    <span class="info-value">{{ submission.submitted_at|date:"d/m/Y H:i"|default:"-" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Entrega Tardía</span>
+                    <span class="info-value">{% if submission.is_late %}<span class="badge badge-warning">Sí</span>{% else %}No{% endif %}</span>
+                </div>
+            </div>
+            
+            {% if submission.notes %}
+            <div class="notes-section">
+                <h4>Notas del Estudiante</h4>
+                <p>{{ submission.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+<style>
+    .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 900px) {
+        .grid-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+    }
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-tertiary);
+        color: var(--color-text);
+        font-size: 14px;
+    }
+    .form-group input:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-glow);
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+    .code-block {
+        background: var(--color-bg-tertiary);
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        max-height: 400px;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .info-label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+    }
+    .info-value {
+        font-size: 15px;
+        font-weight: 500;
+    }
+    .notes-section {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--color-border);
+    }
+    .notes-section h4 {
+        font-size: 14px;
+        color: var(--color-text-muted);
+        margin: 0 0 8px 0;
+    }
+</style>
 {% endblock %}

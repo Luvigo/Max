@@ -4,94 +4,174 @@
 {% block title %}Entregas - {{ activity.title }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1><i class="fas fa-inbox"></i> Entregas - {{ activity.title }}</h1>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'tutor_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
-                <li class="breadcrumb-item active">{{ activity.title }}</li>
-            </ol>
-        </nav>
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-inbox"></i>
+            Entregas
+        </h1>
+        <p class="page-subtitle">{{ activity.title }} - {{ group.name }}</p>
     </div>
 </div>
 
-{% include 'partials/alerts.html' %}
-
-<div class="card">
-    <div class="card-header">
-        <h3>Entregas de {{ activity.title }}</h3>
+<div class="content-body">
+    <!-- Estadísticas -->
+    <div class="stats-grid" style="margin-bottom: 20px;">
+        <div class="stat-card animate-in">
+            <div class="stat-icon" style="background: var(--color-info-glow);">
+                <i class="fas fa-users" style="color: var(--color-info);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.total }}</div>
+                <div class="stat-label">Estudiantes</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.1s;">
+            <div class="stat-icon" style="background: var(--color-success-glow);">
+                <i class="fas fa-check-circle" style="color: var(--color-success);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.submitted }}</div>
+                <div class="stat-label">Entregadas</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.2s;">
+            <div class="stat-icon" style="background: var(--color-warning-glow);">
+                <i class="fas fa-clock" style="color: var(--color-warning);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.pending }}</div>
+                <div class="stat-label">Por Calificar</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.3s;">
+            <div class="stat-icon" style="background: var(--color-primary-glow);">
+                <i class="fas fa-star" style="color: var(--color-primary);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.graded }}</div>
+                <div class="stat-label">Calificadas</div>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        {% if submissions %}
-        <div class="table-responsive">
-            <table class="table table-hover">
+    
+    <!-- Filtros -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <form method="get" class="filters-form">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Estado</label>
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            <option value="submitted" {% if status_filter == 'submitted' %}selected{% endif %}>Entregada</option>
+                            <option value="graded" {% if status_filter == 'graded' %}selected{% endif %}>Calificada</option>
+                            <option value="in_progress" {% if status_filter == 'in_progress' %}selected{% endif %}>En Progreso</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Entregas -->
+    <div class="card animate-in">
+        <div class="card-body" style="padding: 0;">
+            {% if submissions %}
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th>Estudiante</th>
                         <th>Intento</th>
-                        <th>Fecha de Entrega</th>
                         <th>Estado</th>
-                        <th>Puntaje</th>
+                        <th>Fecha Entrega</th>
+                        <th>Calificación</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for submission in submissions %}
-                    {% with feedback=submission.get_latest_feedback %}
                     <tr>
                         <td>
                             <strong>{{ submission.student.get_full_name|default:submission.student.username }}</strong>
-                            <br><small class="text-muted">{{ submission.student.email }}</small>
+                            {% if submission.is_late %}
+                            <span class="badge badge-warning" title="Entrega tardía">Tardía</span>
+                            {% endif %}
                         </td>
-                        <td><span class="badge badge-info">{{ submission.attempt }}</span></td>
-                        <td>{{ submission.submitted_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ submission.attempt }}</td>
                         <td>
+                            <span class="badge {% if submission.status == 'submitted' %}badge-info{% elif submission.status == 'graded' %}badge-success{% elif submission.status == 'in_progress' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                {{ submission.get_status_display }}
+                            </span>
+                        </td>
+                        <td>{{ submission.submitted_at|date:"d/m/Y H:i"|default:"-" }}</td>
+                        <td>
+                            {% if submission.score is not None %}
+                            <strong>{{ submission.score }}/{{ activity.max_score }}</strong>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:tutor_submission_detail' institution_slug=institution.slug submission_id=submission.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
                             {% if submission.status == 'submitted' %}
-                            <span class="badge badge-warning">Pendiente</span>
-                            {% elif submission.status == 'graded' %}
-                            <span class="badge badge-success">Calificada</span>
-                            {% else %}
-                            <span class="badge badge-secondary">{{ submission.get_status_display }}</span>
+                            <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" 
+                               class="btn btn-sm btn-primary" title="Calificar">
+                                <i class="fas fa-star"></i>
+                            </a>
                             {% endif %}
-                        </td>
-                        <td>
-                            {% if feedback and feedback.score %}
-                            <strong>{{ feedback.score }}</strong>
-                            {% if feedback.get_percentage_score %}
-                            <br><small class="text-muted">({{ feedback.get_percentage_score|floatformat:1 }}%)</small>
-                            {% endif %}
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <a href="{% url 'editor:tutor_submission_ide_readonly' institution_slug=institution.slug submission_id=submission.id %}" 
-                                   class="btn btn-sm btn-info" title="Ver código">
-                                    <i class="fas fa-code"></i> Ver IDE
-                                </a>
-                                <a href="{% url 'editor:tutor_submission_grade' institution_slug=institution.slug submission_id=submission.id %}" 
-                                   class="btn btn-sm btn-primary">
-                                    <i class="fas fa-check"></i> Calificar
-                                </a>
-                            </div>
                         </td>
                     </tr>
-                    {% endwith %}
                     {% endfor %}
                 </tbody>
             </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h3>No hay entregas</h3>
+                <p>Aún no hay entregas para esta actividad.</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <i class="fas fa-inbox fa-3x text-muted"></i>
-            <h3>No hay entregas</h3>
-            <p class="text-muted">Aún no hay estudiantes que hayan entregado esta actividad.</p>
-        </div>
-        {% endif %}
     </div>
 </div>
+
+<style>
+    .filters-form .filter-row {
+        display: flex;
+        gap: 16px;
+    }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-item label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .filter-item select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
 {% endblock %}

@@ -155,6 +155,11 @@
                 <span>Mi Información</span>
             </a>
             
+            <a href="/i/{{ institution.slug }}/student/activities/" class="nav-item {% if 'activities' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-tasks"></i>
+                <span>Mis Actividades</span>
+            </a>
+            
             <a href="/i/{{ institution.slug }}/student/courses/" class="nav-item">
                 <i class="fas fa-book"></i>
                 <span>Mis Cursos</span>

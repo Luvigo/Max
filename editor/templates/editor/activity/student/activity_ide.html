@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ activity.title }} - MAX-IDE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <style>
+        :root {
+            --color-bg: #0d1117;
+            --color-bg-secondary: #161b22;
+            --color-bg-tertiary: #21262d;
+            --color-text: #c9d1d9;
+            --color-text-muted: #8b949e;
+            --color-border: #30363d;
+            --color-primary: #58a6ff;
+            --color-success: #2ea043;
+            --color-warning: #e3b341;
+            --color-danger: #f85149;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg);
+            color: var(--color-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .ide-header {
+            background: var(--color-bg-secondary);
+            border-bottom: 1px solid var(--color-border);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .activity-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .activity-info h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .activity-info .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-success { background: rgba(46, 160, 67, 0.2); color: #2ea043; }
+        .badge-warning { background: rgba(227, 179, 65, 0.2); color: #e3b341; }
+        .badge-danger { background: rgba(248, 81, 73, 0.2); color: #f85149; }
+        .badge-info { background: rgba(88, 166, 255, 0.2); color: #58a6ff; }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+        }
+        .btn-primary:hover { background: #4393e6; }
+        .btn-success {
+            background: var(--color-success);
+            color: white;
+        }
+        .btn-success:hover { background: #238636; }
+        .btn-ghost {
+            background: transparent;
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
+        }
+        .btn-ghost:hover { background: var(--color-bg-tertiary); }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Alert Banner */
+        .alert-banner {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .alert-banner.readonly {
+            background: rgba(227, 179, 65, 0.15);
+            border-bottom: 1px solid rgba(227, 179, 65, 0.3);
+            color: #e3b341;
+        }
+        .alert-banner.deadline {
+            background: rgba(248, 81, 73, 0.15);
+            border-bottom: 1px solid rgba(248, 81, 73, 0.3);
+            color: #f85149;
+        }
+        
+        /* Main Content */
+        .ide-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .blockly-container {
+            flex: 1;
+            position: relative;
+        }
+        #blocklyDiv {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+        .code-panel {
+            width: 400px;
+            background: var(--color-bg-secondary);
+            border-left: 1px solid var(--color-border);
+            display: flex;
+            flex-direction: column;
+        }
+        .code-panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .code-panel-content {
+            flex: 1;
+            overflow: auto;
+        }
+        #arduinoCode {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            border: none;
+            color: var(--color-text);
+            font-family: 'Fira Code', monospace;
+            font-size: 13px;
+            padding: 16px;
+            resize: none;
+        }
+        #arduinoCode:focus { outline: none; }
+        
+        /* Submit Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content {
+            background: var(--color-bg-secondary);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 480px;
+            border: 1px solid var(--color-border);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-header h2 {
+            font-size: 18px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--color-text-muted);
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .modal-body p {
+            color: var(--color-text-muted);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            background: var(--color-bg-tertiary);
+            color: var(--color-text);
+            font-size: 14px;
+            resize: vertical;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        /* Status bar */
+        .status-bar {
+            background: var(--color-bg-secondary);
+            border-top: 1px solid var(--color-border);
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--color-text-muted);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="ide-header">
+        <div class="activity-info">
+            <a href="{% url 'editor:student_group_activities' institution_slug=institution.slug %}" class="btn btn-ghost" style="padding: 6px 10px;">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <h1>{{ activity.title }}</h1>
+            {% if submission %}
+            <span class="badge {% if submission.status == 'submitted' %}badge-info{% elif submission.status == 'graded' %}badge-success{% else %}badge-warning{% endif %}">
+                {{ submission.get_status_display }}
+            </span>
+            {% endif %}
+            {% if submission.is_late %}
+            <span class="badge badge-warning">Tardía</span>
+            {% endif %}
+        </div>
+        
+        <div class="header-actions">
+            <button id="btnSave" class="btn btn-ghost" {% if is_read_only %}disabled{% endif %}>
+                <i class="fas fa-save"></i> Guardar
+            </button>
+            
+            {% if can_submit %}
+            <button id="btnSubmit" class="btn btn-success">
+                <i class="fas fa-paper-plane"></i> Entregar
+            </button>
+            {% else %}
+            <button class="btn btn-ghost" disabled title="{{ submit_reason }}">
+                <i class="fas fa-lock"></i> {{ submit_reason|truncatewords:3 }}
+            </button>
+            {% endif %}
+        </div>
+    </header>
+    
+    <!-- Alert Banner -->
+    {% if is_read_only %}
+    <div class="alert-banner readonly">
+        <i class="fas fa-lock"></i>
+        <span>Modo solo lectura - Ya entregaste esta actividad</span>
+    </div>
+    {% elif activity.is_deadline_passed %}
+    <div class="alert-banner deadline">
+        <i class="fas fa-clock"></i>
+        <span>La fecha límite ha pasado{% if activity.allow_late_submit %} (entrega tardía permitida){% endif %}</span>
+    </div>
+    {% endif %}
+    
+    <!-- Main Content -->
+    <main class="ide-main">
+        <div class="blockly-container">
+            <div id="blocklyDiv"></div>
+        </div>
+        
+        <div class="code-panel">
+            <div class="code-panel-header">
+                <i class="fas fa-code"></i> Código Arduino
+            </div>
+            <div class="code-panel-content">
+                <textarea id="arduinoCode" readonly placeholder="El código se generará aquí..."></textarea>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <span id="saveStatus">Listo</span>
+        <span>{{ activity.title }} | Máx: {{ activity.max_score }} pts</span>
+    </div>
+    
+    <!-- Submit Modal -->
+    <div id="submitModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-paper-plane"></i> Entregar Actividad</h2>
+                <button class="modal-close" onclick="closeSubmitModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas entregar esta actividad?
+                {% if not activity.allow_resubmit %}
+                <br><strong>Nota:</strong> No se permite re-entrega.
+                {% endif %}
+                </p>
+                
+                <div class="form-group">
+                    <label for="submitNotes">Notas (opcional)</label>
+                    <textarea id="submitNotes" rows="3" placeholder="Escribe un comentario para tu tutor..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-ghost" onclick="closeSubmitModal()">Cancelar</button>
+                <button id="btnConfirmSubmit" class="btn btn-success">
+                    <i class="fas fa-check"></i> Confirmar Entrega
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Blockly Toolbox -->
+    <xml id="toolbox" style="display: none">
+        <category name="Lógica" colour="#5b80a5">
+            <block type="controls_if"></block>
+            <block type="logic_compare"></block>
+            <block type="logic_operation"></block>
+            <block type="logic_negate"></block>
+            <block type="logic_boolean"></block>
+        </category>
+        <category name="Bucles" colour="#5ba55b">
+            <block type="controls_repeat_ext"></block>
+            <block type="controls_whileUntil"></block>
+            <block type="controls_for"></block>
+        </category>
+        <category name="Matemáticas" colour="#5b67a5">
+            <block type="math_number"></block>
+            <block type="math_arithmetic"></block>
+            <block type="math_random_int"></block>
+        </category>
+        <category name="Texto" colour="#5ba58c">
+            <block type="text"></block>
+            <block type="text_print"></block>
+        </category>
+        <category name="Variables" colour="#a55b80" custom="VARIABLE"></category>
+        <category name="Funciones" colour="#995ba5" custom="PROCEDURE"></category>
+    </xml>
+    
+    <script src="{% static 'editor/js/arduino_blocks.js' %}?v={{ request.timestamp|default:'1' }}"></script>
+    <script src="{% static 'editor/js/arduino_generator.js' %}?v={{ request.timestamp|default:'1' }}"></script>
+    <script>
+        // Configuración
+        const activityId = "{{ activity.id }}";
+        const institutionSlug = "{{ institution.slug }}";
+        const isReadOnly = {{ is_read_only|yesno:"true,false" }};
+        const canSubmit = {{ can_submit|yesno:"true,false" }};
+        const csrfToken = "{{ csrf_token }}";
+        
+        // URLs de API
+        const saveUrl = `/i/${institutionSlug}/api/activity/${activityId}/save/`;
+        const submitUrl = `/i/${institutionSlug}/api/activity/${activityId}/submit/`;
+        
+        // Inicializar Blockly
+        const workspace = Blockly.inject('blocklyDiv', {
+            toolbox: document.getElementById('toolbox'),
+            grid: { spacing: 20, length: 3, colour: '#30363d', snap: true },
+            zoom: { controls: true, wheel: true, startScale: 1.0, maxScale: 3, minScale: 0.3, scaleSpeed: 1.2 },
+            trashcan: true,
+            readOnly: isReadOnly
+        });
+        
+        // Cargar XML previo si existe
+        const savedXml = `{{ project_xml|escapejs }}`;
+        if (savedXml) {
+            try {
+                const xml = Blockly.utils.xml.textToDom(savedXml);
+                Blockly.Xml.domToWorkspace(xml, workspace);
+            } catch (e) {
+                console.error('Error loading XML:', e);
+            }
+        }
+        
+        // Generar código cuando cambie el workspace
+        function updateCode() {
+            try {
+                const code = Blockly.Arduino ? Blockly.Arduino.workspaceToCode(workspace) : '// Generador no disponible';
+                document.getElementById('arduinoCode').value = code;
+            } catch (e) {
+                document.getElementById('arduinoCode').value = '// Error generando código';
+            }
+        }
+        
+        workspace.addChangeListener(updateCode);
+        updateCode();
+        
+        // Guardar progreso
+        let saveTimeout;
+        async function saveProgress() {
+            if (isReadOnly) return;
+            
+            const xml = Blockly.Xml.workspaceToDom(workspace);
+            const xmlText = Blockly.Xml.domToText(xml);
+            const arduinoCode = document.getElementById('arduinoCode').value;
+            
+            document.getElementById('saveStatus').textContent = 'Guardando...';
+            
+            try {
+                const response = await fetch(saveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        xml_content: xmlText,
+                        arduino_code: arduinoCode
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.ok) {
+                    document.getElementById('saveStatus').textContent = 'Guardado ✓';
+                } else {
+                    document.getElementById('saveStatus').textContent = 'Error al guardar';
+                }
+            } catch (e) {
+                document.getElementById('saveStatus').textContent = 'Error de conexión';
+            }
+        }
+        
+        // Autosave
+        workspace.addChangeListener(() => {
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveProgress, 3000);
+        });
+        
+        // Botón guardar
+        document.getElementById('btnSave').addEventListener('click', saveProgress);
+        
+        // Modal de entrega
+        function openSubmitModal() {
+            document.getElementById('submitModal').classList.add('active');
+        }
+        
+        function closeSubmitModal() {
+            document.getElementById('submitModal').classList.remove('active');
+        }
+        
+        if (canSubmit) {
+            document.getElementById('btnSubmit').addEventListener('click', openSubmitModal);
+        }
+        
+        // Confirmar entrega
+        document.getElementById('btnConfirmSubmit').addEventListener('click', async () => {
+            const xml = Blockly.Xml.workspaceToDom(workspace);
+            const xmlText = Blockly.Xml.domToText(xml);
+            const arduinoCode = document.getElementById('arduinoCode').value;
+            const notes = document.getElementById('submitNotes').value;
+            
+            const btn = document.getElementById('btnConfirmSubmit');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entregando...';
+            
+            try {
+                const response = await fetch(submitUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        xml_content: xmlText,
+                        arduino_code: arduinoCode,
+                        notes: notes
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.ok) {
+                    alert('¡Actividad entregada exitosamente!');
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Entrega';
+                }
+            } catch (e) {
+                alert('Error de conexión');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Entrega';
+            }
+        });
+    </script>
+</body>
+</html>

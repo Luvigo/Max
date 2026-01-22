@@ -11,6 +11,7 @@ from . import error_views
 from . import institution_views
 from . import tutor_views
 from . import group_views
+from . import activity_group_views
 
 app_name = 'editor'
 
@@ -123,7 +124,29 @@ urlpatterns = [
     path('student/courses/', academic_views.student_courses_list, name='student_courses_list'),
     
     # ============================================
-    # MÓDULO 3: Actividades y Entregas (con tenant scoping)
+    # MÓDULO 5: Actividades y Entregas por Grupo
+    # Tutor UI + Estudiante UI; Admin via Django Admin
+    # ============================================
+    
+    # Tutor: Actividades por Grupo
+    path('tutor/groups/<uuid:group_id>/activities/', activity_group_views.tutor_group_activities_list, name='tutor_group_activities_list'),
+    path('tutor/groups/<uuid:group_id>/activities/new/', activity_group_views.tutor_group_activity_create, name='tutor_group_activity_create'),
+    path('tutor/groups/<uuid:group_id>/activities/<uuid:activity_id>/edit/', activity_group_views.tutor_group_activity_edit, name='tutor_group_activity_edit'),
+    path('tutor/activities/<uuid:activity_id>/submissions/', activity_group_views.tutor_activity_submissions, name='tutor_activity_submissions_list'),
+    path('tutor/submissions/<uuid:submission_id>/', activity_group_views.tutor_submission_detail, name='tutor_submission_detail'),
+    path('tutor/submissions/<uuid:submission_id>/grade/', activity_group_views.tutor_submission_grade, name='tutor_submission_grade_form'),
+    
+    # Estudiante: Actividades de su Grupo
+    path('student/activities/', activity_group_views.student_group_activities, name='student_group_activities'),
+    path('student/activities/<uuid:activity_id>/', activity_group_views.student_activity_detail, name='student_activity_detail_view'),
+    path('student/activities/<uuid:activity_id>/ide/', activity_group_views.student_activity_ide, name='student_activity_ide_view'),
+    
+    # APIs de Actividades por Grupo
+    path('api/activity/<uuid:activity_id>/submit/', activity_group_views.api_submit_activity, name='api_submit_activity'),
+    path('api/activity/<uuid:activity_id>/save/', activity_group_views.api_save_activity_progress, name='api_save_activity_progress'),
+    
+    # ============================================
+    # Actividades y Entregas por Curso (legacy)
     # ============================================
     
     # Vistas de Tutor

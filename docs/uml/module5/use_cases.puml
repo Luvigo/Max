@@ -1,43 +1,90 @@
 @startuml
+title Modulo 5: Actividades y Entregas (Tutor/Student UI; Admin via Django Admin)
 left to right direction
 
 actor Admin
-actor Institucion
 actor Tutor
 actor Estudiante
-actor "Agent Local" as Agent
 
-rectangle "Módulo 5 v2: Agent Institucional" {
-
-  usecase "Registrar Agent" as UC_Register
-  usecase "Heartbeat Agent" as UC_Heartbeat
-  usecase "Listar Agents" as UC_List
-  usecase "Ver estado Agent" as UC_Status
-  usecase "Verificar Agent en IDE" as UC_Check
-  usecase "Guía instalación" as UC_Guide
-
-  usecase "ERROR: Agent Offline" as E_Offline
-  usecase "ERROR: Versión incompatible" as E_Version
-  usecase "ERROR: Token inválido" as E_Token
+rectangle "Modulo 5: Actividades y Entregas por Grupo" {
+  ' Tutor Use Cases
+  usecase "Crear actividad para grupo" as UC_CreateAct
+  usecase "Editar actividad" as UC_EditAct
+  usecase "Publicar/Cerrar actividad" as UC_PublishAct
+  usecase "Ver entregas" as UC_ViewSubmissions
+  usecase "Ver detalle de entrega" as UC_ViewSubmission
+  usecase "Calificar entrega" as UC_Grade
+  
+  ' Student Use Cases
+  usecase "Ver actividades de mi grupo" as UC_ViewActs
+  usecase "Ver detalle de actividad" as UC_ViewActDetail
+  usecase "Abrir IDE por actividad" as UC_OpenIDE
+  usecase "Guardar progreso" as UC_SaveProgress
+  usecase "Entregar actividad" as UC_Submit
+  usecase "Ver feedback" as UC_ViewFeedback
+  
+  ' Admin Use Cases
+  usecase "Supervisar actividades\n(Django Admin)" as UC_AdminActs
+  usecase "Supervisar entregas\n(Django Admin)" as UC_AdminSubs
+  
+  ' Errors
+  usecase "ERROR: No pertenece al grupo" as E_NotInGroup
+  usecase "ERROR: Fuera de fecha" as E_Late
+  usecase "ERROR: Re-entrega no permitida" as E_NoResubmit
+  usecase "ERROR: Actividad cerrada" as E_Closed
 }
 
-Agent --> UC_Register
-Agent --> UC_Heartbeat
+' Tutor connections
+Tutor --> UC_CreateAct
+Tutor --> UC_EditAct
+Tutor --> UC_PublishAct
+Tutor --> UC_ViewSubmissions
+Tutor --> UC_ViewSubmission
+Tutor --> UC_Grade
 
-Admin --> UC_List
-Admin --> UC_Status
+' Student connections
+Estudiante --> UC_ViewActs
+Estudiante --> UC_ViewActDetail
+Estudiante --> UC_OpenIDE
+Estudiante --> UC_SaveProgress
+Estudiante --> UC_Submit
+Estudiante --> UC_ViewFeedback
 
-Institucion --> UC_List
-Institucion --> UC_Status
+' Admin connections
+Admin --> UC_AdminActs : "Solo /admin/"
+Admin --> UC_AdminSubs : "Solo /admin/"
 
-Tutor --> UC_Check
-Tutor --> UC_Guide
+' Error extensions
+UC_Submit ..> E_NotInGroup : <<extend>>
+UC_Submit ..> E_Late : <<extend>>
+UC_Submit ..> E_NoResubmit : <<extend>>
+UC_Submit ..> E_Closed : <<extend>>
+UC_OpenIDE ..> E_NotInGroup : <<extend>>
 
-Estudiante --> UC_Check
-Estudiante --> UC_Guide
+note right of Tutor
+  **Rutas del Tutor:**
+  /i/slug/tutor/groups/id/activities/
+  /i/slug/tutor/groups/id/activities/new/
+  /i/slug/tutor/activities/id/submissions/
+  /i/slug/tutor/submissions/id/grade/
+end note
 
-UC_Check ..> E_Offline : <<extend>>
-UC_Check ..> E_Version : <<extend>>
-UC_Register ..> E_Token : <<extend>>
+note right of Estudiante
+  **Rutas del Estudiante:**
+  /i/slug/student/activities/
+  /i/slug/student/activities/id/
+  /i/slug/student/activities/id/ide/
+  
+  **Boton Entregar en IDE:**
+  Crea Submission y pasa a read-only
+end note
 
+note bottom of Admin
+  **Admin supervisa en Django Admin:**
+  /admin/editor/activity/
+  /admin/editor/submission/
+  
+  NO hay templates de admin
+  para actividades/entregas.
+end note
 @enduml

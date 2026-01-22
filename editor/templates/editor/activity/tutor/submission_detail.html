@@ -1,0 +1,154 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Entrega - {{ submission.student_name }}{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-file-alt"></i>
+            Detalle de Entrega
+        </h1>
+        <p class="page-subtitle">{{ activity.title }} - {{ submission.student_name }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-ghost">
+            <i class="fas fa-arrow-left"></i> Volver
+        </a>
+        {% if submission.status == 'submitted' %}
+        <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-primary">
+            <i class="fas fa-star"></i> Calificar
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Info del Estudiante -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-user"></i> Información del Estudiante
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Estudiante</span>
+                    <span class="info-value">{{ submission.student_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email</span>
+                    <span class="info-value">{{ submission.student.email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Intento</span>
+                    <span class="info-value">#{{ submission.attempt }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Estado</span>
+                    <span class="badge {% if submission.status == 'submitted' %}badge-info{% elif submission.status == 'graded' %}badge-success{% else %}badge-secondary{% endif %}">
+                        {{ submission.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Info de la Entrega -->
+    <div class="card animate-in" style="animation-delay: 0.1s; margin-bottom: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-clock"></i> Información de la Entrega
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Fecha de Entrega</span>
+                    <span class="info-value">{{ submission.submitted_at|date:"d/m/Y H:i"|default:"-" }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Entrega Tardía</span>
+                    <span class="info-value">{% if submission.is_late %}<span class="badge badge-warning">Sí</span>{% else %}No{% endif %}</span>
+                </div>
+                {% if submission.score is not None %}
+                <div class="info-item">
+                    <span class="info-label">Calificación</span>
+                    <span class="info-value"><strong>{{ submission.score }}/{{ activity.max_score }}</strong></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Calificado por</span>
+                    <span class="info-value">{{ submission.graded_by.get_full_name|default:submission.graded_by.username }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if submission.notes %}
+            <div class="notes-section">
+                <h4>Notas del Estudiante</h4>
+                <p>{{ submission.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Código Entregado -->
+    <div class="card animate-in" style="animation-delay: 0.2s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-code"></i> Código Entregado
+            </h3>
+        </div>
+        <div class="card-body">
+            {% if submission.arduino_code %}
+            <pre class="code-block">{{ submission.arduino_code }}</pre>
+            {% else %}
+            <p class="text-muted">No hay código disponible.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .info-label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+    }
+    .info-value {
+        font-size: 16px;
+        font-weight: 500;
+    }
+    .notes-section {
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--color-border);
+    }
+    .notes-section h4 {
+        font-size: 14px;
+        color: var(--color-text-muted);
+        margin: 0 0 8px 0;
+    }
+    .code-block {
+        background: var(--color-bg-tertiary);
+        padding: 16px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-family: 'Fira Code', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}

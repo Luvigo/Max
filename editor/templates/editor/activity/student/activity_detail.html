@@ -4,128 +4,271 @@
 {% block title %}{{ activity.title }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <div class="page-header-content">
-        <h1><i class="fas fa-tasks"></i> {{ activity.title }}</h1>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'student_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:student_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a></li>
-                <li class="breadcrumb-item active">{{ activity.title }}</li>
-            </ol>
-        </nav>
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-clipboard-list"></i>
+            {{ activity.title }}
+        </h1>
+        <p class="page-subtitle">{{ student.group.name }} - {{ institution.name }}</p>
     </div>
-</div>
-
-{% include 'partials/alerts.html' %}
-
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3>Detalles de la Actividad</h3>
-            </div>
-            <div class="card-body">
-                {% if activity.objective %}
-                <div class="mb-3">
-                    <h5>Objetivo</h5>
-                    <p>{{ activity.objective|linebreaks }}</p>
-                </div>
-                {% endif %}
-                
-                <div class="mb-3">
-                    <h5>Instrucciones</h5>
-                    <p>{{ activity.instructions|linebreaks }}</p>
-                </div>
-                
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Fecha Límite:</strong>
-                        {% if activity.deadline %}
-                        {{ activity.deadline|date:"d/m/Y H:i" }}
-                        {% if activity.is_deadline_passed %}
-                        <span class="badge badge-danger ml-2">Vencida</span>
-                        {% endif %}
-                        {% else %}
-                        <span class="text-muted">Sin fecha límite</span>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-6">
-                        <strong>Re-entrega:</strong>
-                        {% if activity.allow_resubmit %}
-                        <span class="badge badge-success">Permitida</span>
-                        {% else %}
-                        <span class="badge badge-danger">No permitida</span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        {% if submission %}
-        <div class="card mt-4">
-            <div class="card-header">
-                <h3>Mi Entrega</h3>
-            </div>
-            <div class="card-body">
-                <p><strong>Estado:</strong> 
-                    {% if submission.status == 'submitted' %}
-                    <span class="badge badge-warning">Entregada</span>
-                    {% elif submission.status == 'graded' %}
-                    <span class="badge badge-success">Calificada</span>
-                    {% else %}
-                    <span class="badge badge-secondary">Pendiente</span>
-                    {% endif %}
-                </p>
-                <p><strong>Intento:</strong> {{ submission.attempt }}</p>
-                <p><strong>Fecha de Entrega:</strong> {{ submission.submitted_at|date:"d/m/Y H:i" }}</p>
-                
-                {% if submission.status == 'graded' and feedback %}
-                <div class="mt-3">
-                    <a href="{% url 'editor:student_submission_feedback' institution_slug=institution.slug submission_id=submission.id %}" 
-                       class="btn btn-primary">
-                        <i class="fas fa-comment"></i> Ver Feedback
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+    <div class="page-actions">
+        {% if can_submit %}
+        <a href="{% url 'editor:student_activity_ide_view' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-primary">
+            <i class="fas fa-code"></i> Abrir IDE
+        </a>
+        {% elif submission.is_read_only %}
+        <a href="{% url 'editor:student_activity_ide_view' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-secondary">
+            <i class="fas fa-eye"></i> Ver Entrega
+        </a>
         {% endif %}
     </div>
-    
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h3>Acciones</h3>
-            </div>
-            <div class="card-body">
-                {% if can_submit %}
-                {% if not submission or submission.status != 'submitted' or activity.allow_resubmit %}
-                <a href="{% url 'editor:student_activity_submit' institution_slug=institution.slug activity_id=activity.id %}" 
-                   class="btn btn-primary btn-block mb-2">
-                    <i class="fas fa-paper-plane"></i> Entregar Actividad
-                </a>
+</div>
+
+<div class="content-body">
+    <!-- Estado de la Entrega -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-flag" style="color: var(--color-primary);"></i>
+                Estado de tu Entrega
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="submission-status">
+                {% if submission %}
+                <div class="status-badge {% if submission.status == 'graded' %}status-graded{% elif submission.status == 'submitted' %}status-submitted{% elif submission.status == 'in_progress' %}status-progress{% else %}status-pending{% endif %}">
+                    <i class="fas {% if submission.status == 'graded' %}fa-check-circle{% elif submission.status == 'submitted' %}fa-paper-plane{% elif submission.status == 'in_progress' %}fa-edit{% else %}fa-clock{% endif %}"></i>
+                    <span>{{ submission.get_status_display }}</span>
+                </div>
+                
+                {% if submission.submitted_at %}
+                <p class="status-info">Entregado el {{ submission.submitted_at|date:"d/m/Y" }} a las {{ submission.submitted_at|time:"H:i" }}</p>
                 {% endif %}
-                {% else %}
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    {% if activity.is_closed %}
-                    Esta actividad está cerrada.
-                    {% elif activity.is_deadline_passed %}
-                    La fecha límite ya pasó.
-                    {% else %}
-                    La actividad no está disponible para entregas.
-                    {% endif %}
+                
+                {% if submission.is_late %}
+                <p class="status-warning"><i class="fas fa-exclamation-triangle"></i> Entrega tardía</p>
+                {% endif %}
+                
+                {% if submission.score is not None %}
+                <div class="score-display">
+                    <span class="score-label">Calificación:</span>
+                    <span class="score-value">{{ submission.score }} / {{ activity.max_score }}</span>
                 </div>
                 {% endif %}
                 
-                <a href="{% url 'editor:student_activity_ide' institution_slug=institution.slug activity_id=activity.id %}" 
-                   class="btn btn-primary btn-block">
-                    <i class="fas fa-code"></i> Abrir IDE
-                </a>
+                {% else %}
+                <div class="status-badge status-none">
+                    <i class="fas fa-times-circle"></i>
+                    <span>Sin Entregar</span>
+                </div>
+                <p class="status-info">Aún no has entregado esta actividad.</p>
+                {% endif %}
+                
+                {% if not can_submit %}
+                <p class="status-reason"><i class="fas fa-info-circle"></i> {{ submit_reason }}</p>
+                {% endif %}
             </div>
         </div>
     </div>
+    
+    <!-- Información de la Actividad -->
+    <div class="card animate-in" style="animation-delay: 0.1s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-info-circle" style="color: var(--color-info);"></i>
+                Información de la Actividad
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="activity-info">
+                {% if activity.objective %}
+                <div class="info-section">
+                    <h4>Objetivo</h4>
+                    <p>{{ activity.objective }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="info-section">
+                    <h4>Instrucciones</h4>
+                    <div class="instructions-content">{{ activity.instructions|linebreaks }}</div>
+                </div>
+                
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Fecha Límite</span>
+                        <span class="info-value {% if activity.is_deadline_passed %}text-danger{% endif %}">
+                            {% if activity.deadline %}
+                            {{ activity.deadline|date:"d/m/Y H:i" }}
+                            {% if activity.is_deadline_passed %}(Vencida){% endif %}
+                            {% else %}
+                            Sin fecha límite
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Puntuación Máxima</span>
+                        <span class="info-value">{{ activity.max_score }} puntos</span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Re-entrega</span>
+                        <span class="info-value">{% if activity.allow_resubmit %}Permitida{% else %}No permitida{% endif %}</span>
+                    </div>
+                    
+                    <div class="info-item">
+                        <span class="info-label">Entrega Tardía</span>
+                        <span class="info-value">{% if activity.allow_late_submit %}Permitida{% else %}No permitida{% endif %}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Feedback del Tutor -->
+    {% if submission and submission.status == 'graded' %}
+    {% with feedback=submission.get_latest_feedback %}
+    {% if feedback %}
+    <div class="card animate-in" style="animation-delay: 0.2s; margin-top: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-comment" style="color: var(--color-success);"></i>
+                Feedback del Tutor
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="feedback-content">
+                {{ feedback.comments|linebreaks }}
+            </div>
+            <p class="feedback-meta">
+                <i class="fas fa-user"></i> {{ feedback.tutor.get_full_name|default:feedback.tutor.username }}
+                - {{ feedback.created_at|date:"d/m/Y H:i" }}
+            </p>
+        </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
 </div>
+
+<style>
+    .submission-status {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 12px;
+    }
+    .status-badge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-size: 16px;
+        font-weight: 600;
+    }
+    .status-graded {
+        background: rgba(46, 160, 67, 0.15);
+        color: #2ea043;
+    }
+    .status-submitted {
+        background: rgba(88, 166, 255, 0.15);
+        color: #58a6ff;
+    }
+    .status-progress {
+        background: rgba(227, 179, 65, 0.15);
+        color: #e3b341;
+    }
+    .status-pending, .status-none {
+        background: rgba(139, 148, 158, 0.15);
+        color: #8b949e;
+    }
+    .status-info {
+        color: var(--color-text-muted);
+        font-size: 14px;
+        margin: 0;
+    }
+    .status-warning {
+        color: #e3b341;
+        font-size: 14px;
+        margin: 0;
+    }
+    .status-reason {
+        color: var(--color-text-muted);
+        font-size: 14px;
+        margin: 0;
+        padding: 8px 16px;
+        background: var(--color-bg-tertiary);
+        border-radius: 8px;
+    }
+    .score-display {
+        margin-top: 8px;
+        padding: 12px 20px;
+        background: rgba(46, 160, 67, 0.1);
+        border-radius: 8px;
+    }
+    .score-label {
+        font-size: 14px;
+        color: var(--color-text-muted);
+    }
+    .score-value {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2ea043;
+        margin-left: 8px;
+    }
+    .info-section {
+        margin-bottom: 20px;
+    }
+    .info-section h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .instructions-content {
+        background: var(--color-bg-tertiary);
+        padding: 16px;
+        border-radius: 8px;
+        line-height: 1.6;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--color-border);
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .info-label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+    }
+    .info-value {
+        font-weight: 500;
+    }
+    .text-danger {
+        color: #f85149 !important;
+    }
+    .feedback-content {
+        background: var(--color-bg-tertiary);
+        padding: 16px;
+        border-radius: 8px;
+        line-height: 1.6;
+    }
+    .feedback-meta {
+        margin: 12px 0 0 0;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+</style>
 {% endblock %}
