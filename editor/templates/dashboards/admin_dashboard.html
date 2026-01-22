@@ -63,7 +63,7 @@
                 <i class="fas fa-building" style="color: var(--color-purple);"></i>
                 Instituciones Recientes
             </h3>
-            <a href="{% url 'editor:institutions_list' %}" class="btn btn-ghost">Ver todas</a>
+            <a href="/admin/institutions/" class="btn btn-ghost">Ver todas</a>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if recent_institutions %}
@@ -97,7 +97,7 @@
             <div class="empty-state">
                 <i class="fas fa-building"></i>
                 <p>No hay instituciones registradas</p>
-                <a href="{% url 'editor:institution_create' %}" class="btn btn-primary">
+                <a href="/admin/institutions/create/" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Crear Institución
                 </a>
             </div>
@@ -156,13 +156,13 @@
     </div>
     <div class="card-body">
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="{% url 'editor:institution_create' %}" class="btn btn-primary">
+            <a href="/admin/institutions/create/" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nueva Institución
             </a>
-            <a href="{% url 'editor:course_create' %}" class="btn btn-secondary">
+            <a href="/admin/courses/create/" class="btn btn-secondary">
                 <i class="fas fa-plus"></i> Nuevo Curso
             </a>
-            <a href="{% url 'editor:student_create' %}" class="btn btn-secondary">
+            <a href="/admin/students/create/" class="btn btn-secondary">
                 <i class="fas fa-user-plus"></i> Nuevo Estudiante
             </a>
             <a href="{% url 'admin:index' %}" class="btn btn-ghost">

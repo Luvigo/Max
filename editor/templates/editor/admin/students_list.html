@@ -5,7 +5,7 @@
 {% block content %}
 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <h1>👥 Estudiantes</h1>
-    <a href="{% url 'editor:student_create' %}" class="btn btn-primary">➕ Crear Estudiante</a>
+    <a href="/admin/students/create/" class="btn btn-primary">➕ Crear Estudiante</a>
 </div>
 
 <div class="card" style="margin-bottom: 20px;">
@@ -53,7 +53,7 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a href="{% url 'editor:student_detail' student.id %}" class="btn btn-sm">Ver</a>
+                    <a href="/admin/students/{{ student.id }}/" class="btn btn-sm">Ver</a>
                 </td>
             </tr>
             {% empty %}

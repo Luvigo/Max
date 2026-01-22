@@ -26,18 +26,18 @@
     <div class="card">
         <h2>📚 Accesos Rápidos</h2>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-            <a href="{% url 'editor:institution_create' %}" class="btn btn-primary">➕ Crear Institución</a>
-            <a href="{% url 'editor:course_create' %}" class="btn btn-primary">➕ Crear Curso</a>
-            <a href="{% url 'editor:student_create' %}" class="btn btn-primary">➕ Crear Estudiante</a>
+            <a href="/admin/institutions/create/" class="btn btn-primary">➕ Crear Institución</a>
+            <a href="/admin/courses/create/" class="btn btn-primary">➕ Crear Curso</a>
+            <a href="/admin/students/create/" class="btn btn-primary">➕ Crear Estudiante</a>
         </div>
     </div>
     
     <div class="card">
         <h2>📋 Enlaces</h2>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-            <a href="{% url 'editor:institutions_list' %}" class="btn">Ver Instituciones</a>
-            <a href="{% url 'editor:courses_list' %}" class="btn">Ver Cursos</a>
-            <a href="{% url 'editor:students_list' %}" class="btn">Ver Estudiantes</a>
+            <a href="/admin/institutions/" class="btn">Ver Instituciones</a>
+            <a href="/admin/courses/" class="btn">Ver Cursos</a>
+            <a href="/admin/students/" class="btn">Ver Estudiantes</a>
         </div>
     </div>
 </div>
@@ -61,7 +61,7 @@
                 <td>{{ student.user.get_full_name|default:student.user.username }}</td>
                 <td>{{ student.course.name|default:"Sin curso" }}</td>
                 <td>{{ student.created_at|date:"d/m/Y" }}</td>
-                <td><a href="{% url 'editor:student_detail' student.id %}" class="btn btn-sm">Ver</a></td>
+                <td><a href="/admin/students/{{ student.id }}/" class="btn btn-sm">Ver</a></td>
             </tr>
             {% empty %}
             <tr>

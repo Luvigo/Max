@@ -199,6 +199,22 @@ def institution_enroll_student(request, institution_slug, course_id):
                 enrollment.notes = form.cleaned_data['notes']
                 enrollment.save()
             
+            # También actualizar Student.course si existe y no tiene curso asignado
+            from .models import Student
+            try:
+                student_profile = Student.objects.get(user=student)
+                if not student_profile.course:
+                    student_profile.course = course
+                    student_profile.save()
+            except Student.DoesNotExist:
+                # Crear perfil de Student si no existe
+                Student.objects.create(
+                    user=student,
+                    student_id=f'AUTO-{student.id}',
+                    course=course,
+                    is_active=True
+                )
+            
             messages.success(request, f'Estudiante "{student.get_full_name() or student.username}" matriculado exitosamente.')
             return redirect('editor:institution_course_detail', institution_slug=institution_slug, course_id=course_id)
     else:

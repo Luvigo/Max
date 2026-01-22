@@ -227,10 +227,10 @@
         <nav class="nav">
             {% if user.is_authenticated %}
                 {% if user.is_staff or user.is_superuser %}
-                    <a href="{% url 'editor:admin_dashboard' %}">Panel Admin</a>
-                    <a href="{% url 'editor:institutions_list' %}">Instituciones</a>
-                    <a href="{% url 'editor:courses_list' %}">Cursos</a>
-                    <a href="{% url 'editor:students_list' %}">Estudiantes</a>
+                    <a href="/admin/">Panel Admin</a>
+                    <a href="/admin/institutions/">Instituciones</a>
+                    <a href="/admin/courses/">Cursos</a>
+                    <a href="/admin/students/">Estudiantes</a>
                 {% else %}
                     <a href="{% url 'dashboard' %}">Mi Panel</a>
                     <a href="{% url 'editor:student_projects' %}">Mis Proyectos</a>
