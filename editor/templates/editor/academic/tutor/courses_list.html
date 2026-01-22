@@ -53,10 +53,14 @@
                             <span class="badge badge-secondary">{{ course.get_status_display }}</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td style="white-space: nowrap;">
+                            <a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=course.id %}" 
+                               class="btn btn-sm btn-primary" title="Ver actividades">
+                                <i class="fas fa-tasks"></i> Actividades
+                            </a>
                             <a href="{% url 'editor:tutor_course_roster' institution_slug=institution.slug course_id=course.id %}" 
-                               class="btn btn-sm btn-primary">
-                                <i class="fas fa-users"></i> Ver Roster
+                               class="btn btn-sm btn-secondary" title="Ver estudiantes">
+                                <i class="fas fa-users"></i> Roster
                             </a>
                         </td>
                     </tr>
