@@ -8,6 +8,7 @@ from . import activity_views
 from . import ide_views
 from . import agent_views
 from . import error_views
+from . import institution_views
 
 app_name = 'editor'
 
@@ -55,6 +56,16 @@ urlpatterns = [
     path('api/projects/list/', student_views.api_list_projects, name='api_list_projects'),
     path('api/projects/create/', student_views.api_create_project, name='api_create_project'),
     path('api/projects/delete/<int:project_id>/', student_views.api_delete_project, name='api_delete_project'),
+    
+    # ============================================
+    # MÓDULO 2: Institución (solo lectura)
+    # CRUD de Institution vive en Django Admin (/admin/)
+    # ============================================
+    
+    # Vista read-only "Mi Institución"
+    path('my-institution/', institution_views.my_institution, name='my_institution'),
+    path('tutor/my-institution/', institution_views.tutor_my_institution, name='tutor_my_institution'),
+    path('student/my-institution/', institution_views.student_my_institution, name='student_my_institution'),
     
     # ============================================
     # MÓDULO 2: Estructura Académica (con tenant scoping)

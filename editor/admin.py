@@ -12,20 +12,51 @@ from .models import (
 
 @admin.register(Institution)
 class InstitutionAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug', 'code', 'status', 'get_members_count', 'get_courses_count', 'created_at']
-    list_filter = ['status', 'created_at']
-    search_fields = ['name', 'code', 'slug']
-    readonly_fields = ['created_at', 'updated_at', 'get_members_count', 'get_courses_count']
+    """
+    MÓDULO 2: Admin de Institución
+    
+    Todo el CRUD de instituciones se hace desde aquí.
+    NO se crean vistas/templates de admin para instituciones.
+    """
+    list_display = [
+        'name', 'code', 'city', 'status', 
+        'get_tutors_count', 'get_students_count', 'get_courses_count', 
+        'created_at'
+    ]
+    list_filter = ['status', 'country', 'city', 'created_at']
+    search_fields = ['name', 'code', 'slug', 'email', 'city', 'address']
+    readonly_fields = [
+        'created_at', 'updated_at', 
+        'get_members_count', 'get_tutors_count', 'get_students_count', 'get_courses_count',
+        'agent_token'
+    ]
     prepopulated_fields = {'slug': ('name',)}
+    ordering = ['name']
+    list_per_page = 25
+    date_hierarchy = 'created_at'
+    
     fieldsets = (
         ('Información General', {
             'fields': ('name', 'slug', 'code', 'description', 'logo')
         }),
+        ('Información de Contacto', {
+            'fields': ('email', 'phone', 'website'),
+            'description': 'Datos de contacto de la institución'
+        }),
+        ('Dirección', {
+            'fields': ('address', 'city', 'state', 'country', 'postal_code'),
+            'classes': ('collapse',)
+        }),
         ('Estado', {
             'fields': ('status', 'is_active')
         }),
+        ('Configuración del Agent', {
+            'fields': ('agent_token',),
+            'classes': ('collapse',),
+            'description': 'Token para registro de Agents locales'
+        }),
         ('Estadísticas', {
-            'fields': ('get_members_count', 'get_courses_count'),
+            'fields': ('get_members_count', 'get_tutors_count', 'get_students_count', 'get_courses_count'),
             'classes': ('collapse',)
         }),
         ('Fechas', {
@@ -36,11 +67,31 @@ class InstitutionAdmin(admin.ModelAdmin):
     
     def get_members_count(self, obj):
         return obj.get_members_count()
-    get_members_count.short_description = 'Miembros'
+    get_members_count.short_description = 'Total Miembros'
+    
+    def get_tutors_count(self, obj):
+        return obj.get_tutors_count()
+    get_tutors_count.short_description = 'Tutores'
+    
+    def get_students_count(self, obj):
+        return obj.get_students_count()
+    get_students_count.short_description = 'Estudiantes'
     
     def get_courses_count(self, obj):
         return obj.get_courses_count()
     get_courses_count.short_description = 'Cursos'
+    
+    actions = ['activate_institutions', 'deactivate_institutions']
+    
+    @admin.action(description='Activar instituciones seleccionadas')
+    def activate_institutions(self, request, queryset):
+        updated = queryset.update(status='active', is_active=True)
+        self.message_user(request, f'{updated} institución(es) activada(s).')
+    
+    @admin.action(description='Desactivar instituciones seleccionadas')
+    def deactivate_institutions(self, request, queryset):
+        updated = queryset.update(status='inactive', is_active=False)
+        self.message_user(request, f'{updated} institución(es) desactivada(s).')
 
 
 @admin.register(Membership)

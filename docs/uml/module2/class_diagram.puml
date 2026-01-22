@@ -1,82 +1,104 @@
 @startuml
-!theme cerulean
-title Módulo 2: Diagrama de Clases - Estructura Académica
+title Módulo 2: Diagrama de Clases - Institución
 
-skinparam classAttributeIconSize 0
-
-package "django.contrib.auth" <<Database>> {
-    class User {
-        +id: int
-        +username: str
-        +email: str
-        +first_name: str
-        +last_name: str
-    }
-}
-
-package "editor.models" <<Database>> {
-    
+package "Modelos de Institución" {
     class Institution {
         +id: UUID
         +name: str
-        +slug: str {unique}
-        +status: enum
-    }
-    
-    class Course {
-        +id: int
-        +institution: FK(Institution)
-        +name: str
+        +slug: str
         +code: str
-        +grade_level: str
-        +status: enum(active, inactive, completed, cancelled)
-        +academic_year: str
         +description: str
+        +logo: URL
+        --
+        **Contacto**
+        +email: str
+        +phone: str
+        +website: URL
+        --
+        **Dirección**
+        +address: str
+        +city: str
+        +state: str
+        +country: str
+        +postal_code: str
+        --
+        +status: str ['active', 'inactive', 'suspended']
+        +agent_token: str
         +created_at: datetime
         +updated_at: datetime
         --
+        +get_members_count(): int
+        +get_tutors_count(): int
         +get_students_count(): int
-        +get_enrolled_students(): QuerySet
-        +get_assigned_tutors(): QuerySet
-    }
-    
-    class Enrollment {
-        +id: UUID
-        +course: FK(Course)
-        +student: FK(User)
-        +status: enum(active, inactive, completed, dropped)
-        +enrolled_at: datetime
-        +notes: str
-        --
-        +institution: Institution {property}
-    }
-    
-    class TeachingAssignment {
-        +id: UUID
-        +course: FK(Course)
-        +tutor: FK(User)
-        +status: enum(active, inactive, completed)
-        +assigned_at: datetime
-        +notes: str
-        --
-        +institution: Institution {property}
+        +get_courses_count(): int
+        +get_tutors(): QuerySet<User>
+        +get_students(): QuerySet<User>
+        +get_full_address(): str
     }
     
     class Membership {
         +id: UUID
         +user: FK(User)
         +institution: FK(Institution)
-        +role: enum(admin, institution, tutor, student)
+        +role: str
         +is_active: bool
     }
 }
 
-' Relaciones
-Institution ||--o{ Course : "tiene"
-Course ||--o{ Enrollment : "matricula"
-Course ||--o{ TeachingAssignment : "asigna"
-User ||--o{ Enrollment : "está matriculado"
-User ||--o{ TeachingAssignment : "tutorea"
-User ||--o{ Membership : "pertenece"
+package "Django Admin" {
+    class InstitutionAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +search_fields: list
+        +fieldsets: tuple
+        --
+        +get_tutors_count(obj)
+        +get_students_count(obj)
+        +activate_institutions(queryset)
+        +deactivate_institutions(queryset)
+    }
+}
 
+package "Vistas Read-Only" {
+    class "institution_views.py" <<module>> {
+        +my_institution(request, slug)
+        +tutor_my_institution(request, slug)
+        +student_my_institution(request, slug)
+    }
+}
+
+package "Templates" {
+    class "my_institution.html" <<template>> {
+        Vista genérica read-only
+    }
+    class "tutor_institution.html" <<template>> {
+        Vista de tutor con sus cursos
+    }
+    class "student_institution.html" <<template>> {
+        Vista de estudiante con sus cursos/tutores
+    }
+}
+
+Institution "1" -- "*" Membership
+InstitutionAdmin --> Institution : "CRUD en /admin/"
+"institution_views.py" --> Institution : "Read-Only"
+"tutor_institution.html" --> "institution_views.py"
+"student_institution.html" --> "institution_views.py"
+
+note bottom of InstitutionAdmin
+  **Campos del Admin:**
+  - list_display: name, code, city, status, tutors, students, courses
+  - list_filter: status, country, city, created_at
+  - search_fields: name, code, slug, email, city
+  - actions: activate/deactivate
+end note
+
+note right of "institution_views.py"
+  **Decoradores:**
+  - @login_required
+  - @tutor_required (para tutor)
+  - @student_required (para student)
+  
+  **NO permite edición**
+end note
 @enduml

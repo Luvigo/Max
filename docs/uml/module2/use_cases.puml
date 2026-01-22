@@ -1,34 +1,58 @@
 @startuml
+title Módulo 2: Institución (solo info; CRUD en Django Admin)
 left to right direction
+
 actor Admin
-actor "Institución" as Inst
 actor Tutor
 actor Estudiante
 
-rectangle "Módulo 2: Estructura Académica" {
-  usecase "Crear/Editar Curso" as UC_CourseCRUD
-  usecase "Asignar Tutor a Curso" as UC_AssignTutor
-  usecase "Matricular Estudiantes" as UC_Enroll
-  usecase "Importar CSV Estudiantes" as UC_ImportCSV
-  usecase "Ver cursos asignados (Tutor)" as UC_TutorCourses
-  usecase "Ver roster del curso (Tutor)" as UC_Roster
-  usecase "Ver cursos matriculados (Estudiante)" as UC_StudentCourses
-
-  usecase "ERROR: CSV inválido" as E_CSV
-  usecase "ERROR: Cross-tenant" as E_CrossTenant
-  usecase "ERROR: Duplicados" as E_Duplicate
+rectangle "Módulo 2: Institución como Entidad Informativa" {
+  usecase "Gestionar instituciones\nen Django Admin" as UC_ManageInst
+  usecase "Ver mi institución\n(Tutor - Read-Only)" as UC_ViewInstTutor
+  usecase "Ver mi institución\n(Estudiante - Read-Only)" as UC_ViewInstStudent
+  
+  usecase "Ver estadísticas" as UC_Stats
+  usecase "Ver info de contacto" as UC_Contact
+  usecase "Ver mis cursos" as UC_MyCourses
+  usecase "Ver mis tutores" as UC_MyTutors
+  
+  usecase "ERROR: Modificación\nno autorizada" as E_403
+  usecase "ERROR: Sin acceso\na institución" as E_NoAccess
 }
 
-Admin --> UC_CourseCRUD
-Inst --> UC_CourseCRUD
-Inst --> UC_AssignTutor
-Inst --> UC_Enroll
-Inst --> UC_ImportCSV
-Tutor --> UC_TutorCourses
-Tutor --> UC_Roster
-Estudiante --> UC_StudentCourses
+Admin --> UC_ManageInst : "Solo en /admin/"
 
-UC_ImportCSV ..> E_CSV : <<extend>>
-UC_AssignTutor ..> E_CrossTenant : <<extend>>
-UC_Enroll ..> E_Duplicate : <<extend>>
+Tutor --> UC_ViewInstTutor
+Tutor --> UC_Stats
+Tutor --> UC_MyCourses
+
+Estudiante --> UC_ViewInstStudent
+Estudiante --> UC_Contact
+Estudiante --> UC_MyCourses
+Estudiante --> UC_MyTutors
+
+UC_ViewInstTutor ..> E_403 : <<extend>>
+UC_ViewInstStudent ..> E_403 : <<extend>>
+UC_ViewInstTutor ..> E_NoAccess : <<extend>>
+UC_ViewInstStudent ..> E_NoAccess : <<extend>>
+
+note right of UC_ManageInst
+  **REGLA CLAVE:**
+  Todo CRUD de Institution
+  vive en Django Admin.
+  NO hay vistas/templates
+  de admin en la app.
+end note
+
+note bottom of UC_ViewInstTutor
+  Ruta: /i/<slug>/tutor/my-institution/
+  Template: tutor_institution.html
+  Decorator: @tutor_required
+end note
+
+note bottom of UC_ViewInstStudent
+  Ruta: /i/<slug>/student/my-institution/
+  Template: student_institution.html
+  Decorator: @student_required
+end note
 @enduml

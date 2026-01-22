@@ -1,0 +1,206 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mi Institución - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-university"></i>
+            Mi Institución
+        </h1>
+        <p class="page-subtitle">Vista de Tutor - {{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Información Principal -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                {% if institution.logo %}
+                <img src="{{ institution.logo }}" alt="" style="height: 32px; margin-right: 10px; vertical-align: middle;">
+                {% endif %}
+                {{ institution.name }}
+            </h3>
+            <span class="badge badge-info">{{ institution.code }}</span>
+        </div>
+        <div class="card-body">
+            {% if institution.description %}
+            <p style="margin-bottom: 16px; line-height: 1.6;">{{ institution.description }}</p>
+            {% endif %}
+            
+            <div class="info-grid">
+                {% if institution.email %}
+                <div class="info-item">
+                    <span class="info-label"><i class="fas fa-envelope"></i> Email:</span>
+                    <a href="mailto:{{ institution.email }}">{{ institution.email }}</a>
+                </div>
+                {% endif %}
+                {% if institution.phone %}
+                <div class="info-item">
+                    <span class="info-label"><i class="fas fa-phone"></i> Teléfono:</span>
+                    {{ institution.phone }}
+                </div>
+                {% endif %}
+                {% if institution.website %}
+                <div class="info-item">
+                    <span class="info-label"><i class="fas fa-globe"></i> Web:</span>
+                    <a href="{{ institution.website }}" target="_blank">{{ institution.website }}</a>
+                </div>
+                {% endif %}
+                {% if institution.address %}
+                <div class="info-item">
+                    <span class="info-label"><i class="fas fa-map-marker-alt"></i> Dirección:</span>
+                    {{ institution.get_full_address }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mis Estadísticas -->
+    <div class="stats-grid" style="margin-top: 20px;">
+        <div class="stat-card animate-in" style="animation-delay: 0.1s;">
+            <div class="stat-icon" style="background: var(--color-primary-glow);">
+                <i class="fas fa-chalkboard" style="color: var(--color-primary);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.courses_count }}</div>
+                <div class="stat-label">Mis Cursos</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.2s;">
+            <div class="stat-icon" style="background: var(--color-success-glow);">
+                <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.students_count }}</div>
+                <div class="stat-label">Mis Estudiantes</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.3s;">
+            <div class="stat-icon" style="background: var(--color-warning-glow);">
+                <i class="fas fa-users" style="color: var(--color-warning);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.total_students }}</div>
+                <div class="stat-label">Total Institución</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.4s;">
+            <div class="stat-icon" style="background: var(--color-info-glow);">
+                <i class="fas fa-chalkboard-teacher" style="color: var(--color-info);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.tutors_count }}</div>
+                <div class="stat-label">Tutores</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mis Cursos -->
+    <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.5s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-book" style="color: var(--color-primary);"></i>
+                Mis Cursos Asignados
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if my_courses %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Código</th>
+                        <th>Nivel</th>
+                        <th>Año</th>
+                        <th>Estudiantes</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for assignment in my_courses %}
+                    <tr>
+                        <td><strong>{{ assignment.course.name }}</strong></td>
+                        <td><span class="badge badge-secondary">{{ assignment.course.code }}</span></td>
+                        <td>{{ assignment.course.grade_level|default:"-" }}</td>
+                        <td>{{ assignment.course.academic_year }}</td>
+                        <td>
+                            <span class="badge badge-info">{{ assignment.course.get_students_count }}</span>
+                        </td>
+                        <td>
+                            <span class="badge {% if assignment.course.status == 'active' %}badge-success{% else %}badge-warning{% endif %}">
+                                {{ assignment.course.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:tutor_course_roster' institution_slug=institution.slug course_id=assignment.course.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Roster">
+                                <i class="fas fa-users"></i>
+                            </a>
+                            <a href="{% url 'editor:tutor_activities_list' institution_slug=institution.slug course_id=assignment.course.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Actividades">
+                                <i class="fas fa-tasks"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No tienes cursos asignados actualmente.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+    }
+    .info-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--color-text-muted);
+    }
+    .info-item a {
+        color: var(--color-primary);
+        text-decoration: none;
+    }
+    .info-item a:hover {
+        text-decoration: underline;
+    }
+    .info-label {
+        font-weight: 500;
+        color: var(--color-text);
+    }
+    .info-label i {
+        width: 20px;
+        text-align: center;
+        margin-right: 4px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}

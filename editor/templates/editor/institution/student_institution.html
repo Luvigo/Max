@@ -1,0 +1,305 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mi Institución - {{ institution.name }}{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-university"></i>
+            Mi Institución
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Información Principal -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                {% if institution.logo %}
+                <img src="{{ institution.logo }}" alt="" style="height: 32px; margin-right: 10px; vertical-align: middle;">
+                {% endif %}
+                {{ institution.name }}
+            </h3>
+            <span class="badge badge-info">{{ institution.code }}</span>
+        </div>
+        <div class="card-body">
+            {% if institution.description %}
+            <p style="margin-bottom: 16px; line-height: 1.6;">{{ institution.description }}</p>
+            {% endif %}
+            
+            <div class="contact-cards">
+                {% if institution.email %}
+                <div class="contact-card">
+                    <i class="fas fa-envelope"></i>
+                    <div>
+                        <span class="label">Email</span>
+                        <a href="mailto:{{ institution.email }}">{{ institution.email }}</a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if institution.phone %}
+                <div class="contact-card">
+                    <i class="fas fa-phone"></i>
+                    <div>
+                        <span class="label">Teléfono</span>
+                        <span>{{ institution.phone }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if institution.website %}
+                <div class="contact-card">
+                    <i class="fas fa-globe"></i>
+                    <div>
+                        <span class="label">Sitio Web</span>
+                        <a href="{{ institution.website }}" target="_blank">Visitar</a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if institution.address %}
+                <div class="contact-card">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <div>
+                        <span class="label">Dirección</span>
+                        <span>{{ institution.get_full_address }}</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Estadísticas -->
+    <div class="stats-row" style="margin-top: 20px;">
+        <div class="stat-card animate-in" style="animation-delay: 0.1s;">
+            <div class="stat-icon" style="background: var(--color-primary-glow);">
+                <i class="fas fa-book-open" style="color: var(--color-primary);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.courses_count }}</div>
+                <div class="stat-label">Mis Cursos</div>
+            </div>
+        </div>
+        
+        <div class="stat-card animate-in" style="animation-delay: 0.2s;">
+            <div class="stat-icon" style="background: var(--color-success-glow);">
+                <i class="fas fa-chalkboard-teacher" style="color: var(--color-success);"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-value">{{ stats.tutors_count }}</div>
+                <div class="stat-label">Mis Tutores</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mis Cursos -->
+    <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.3s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
+                Mis Cursos
+            </h3>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if my_enrollments %}
+            <div class="courses-list">
+                {% for enrollment in my_enrollments %}
+                <div class="course-item">
+                    <div class="course-icon">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <div class="course-info">
+                        <h4>{{ enrollment.course.name }}</h4>
+                        <p>
+                            <span class="badge badge-secondary">{{ enrollment.course.code }}</span>
+                            <span style="margin-left: 8px;">{{ enrollment.course.academic_year }}</span>
+                        </p>
+                    </div>
+                    <div class="course-status">
+                        <span class="badge {% if enrollment.status == 'active' %}badge-success{% else %}badge-secondary{% endif %}">
+                            {{ enrollment.get_status_display }}
+                        </span>
+                    </div>
+                    <div class="course-actions">
+                        <a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=enrollment.course.id %}" 
+                           class="btn btn-sm btn-primary">
+                            <i class="fas fa-tasks"></i> Actividades
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>No estás matriculado en ningún curso actualmente.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Mis Tutores -->
+    {% if my_tutors %}
+    <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.4s;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-chalkboard-teacher" style="color: var(--color-success);"></i>
+                Mis Tutores
+            </h3>
+        </div>
+        <div class="card-body">
+            <div class="tutors-grid">
+                {% for tutor in my_tutors %}
+                <div class="tutor-card">
+                    <div class="tutor-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="tutor-info">
+                        <h4>{{ tutor.get_full_name|default:tutor.username }}</h4>
+                        {% if tutor.email %}
+                        <a href="mailto:{{ tutor.email }}" class="tutor-email">
+                            <i class="fas fa-envelope"></i> {{ tutor.email }}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .contact-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+    }
+    .contact-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--color-bg-tertiary, #21262d);
+        border-radius: 8px;
+    }
+    .contact-card i {
+        font-size: 20px;
+        color: var(--color-primary);
+        width: 24px;
+        text-align: center;
+    }
+    .contact-card .label {
+        display: block;
+        font-size: 12px;
+        color: var(--color-text-muted);
+        margin-bottom: 2px;
+    }
+    .contact-card a {
+        color: var(--color-primary);
+        text-decoration: none;
+    }
+    .contact-card a:hover {
+        text-decoration: underline;
+    }
+    
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+    }
+    
+    .courses-list {
+        display: flex;
+        flex-direction: column;
+    }
+    .course-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--color-border, #30363d);
+    }
+    .course-item:last-child {
+        border-bottom: none;
+    }
+    .course-icon {
+        width: 48px;
+        height: 48px;
+        background: var(--color-primary-glow);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-primary);
+        font-size: 20px;
+    }
+    .course-info {
+        flex: 1;
+    }
+    .course-info h4 {
+        margin: 0 0 4px 0;
+        font-size: 1rem;
+    }
+    .course-info p {
+        margin: 0;
+        font-size: 14px;
+        color: var(--color-text-muted);
+    }
+    
+    .tutors-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+    }
+    .tutor-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: var(--color-bg-tertiary, #21262d);
+        border-radius: 8px;
+    }
+    .tutor-avatar {
+        width: 48px;
+        height: 48px;
+        background: var(--color-success-glow);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-success);
+        font-size: 20px;
+    }
+    .tutor-info h4 {
+        margin: 0 0 4px 0;
+        font-size: 1rem;
+    }
+    .tutor-email {
+        font-size: 13px;
+        color: var(--color-primary);
+        text-decoration: none;
+    }
+    .tutor-email:hover {
+        text-decoration: underline;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}

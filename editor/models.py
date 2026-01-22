@@ -14,13 +14,30 @@ except ImportError:
 
 
 class Institution(models.Model):
-    """Institución educativa - Tenant principal"""
+    """
+    MÓDULO 2: Institución educativa - Tenant principal
+    
+    La institución es una entidad informativa. Todo CRUD se hace desde Django Admin.
+    Tutor/Estudiante solo tienen vistas read-only.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=200, verbose_name="Nombre")
     slug = models.SlugField(max_length=100, unique=True, blank=True, verbose_name="Slug URL")
     code = models.CharField(max_length=50, unique=True, verbose_name="Código")
     description = models.TextField(blank=True, verbose_name="Descripción")
     logo = models.URLField(blank=True, verbose_name="Logo URL")
+    
+    # Información de contacto (MÓDULO 2)
+    email = models.EmailField(blank=True, verbose_name="Email de contacto")
+    phone = models.CharField(max_length=30, blank=True, verbose_name="Teléfono")
+    website = models.URLField(blank=True, verbose_name="Sitio web")
+    
+    # Dirección (MÓDULO 2)
+    address = models.CharField(max_length=300, blank=True, verbose_name="Dirección")
+    city = models.CharField(max_length=100, blank=True, verbose_name="Ciudad")
+    state = models.CharField(max_length=100, blank=True, verbose_name="Estado/Provincia")
+    country = models.CharField(max_length=100, default="México", verbose_name="País")
+    postal_code = models.CharField(max_length=20, blank=True, verbose_name="Código Postal")
     
     # Status
     STATUS_CHOICES = [
@@ -82,6 +99,33 @@ class Institution(models.Model):
     
     def get_students_count(self):
         return self.memberships.filter(role='student', is_active=True).count()
+    
+    def get_tutors_count(self):
+        """Obtener número de tutores activos"""
+        return self.memberships.filter(role='tutor', is_active=True).count()
+    
+    def get_tutors(self):
+        """Obtener lista de tutores de la institución"""
+        from django.contrib.auth.models import User
+        return User.objects.filter(
+            memberships__institution=self,
+            memberships__role='tutor',
+            memberships__is_active=True
+        ).distinct()
+    
+    def get_students(self):
+        """Obtener lista de estudiantes de la institución"""
+        from django.contrib.auth.models import User
+        return User.objects.filter(
+            memberships__institution=self,
+            memberships__role='student',
+            memberships__is_active=True
+        ).distinct()
+    
+    def get_full_address(self):
+        """Obtener dirección completa formateada"""
+        parts = [self.address, self.city, self.state, self.postal_code, self.country]
+        return ", ".join(p for p in parts if p)
 
 
 class Membership(models.Model):
