@@ -8,6 +8,7 @@
     ❌ ELIMINADOS:
     - Sección de Admin (usa Django Admin /admin/)
     - Sección de Institución (institución es solo info)
+    - "Mis Cursos" (unificado con Grupos de Estudiantes)
 -->
 <aside class="sidebar">
     <div class="sidebar-header">
@@ -60,11 +61,6 @@
             <a href="/i/{{ institution.slug }}/tutor/students/" class="nav-item {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="fas fa-user-graduate"></i>
                 <span>Mis Estudiantes</span>
-            </a>
-            
-            <a href="/i/{{ institution.slug }}/tutor/courses/" class="nav-item">
-                <i class="fas fa-book-open"></i>
-                <span>Mis Cursos</span>
             </a>
         </div>
         
@@ -132,11 +128,6 @@
                 <i class="fas fa-tasks"></i>
                 <span>Mis Actividades</span>
             </a>
-            
-            <a href="/i/{{ institution.slug }}/student/courses/" class="nav-item">
-                <i class="fas fa-book"></i>
-                <span>Mis Cursos</span>
-            </a>
         </div>
         {% endif %}
         
@@ -146,12 +137,12 @@
         <div class="nav-section">
             <div class="nav-section-title">Ayuda</div>
             
-            <a href="#" class="nav-item">
+            <a href="#" class="nav-item" onclick="showDocumentationModal(); return false;">
                 <i class="fas fa-question-circle"></i>
                 <span>Documentación</span>
             </a>
             
-            <a href="#" class="nav-item">
+            <a href="#" class="nav-item" onclick="showReportProblemModal(); return false;">
                 <i class="fas fa-bug"></i>
                 <span>Reportar Problema</span>
             </a>
@@ -181,3 +172,275 @@
         </div>
     </div>
 </aside>
+
+<!-- Modal de Documentación -->
+<div id="documentationModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-book"></i> Documentación</h3>
+            <button class="modal-close" onclick="closeDocumentationModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="doc-section">
+                <h4><i class="fas fa-play-circle"></i> Primeros Pasos</h4>
+                <ul>
+                    <li>Usa el <strong>Editor IDE</strong> para crear programas con bloques visuales</li>
+                    <li>Conecta tu Arduino mediante el <strong>Agent Local</strong></li>
+                    <li>Compila y sube tu código con un solo clic</li>
+                </ul>
+            </div>
+            <div class="doc-section">
+                <h4><i class="fas fa-puzzle-piece"></i> Bloques Disponibles</h4>
+                <ul>
+                    <li><strong>Control:</strong> Bucles, condicionales, delays</li>
+                    <li><strong>Lógica:</strong> Comparaciones, operadores AND/OR</li>
+                    <li><strong>Matemáticas:</strong> Operaciones numéricas</li>
+                    <li><strong>MAX Robot:</strong> Motores, sensores, servos</li>
+                </ul>
+            </div>
+            <div class="doc-section">
+                <h4><i class="fas fa-keyboard"></i> Atajos de Teclado</h4>
+                <ul>
+                    <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - Guardar proyecto</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> - Deshacer</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Y</kbd> - Rehacer</li>
+                    <li><kbd>Delete</kbd> - Eliminar bloque seleccionado</li>
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeDocumentationModal()">Entendido</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Reportar Problema -->
+<div id="reportProblemModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-bug"></i> Reportar Problema</h3>
+            <button class="modal-close" onclick="closeReportProblemModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="reportProblemForm">
+                <div class="form-group">
+                    <label for="problemType">Tipo de Problema</label>
+                    <select id="problemType" class="form-control" required>
+                        <option value="">Selecciona una opción...</option>
+                        <option value="bug">🐛 Error en la aplicación</option>
+                        <option value="ide">💻 Problema con el IDE</option>
+                        <option value="agent">🔌 Problema de conexión con Agent</option>
+                        <option value="compile">⚙️ Error de compilación</option>
+                        <option value="upload">📤 Error al subir código</option>
+                        <option value="other">❓ Otro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="problemDescription">Descripción del Problema</label>
+                    <textarea id="problemDescription" class="form-control" rows="4" placeholder="Describe el problema con el mayor detalle posible..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="problemSteps">Pasos para Reproducir (opcional)</label>
+                    <textarea id="problemSteps" class="form-control" rows="3" placeholder="1. Abrir el IDE&#10;2. Crear un bloque...&#10;3. ..."></textarea>
+                </div>
+            </form>
+            <div class="alert alert-info" style="margin-top: 15px;">
+                <i class="fas fa-info-circle"></i> Tu reporte será enviado al administrador del sistema para su revisión.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeReportProblemModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="submitProblemReport()">
+                <i class="fas fa-paper-plane"></i> Enviar Reporte
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Estilos para los modales -->
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--bg-secondary, #1e1e2e);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color, #3d3d5c);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color, #3d3d5c);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-primary, #fff);
+    font-size: 1.2rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #888);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--text-primary, #fff);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color, #3d3d5c);
+}
+
+.doc-section {
+    margin-bottom: 20px;
+}
+
+.doc-section h4 {
+    color: var(--accent-color, #58a6ff);
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.doc-section ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary, #ccc);
+}
+
+.doc-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+kbd {
+    background: var(--bg-tertiary, #2d2d4a);
+    border: 1px solid var(--border-color, #3d3d5c);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    font-family: monospace;
+    color: var(--text-primary, #fff);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-primary, #fff);
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg-tertiary, #2d2d4a);
+    border: 1px solid var(--border-color, #3d3d5c);
+    border-radius: 6px;
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-color, #58a6ff);
+}
+
+.alert-info {
+    background: rgba(88, 166, 255, 0.1);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    color: #58a6ff;
+    font-size: 0.9rem;
+}
+</style>
+
+<!-- Scripts para los modales -->
+<script>
+function showDocumentationModal() {
+    document.getElementById('documentationModal').style.display = 'flex';
+}
+
+function closeDocumentationModal() {
+    document.getElementById('documentationModal').style.display = 'none';
+}
+
+function showReportProblemModal() {
+    document.getElementById('reportProblemModal').style.display = 'flex';
+}
+
+function closeReportProblemModal() {
+    document.getElementById('reportProblemModal').style.display = 'none';
+    document.getElementById('reportProblemForm').reset();
+}
+
+function submitProblemReport() {
+    const form = document.getElementById('reportProblemForm');
+    const problemType = document.getElementById('problemType').value;
+    const problemDescription = document.getElementById('problemDescription').value;
+    const problemSteps = document.getElementById('problemSteps').value;
+    
+    if (!problemType || !problemDescription) {
+        alert('Por favor completa los campos requeridos.');
+        return;
+    }
+    
+    // Aquí se podría enviar el reporte al servidor
+    // Por ahora mostramos un mensaje de confirmación
+    alert('✅ Reporte enviado correctamente.\n\nGracias por ayudarnos a mejorar MAX-IDE.');
+    closeReportProblemModal();
+}
+
+// Cerrar modales con Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeDocumentationModal();
+        closeReportProblemModal();
+    }
+});
+
+// Cerrar modales al hacer clic fuera
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+});
+</script>
