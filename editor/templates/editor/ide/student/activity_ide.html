@@ -1,515 +1,718 @@
-{% extends 'editor/base.html' %}
 {% load static %}
-
-{% block title %}{{ activity.title }} - MAX-IDE{% endblock %}
-
-{% block extra_head %}
-<style>
-    .activity-context {
-        background: var(--color-bg-card, #161b22);
-        border-bottom: 1px solid var(--color-border, #30363d);
-        padding: 12px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ activity.title }} - MAX-IDE</title>
     
-    .activity-context-left {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    .activity-context-breadcrumb {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 14px;
-        color: var(--color-text-muted, #8b949e);
-    }
+    <!-- Blockly -->
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
     
-    .activity-context-breadcrumb a {
-        color: var(--color-primary, #58a6ff);
-        text-decoration: none;
-    }
+    <!-- Estilos -->
+    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}">
     
-    .activity-context-breadcrumb a:hover {
-        text-decoration: underline;
-    }
-    
-    .activity-context-title {
-        font-weight: 600;
-        color: var(--color-text, #e6edf3);
-    }
-    
-    .activity-context-right {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-    
-    .activity-badge {
-        padding: 4px 12px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .badge-pending {
-        background: var(--color-warning-glow, rgba(210, 153, 34, 0.15));
-        color: var(--color-warning, #d29922);
-    }
-    
-    .badge-inprogress {
-        background: rgba(234, 179, 8, 0.15);
-        color: #eab308;
-    }
-    
-    .badge-submitted {
-        background: var(--color-primary-glow, rgba(88, 166, 255, 0.15));
-        color: var(--color-primary, #58a6ff);
-    }
-    
-    .badge-graded {
-        background: var(--color-success-glow, rgba(63, 185, 80, 0.15));
-        color: var(--color-success, #3fb950);
-    }
-    
-    .badge-readonly {
-        background: var(--color-danger-glow, rgba(248, 81, 73, 0.15));
-        color: var(--color-danger, #f85149);
-    }
-    
-    /* Modal de confirmación de entrega */
-    .submit-modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s;
-    }
-    
-    .submit-modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-    
-    .submit-modal {
-        background: var(--color-bg-secondary, #161b22);
-        border: 1px solid var(--color-border, #30363d);
-        border-radius: 12px;
-        width: 90%;
-        max-width: 450px;
-        padding: 24px;
-        transform: scale(0.9);
-        transition: transform 0.3s;
-    }
-    
-    .submit-modal-overlay.active .submit-modal {
-        transform: scale(1);
-    }
-    
-    .submit-modal h3 {
-        margin: 0 0 16px 0;
-        font-size: 1.2rem;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    
-    .submit-modal p {
-        color: var(--color-text-muted, #8b949e);
-        margin: 0 0 20px 0;
-        line-height: 1.5;
-    }
-    
-    .submit-modal-actions {
-        display: flex;
-        gap: 12px;
-        justify-content: flex-end;
-    }
-    
-    .submit-modal .btn-cancel {
-        background: transparent;
-        border: 1px solid var(--color-border, #30363d);
-        color: var(--color-text-muted, #8b949e);
-    }
-    
-    .submit-modal .btn-confirm {
-        background: var(--color-success, #238636);
-        color: white;
-    }
-    
-    .submit-status-message {
-        margin-top: 16px;
-        padding: 12px;
-        border-radius: 6px;
-        display: none;
-    }
-    
-    .submit-status-message.show {
-        display: block;
-    }
-    
-    .submit-status-message.success {
-        background: rgba(46, 160, 67, 0.15);
-        color: #3fb950;
-    }
-    
-    .submit-status-message.error {
-        background: rgba(248, 81, 73, 0.15);
-        color: #f85149;
-    }
-    
-    .alert-readonly {
-        background: var(--color-danger-glow, rgba(248, 81, 73, 0.15));
-        border: 1px solid var(--color-danger, #f85149);
-        color: var(--color-danger, #f85149);
-        padding: 12px 16px;
-        border-radius: 6px;
-        margin: 12px 20px;
-    }
-</style>
-{% endblock %}
-
-{% block body %}
-<div class="app-container" data-institution-slug="{{ institution.slug }}">
-    <!-- Agent Status Banner -->
-    {% include 'partials/agent_status.html' %}
-    
-    <!-- Activity Context Bar -->
-    <div class="activity-context">
-        <div class="activity-context-left">
-            <div class="activity-context-breadcrumb">
+    <style>
+        .activity-context-bar {
+            background: linear-gradient(135deg, #1a1f35 0%, #0d1117 100%);
+            border-bottom: 1px solid #30363d;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .activity-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #8b949e;
+        }
+        .activity-breadcrumb a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        .activity-breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .activity-breadcrumb .separator {
+            color: #484f58;
+        }
+        .activity-title {
+            color: #e6edf3;
+            font-weight: 600;
+        }
+        .activity-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .activity-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .badge-inprogress {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+        }
+        .badge-submitted {
+            background: rgba(88, 166, 255, 0.15);
+            color: #58a6ff;
+        }
+        .badge-graded {
+            background: rgba(63, 185, 80, 0.15);
+            color: #3fb950;
+        }
+        .badge-readonly {
+            background: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+        }
+        .readonly-alert {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            color: #f85149;
+            padding: 8px 20px;
+            font-size: 13px;
+            text-align: center;
+        }
+        /* Modal de entrega */
+        .submit-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .submit-modal-overlay.active {
+            display: flex;
+        }
+        .submit-modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 450px;
+            padding: 24px;
+        }
+        .submit-modal h3 {
+            margin: 0 0 16px 0;
+            font-size: 1.2rem;
+        }
+        .submit-modal p {
+            color: #8b949e;
+            margin: 0 0 20px 0;
+            line-height: 1.5;
+        }
+        .submit-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        .submit-status-message {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+        }
+        .submit-status-message.show {
+            display: block;
+        }
+        .submit-status-message.success {
+            background: rgba(46, 160, 67, 0.15);
+            color: #3fb950;
+        }
+        .submit-status-message.error {
+            background: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Activity Context Bar -->
+        <div class="activity-context-bar">
+            <div class="activity-breadcrumb">
                 <a href="{% url 'student_dashboard' slug=institution.slug %}">{{ institution.name }}</a>
-                <span>/</span>
-                <a href="{% url 'editor:student_courses_list' institution_slug=institution.slug %}">Cursos</a>
-                <span>/</span>
+                <span class="separator">/</span>
                 <a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">{{ activity.course.name }}</a>
-                <span>/</span>
-                <span class="activity-context-title">{{ activity.title }}</span>
+                <span class="separator">/</span>
+                <span class="activity-title">{{ activity.title }}</span>
             </div>
-        </div>
-        <div class="activity-context-right">
-            <!-- Badge de estado pedagógico -->
-            <span class="activity-badge" id="submissionStatusBadge">
-            {% if last_submission %}
-                {% if last_submission.status == 'graded' %}
-                <span class="badge-graded">🟢 Calificada</span>
-                {% elif last_submission.status == 'submitted' %}
-                <span class="badge-submitted">🔵 Entregada</span>
-                {% else %}
-                <span class="badge-inprogress">🟡 En progreso</span>
+            <div class="activity-actions">
+                <span class="activity-badge {% if last_submission.status == 'graded' %}badge-graded{% elif last_submission.status == 'submitted' %}badge-submitted{% else %}badge-inprogress{% endif %}">
+                    {% if last_submission.status == 'graded' %}🟢 Calificada
+                    {% elif last_submission.status == 'submitted' %}🔵 Entregada
+                    {% else %}🟡 En progreso{% endif %}
+                </span>
+                {% if is_frozen or is_read_only %}
+                <span class="activity-badge badge-readonly">🔒 Solo Lectura</span>
                 {% endif %}
-            {% else %}
-                <span class="badge-inprogress">🟡 En progreso</span>
-            {% endif %}
-            </span>
-            
-            {% if is_frozen or is_read_only %}
-            <span class="activity-badge badge-readonly">🔒 Solo Lectura</span>
-            {% endif %}
-            
-            {% if can_submit and not is_frozen %}
-            <button class="btn btn-success btn-sm" id="btnSubmitActivity">
-                📤 Entregar
-            </button>
-            {% endif %}
+                {% if can_submit and not is_frozen %}
+                <button class="btn btn-success btn-sm" id="btnSubmitActivity">📤 Entregar</button>
+                {% endif %}
+            </div>
         </div>
-    </div>
-    
-    {% if is_frozen or is_read_only %}
-    <div class="alert-readonly">
-        <strong>⚠️ Modo Solo Lectura:</strong>
-        {% if is_frozen %}
-        Este workspace está congelado porque ya entregaste esta actividad y no se permite re-entrega.
-        {% elif activity.is_closed %}
-        Esta actividad está cerrada.
-        {% elif activity.is_deadline_passed %}
-        La fecha límite ya pasó.
+        
+        {% if is_frozen or is_read_only %}
+        <div class="readonly-alert">
+            ⚠️ <strong>Modo Solo Lectura:</strong>
+            {% if is_frozen %}Este workspace está congelado.
+            {% elif activity.is_closed %}Esta actividad está cerrada.
+            {% else %}La fecha límite ya pasó.{% endif %}
+        </div>
         {% endif %}
+        
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">MAX-IDE</div>
+                <span class="logo-badge">ARDUINO</span>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Board Selector -->
+                <div class="control-group">
+                    <label><span>🎯</span> Board</label>
+                    <select id="boardSelect">
+                        <option value="arduino:avr:uno">Arduino UNO</option>
+                        <option value="arduino:avr:nano">Arduino Nano</option>
+                        <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
+                        <option value="arduino:avr:mega">Arduino Mega</option>
+                    </select>
+                </div>
+                
+                <!-- Port Selector -->
+                <div class="control-group">
+                    <label><span>🔌</span> Puerto</label>
+                    <select id="portSelect">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                    <button class="btn btn-icon-only btn-ghost" id="btnRefreshPorts" title="Actualizar puertos">🔄</button>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-ghost" id="btnSerialMonitor" title="Monitor Serial">
+                        <span>📟</span><span>Serial</span>
+                    </button>
+                    <button class="btn btn-warning" id="btnCompile" data-action="verify" {% if is_read_only %}disabled{% endif %}>
+                        <span>⚙️</span><span>Verificar</span>
+                    </button>
+                    <button class="btn btn-success" id="btnUpload" data-action="upload" {% if is_read_only %}disabled{% endif %}>
+                        <span>🚀</span><span>Subir</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Workspace de Blockly -->
+            <div class="workspace-container">
+                <div class="workspace-header">
+                    <div class="workspace-tabs">
+                        <button class="workspace-tab active"><span>📦</span> Bloques</button>
+                    </div>
+                    <div class="workspace-actions">
+                        {% if not is_read_only %}
+                        <span id="autosaveIndicator" style="font-size: 12px; color: #8b949e;"></span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="blocklyDiv"></div>
+            </div>
+            
+            <!-- Panel de código -->
+            <div class="code-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title"><span class="icon">&lt;/&gt;</span> Código Arduino</h3>
+                    <button class="btn btn-sm btn-ghost" id="btnCopyCode" title="Copiar código">📋 Copiar</button>
+                </div>
+                <div class="code-content">
+                    <pre><code id="codeOutput">// El código aparecerá aquí</code></pre>
+                </div>
+                
+                <!-- Console -->
+                <div class="console-panel">
+                    <div class="console-header">
+                        <h4><span>📟</span> Consola</h4>
+                        <button class="btn btn-sm btn-ghost" id="btnClearConsole">Limpiar</button>
+                    </div>
+                    <div class="console-content" id="consoleOutput">
+                        <div class="console-line info">
+                            <span class="console-time">[00:00]</span>
+                            <span>MAX-IDE listo - Actividad: {{ activity.title }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span class="status-dot disconnected" id="statusDot"></span>
+                    <span id="statusText">Sin conexión</span>
+                </div>
+                <div class="status-item">
+                    <span>📦</span>
+                    <span id="blockCount">0 bloques</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <div class="status-item" id="agentStatus">
+                    <span class="status-dot disconnected" id="agentStatusDot"></span>
+                    <span id="agentStatusText">Agent: Verificando...</span>
+                </div>
+                <div class="status-item">MAX-IDE v1.0</div>
+            </div>
+        </footer>
     </div>
-    {% endif %}
     
-    <!-- Header -->
-    <header class="header">
-        <div class="logo">
-            <div class="logo-icon">⚡</div>
-            <div class="logo-text">MAX-IDE</div>
-            <span class="logo-badge">ARDUINO</span>
-        </div>
-        
-        <div class="header-controls">
-            <!-- Board Selector -->
-            <div class="control-group">
-                <label>
-                    <span>🎯</span>
-                    Board
-                </label>
-                <select id="boardSelect">
-                    <option value="arduino:avr:uno">Arduino UNO</option>
-                    <option value="arduino:avr:nano">Arduino Nano</option>
-                    <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
-                    <option value="arduino:avr:mega">Arduino Mega</option>
-                    <option value="arduino:avr:leonardo">Arduino Leonardo</option>
-                </select>
+    <!-- Modal Monitor Serial -->
+    <div class="modal-overlay" id="serialModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title"><span class="icon">📟</span> Monitor Serial</h2>
+                <button class="modal-close" id="btnCloseSerial">&times;</button>
             </div>
-            
-            <!-- Port Selector -->
-            <div class="control-group">
-                <label>
-                    <span>🔌</span>
-                    Puerto
-                </label>
-                <select id="portSelect">
-                    <option value="">Seleccionar...</option>
-                </select>
-                <button class="btn btn-icon-only btn-ghost" id="btnAddPort" title="Agregar nuevo puerto">
-                    ➕
-                </button>
-                <button class="btn btn-icon-only btn-ghost" id="btnRefreshPorts" title="Actualizar puertos">
-                    🔄
-                </button>
-            </div>
-            
-            <!-- Action Buttons -->
-            <div class="action-buttons">
-                <button class="btn btn-ghost" id="btnSerialMonitor" title="Monitor Serial">
-                    <span>📟</span>
-                    <span>Serial</span>
-                </button>
-                <button class="btn btn-warning" id="btnCompile" data-action="verify" {% if is_read_only %}disabled{% endif %}>
-                    <span>⚙️</span>
-                    <span>Verificar</span>
-                </button>
-                <button class="btn btn-success" id="btnUpload" data-action="upload" {% if is_read_only %}disabled{% endif %}>
-                    <span>🚀</span>
-                    <span>Subir</span>
-                </button>
-                <button class="btn btn-ghost" id="btnCopyDiagnostic" title="Copiar Diagnóstico">
-                    <span>📋</span>
-                    <span>Copiar Diagnóstico</span>
-                </button>
-                <button class="btn btn-ghost" id="btnReportError" title="Reportar Error">
-                    <span>⚠️</span>
-                    <span>Reportar</span>
-                </button>
-            </div>
-        </div>
-    </header>
-    
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Workspace de Blockly -->
-        <div class="workspace-container">
-            <div class="workspace-header">
-                <div class="workspace-tabs">
-                    <button class="workspace-tab active">
-                        <span>📦</span>
-                        Bloques
-                    </button>
+            <div class="modal-body">
+                <div class="serial-controls">
+                    <div class="control-group">
+                        <label>Baudrate</label>
+                        <select id="serialBaudrate">
+                            <option value="9600">9600</option>
+                            <option value="115200">115200</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btnSerialConnect"><span>🔗</span> Conectar</button>
+                    <button class="btn btn-danger hidden" id="btnSerialDisconnect"><span>⛔</span> Desconectar</button>
                 </div>
-                <div class="workspace-actions">
-                    {% if not is_read_only %}
-                    <button class="btn btn-sm btn-ghost" id="btnAutoSave" title="Auto-guardado activo">
-                        💾 Auto-guardado
-                    </button>
-                    <button class="btn btn-sm btn-ghost" id="btnCreateSnapshot" title="Crear Snapshot">
-                        📸 Snapshot
-                    </button>
-                    {% endif %}
+                <div class="serial-output" id="serialOutput">
+                    <div class="line system">Esperando conexión...</div>
+                </div>
+                <div class="serial-input-container">
+                    <input type="text" class="serial-input" id="serialInput" placeholder="Escribe un mensaje..." disabled>
+                    <button class="btn btn-primary" id="btnSerialSend" disabled>Enviar</button>
                 </div>
             </div>
-            <div id="blocklyDiv" class="blockly-workspace"></div>
-        </div>
-        
-        <!-- Code Editor -->
-        <div class="code-container">
-            <div class="code-header">
-                <div class="code-tabs">
-                    <button class="code-tab active" data-tab="arduino">
-                        <span>📝</span>
-                        Arduino
-                    </button>
-                </div>
-                <div class="code-actions">
-                    <button class="btn btn-sm btn-ghost" id="btnCopyCode" title="Copiar código">
-                        📋 Copiar
-                    </button>
-                </div>
-            </div>
-            <pre id="arduinoCode" class="code-content" {% if is_read_only %}readonly{% endif %}></pre>
-        </div>
-    </main>
-</div>
-
-<!-- Toolbox XML -->
-<xml id="toolbox" style="display: none;">
-    <!-- El toolbox se carga desde el template base o desde un archivo separado -->
-</xml>
-
-<!-- Modal de confirmación de entrega -->
-<div class="submit-modal-overlay" id="submitModalOverlay">
-    <div class="submit-modal">
-        <h3>📤 Confirmar Entrega</h3>
-        <p>
-            ¿Estás seguro de que quieres entregar esta actividad?
-            {% if not activity.allow_resubmit %}
-            <br><strong>⚠️ Nota:</strong> Esta actividad no permite re-entregas. Una vez entregada, no podrás editarla.
-            {% else %}
-            <br>Podrás volver a entregar si lo necesitas.
-            {% endif %}
-        </p>
-        <div class="submit-status-message" id="submitStatusMessage"></div>
-        <div class="submit-modal-actions">
-            <button class="btn btn-cancel" id="btnCancelSubmit">Cancelar</button>
-            <button class="btn btn-confirm" id="btnConfirmSubmit">
-                <span id="btnConfirmSubmitText">Entregar</span>
-            </button>
         </div>
     </div>
-</div>
-
-<script>
-    // Configuración del IDE con contexto de actividad
-    const IDE_CONFIG = {
-        projectId: '{{ project.id }}',
-        activityId: '{{ activity.id }}',
-        institutionSlug: '{{ institution.slug }}',
-        courseId: '{{ activity.course.id }}',
-        isReadOnly: {{ is_read_only|yesno:"true,false" }},
-        isFrozen: {{ is_frozen|yesno:"true,false" }},
-        canSubmit: {{ can_submit|yesno:"true,false" }},
-        allowResubmit: {{ activity.allow_resubmit|yesno:"true,false" }},
-        autosaveEnabled: !{{ is_read_only|yesno:"true,false" }},
-        autosaveInterval: 30000, // 30 segundos
-        submitUrl: '{% url "editor:student_activity_submit" institution_slug=institution.slug activity_id=activity.id %}',
-        csrfToken: '{{ csrf_token }}'
-    };
     
-    // Inicializar Blockly con el proyecto
-    const blocklyXml = {{ project.blockly_xml|default:"''"|safe }};
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
     
-    // Funciones del modal de entrega
-    function openSubmitModal() {
-        document.getElementById('submitModalOverlay').classList.add('active');
-        document.getElementById('submitStatusMessage').className = 'submit-status-message';
-        document.getElementById('submitStatusMessage').textContent = '';
-        document.getElementById('btnConfirmSubmit').disabled = false;
-        document.getElementById('btnConfirmSubmitText').textContent = 'Entregar';
-    }
+    <!-- Modal de entrega -->
+    <div class="submit-modal-overlay" id="submitModalOverlay">
+        <div class="submit-modal">
+            <h3>📤 Confirmar Entrega</h3>
+            <p>
+                ¿Estás seguro de que quieres entregar esta actividad?
+                {% if not activity.allow_resubmit %}
+                <br><strong>⚠️ Nota:</strong> No se permite re-entrega.
+                {% endif %}
+            </p>
+            <div class="submit-status-message" id="submitStatusMessage"></div>
+            <div class="submit-modal-actions">
+                <button class="btn" id="btnCancelSubmit">Cancelar</button>
+                <button class="btn btn-success" id="btnConfirmSubmit">Entregar</button>
+            </div>
+        </div>
+    </div>
     
-    function closeSubmitModal() {
-        document.getElementById('submitModalOverlay').classList.remove('active');
-    }
-    
-    async function performSubmit() {
-        const btn = document.getElementById('btnConfirmSubmit');
-        const btnText = document.getElementById('btnConfirmSubmitText');
-        const statusMsg = document.getElementById('submitStatusMessage');
+    <!-- Toolbox XML para Blockly -->
+    <xml id="toolbox" style="display: none;">
+        <category name="⚙️ Estructura" colour="60">
+            <block type="arduino_setup"></block>
+            <block type="arduino_loop"></block>
+        </category>
         
-        btn.disabled = true;
-        btnText.innerHTML = '<span class="mini-spinner"></span> Entregando...';
-        statusMsg.className = 'submit-status-message';
+        <category name="📌 Digital" colour="230">
+            <block type="arduino_pin_mode">
+                <field name="PIN">13</field>
+                <field name="MODE">OUTPUT</field>
+            </block>
+            <block type="arduino_digital_write">
+                <field name="PIN">13</field>
+                <field name="VALUE">HIGH</field>
+            </block>
+            <block type="arduino_digital_read">
+                <field name="PIN">2</field>
+            </block>
+        </category>
         
-        try {
-            // Crear FormData con el project_id
-            const formData = new FormData();
-            formData.append('project_id', IDE_CONFIG.projectId);
+        <category name="📊 Analógico" colour="180">
+            <block type="arduino_analog_read">
+                <field name="PIN">0</field>
+            </block>
+            <block type="arduino_analog_write">
+                <field name="PIN">9</field>
+                <value name="VALUE">
+                    <block type="arduino_number">
+                        <field name="NUM">128</field>
+                    </block>
+                </value>
+            </block>
+        </category>
+        
+        <category name="⏱️ Tiempo" colour="330">
+            <block type="arduino_delay">
+                <value name="TIME">
+                    <block type="arduino_number">
+                        <field name="NUM">1000</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_delay_microseconds">
+                <value name="TIME">
+                    <block type="arduino_number">
+                        <field name="NUM">100</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_millis"></block>
+            <block type="arduino_micros"></block>
+        </category>
+        
+        <category name="📡 Serial" colour="20">
+            <block type="arduino_serial_begin">
+                <field name="BAUD">9600</field>
+            </block>
+            <block type="arduino_serial_print"></block>
+            <block type="arduino_serial_println"></block>
+            <block type="arduino_serial_available"></block>
+            <block type="arduino_serial_read"></block>
+        </category>
+        
+        <category name="🔀 Control" colour="210">
+            <label text="── Condicionales ──"></label>
+            <block type="arduino_if"></block>
+            <block type="arduino_if_else"></block>
+            <block type="arduino_if_elseif"></block>
+            <block type="arduino_if_elseif_else"></block>
+            <block type="arduino_if_elseif2_else"></block>
+            <label text="── Ciclos ──"></label>
+            <block type="arduino_for">
+                <field name="VAR">i</field>
+                <field name="FROM">0</field>
+                <field name="TO">10</field>
+            </block>
+            <block type="arduino_while"></block>
+        </category>
+        
+        <category name="⚖️ Lógica" colour="210">
+            <block type="arduino_compare"></block>
+            <block type="arduino_logic"></block>
+            <block type="arduino_not"></block>
+            <block type="arduino_true"></block>
+            <block type="arduino_false"></block>
+        </category>
+        
+        <category name="🔢 Matemáticas" colour="200">
+            <block type="arduino_number">
+                <field name="NUM">0</field>
+            </block>
+            <block type="arduino_math"></block>
+            <block type="arduino_map"></block>
+            <block type="arduino_constrain"></block>
+            <block type="arduino_random"></block>
+        </category>
+        
+        <category name="📝 Variables" colour="290">
+            <block type="arduino_variable_int"></block>
+            <block type="arduino_variable_float"></block>
+            <block type="arduino_variable_string"></block>
+            <block type="arduino_variable_boolean"></block>
+            <block type="arduino_get_variable"></block>
+            <block type="arduino_set_variable"></block>
+        </category>
+        
+        <category name="📝 Texto" colour="160">
+            <block type="arduino_string">
+                <field name="TEXT">Hola</field>
+            </block>
+        </category>
+        
+        <category name="🔧 Componentes" colour="40">
+            <block type="arduino_led_builtin">
+                <field name="STATE">HIGH</field>
+            </block>
+            <block type="arduino_tone"></block>
+            <block type="arduino_no_tone"></block>
+        </category>
+        
+        <category name="🦾 Servos" colour="270">
+            <block type="arduino_servo_attach">
+                <field name="NAME">miServo</field>
+                <field name="PIN">9</field>
+            </block>
+            <block type="arduino_servo_attach_limits">
+                <field name="NAME">miServo</field>
+                <field name="PIN">9</field>
+                <field name="MIN">544</field>
+                <field name="MAX">2400</field>
+            </block>
+            <block type="arduino_servo_write">
+                <field name="NAME">miServo</field>
+                <value name="ANGLE">
+                    <block type="arduino_number">
+                        <field name="NUM">90</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_servo_write_simple">
+                <field name="NAME">miServo</field>
+                <field name="ANGLE">90</field>
+            </block>
+            <block type="arduino_servo_write_microseconds">
+                <field name="NAME">miServo</field>
+                <value name="US">
+                    <block type="arduino_number">
+                        <field name="NUM">1500</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_servo_read">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_attached">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_detach">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_sweep">
+                <field name="NAME">miServo</field>
+                <field name="FROM">0</field>
+                <field name="TO">180</field>
+                <value name="DELAY">
+                    <block type="arduino_number">
+                        <field name="NUM">15</field>
+                    </block>
+                </value>
+            </block>
+        </category>
+        
+        <!-- 🚗 CARRITO MAX - Bloques especiales -->
+        <category name="🚗 Carrito MAX" colour="190" expanded="false">
+            <category name="⚙️ Inicialización" colour="190">
+                <block type="max_init_motores">
+                    <field name="PIN_IZQ">9</field>
+                    <field name="PIN_DER">10</field>
+                </block>
+                <block type="max_init_distancia">
+                    <field name="PIN_TRIG">6</field>
+                    <field name="PIN_ECHO">7</field>
+                </block>
+                <block type="max_init_lineas">
+                    <field name="PIN_IZQ">0</field>
+                    <field name="PIN_CENT">1</field>
+                    <field name="PIN_DER">2</field>
+                </block>
+                <block type="max_init_buzzer">
+                    <field name="PIN">3</field>
+                </block>
+                <block type="max_init_garra">
+                    <field name="PIN">11</field>
+                    <field name="CERRADA">140</field>
+                    <field name="ABIERTA">40</field>
+                </block>
+            </category>
             
-            const response = await fetch(IDE_CONFIG.submitUrl, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': IDE_CONFIG.csrfToken
-                },
-                body: formData
-            });
+            <category name="🏎️ Movimiento" colour="120">
+                <block type="max_adelante">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_atras">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_izquierda">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_derecha">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_detener"></block>
+                <block type="max_adelante_var"></block>
+                <block type="max_atras_var"></block>
+                <block type="max_izquierda_var"></block>
+                <block type="max_derecha_var"></block>
+                <block type="max_avanzar_tiempo">
+                    <field name="VEL">30</field>
+                    <field name="TIEMPO">1000</field>
+                </block>
+                <block type="max_retroceder_tiempo">
+                    <field name="VEL">30</field>
+                    <field name="TIEMPO">1000</field>
+                </block>
+                <block type="max_girar_tiempo">
+                    <field name="DIR">derecha</field>
+                    <field name="VEL">25</field>
+                    <field name="TIEMPO">500</field>
+                </block>
+            </category>
             
-            if (response.redirected) {
-                // Éxito - la vista redirige
-                statusMsg.className = 'submit-status-message show success';
-                statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
-                btnText.textContent = '✓ Entregado';
-                
-                // Actualizar badge
-                updateSubmissionBadge('submitted');
-                
-                // Esperar un momento y recargar
-                setTimeout(() => {
-                    window.location.href = response.url;
-                }, 1500);
-            } else if (!response.ok) {
-                throw new Error('Error en la entrega');
-            } else {
-                // Éxito sin redirect
-                statusMsg.className = 'submit-status-message show success';
-                statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
-                btnText.textContent = '✓ Entregado';
-                updateSubmissionBadge('submitted');
-                
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            }
-        } catch (error) {
-            statusMsg.className = 'submit-status-message show error';
-            statusMsg.textContent = '✗ Error al entregar: ' + (error.message || 'Intenta de nuevo');
-            btn.disabled = false;
-            btnText.textContent = 'Reintentar';
-        }
-    }
-    
-    function updateSubmissionBadge(status) {
-        const badge = document.getElementById('submissionStatusBadge');
-        if (badge) {
-            if (status === 'submitted') {
-                badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
-            } else if (status === 'graded') {
-                badge.innerHTML = '<span class="badge-graded">🟢 Calificada</span>';
-            } else {
-                badge.innerHTML = '<span class="badge-inprogress">🟡 En progreso</span>';
-            }
-        }
+            <category name="📡 Sensor Distancia" colour="230">
+                <block type="max_medir_distancia"></block>
+                <block type="max_distancia_menor_que">
+                    <field name="CM">20</field>
+                </block>
+                <block type="max_distancia_mayor_que">
+                    <field name="CM">30</field>
+                </block>
+                <block type="max_evitar_obstaculo">
+                    <field name="DISTANCIA">20</field>
+                </block>
+            </category>
+            
+            <category name="➖ Sensor Líneas" colour="60">
+                <block type="max_leer_linea_izq"></block>
+                <block type="max_leer_linea_centro"></block>
+                <block type="max_leer_linea_der"></block>
+                <block type="max_linea_detectada">
+                    <field name="SENSOR">CENT</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+            </category>
+            
+            <category name="🎵 Buzzer/Sonido" colour="300">
+                <block type="max_tocar_nota">
+                    <field name="NOTA">262</field>
+                    <field name="DURACION">300</field>
+                </block>
+                <block type="max_tocar_frecuencia">
+                    <value name="FREQ">
+                        <block type="arduino_number">
+                            <field name="NUM">440</field>
+                        </block>
+                    </value>
+                    <value name="DURACION">
+                        <block type="arduino_number">
+                            <field name="NUM">300</field>
+                        </block>
+                    </value>
+                </block>
+                <block type="max_beep"></block>
+                <block type="max_detener_sonido"></block>
+            </category>
+            
+            <category name="🦾 Garra" colour="45">
+                <block type="max_abrir_garra"></block>
+                <block type="max_cerrar_garra"></block>
+                <block type="max_mover_garra">
+                    <field name="ANGULO">45</field>
+                </block>
+            </category>
+        </category>
         
-        // Deshabilitar botón de entregar si ya entregó
-        if (status === 'submitted' || status === 'graded') {
-            const submitBtn = document.getElementById('btnSubmitActivity');
-            if (submitBtn && !IDE_CONFIG.allowResubmit) {
-                submitBtn.disabled = true;
-                submitBtn.style.opacity = '0.5';
-            }
-        }
-    }
+        <category name="⚡ Avanzado" colour="0">
+            <block type="arduino_include">
+                <field name="LIBRARY">Servo.h</field>
+            </block>
+            <block type="arduino_custom_code"></block>
+            <block type="arduino_comment"></block>
+        </category>
+    </xml>
     
-    // Event listeners del modal
-    {% if can_submit and not is_frozen %}
-    document.getElementById('btnSubmitActivity')?.addEventListener('click', openSubmitModal);
-    document.getElementById('btnCancelSubmit')?.addEventListener('click', closeSubmitModal);
-    document.getElementById('btnConfirmSubmit')?.addEventListener('click', performSubmit);
-    document.getElementById('submitModalOverlay')?.addEventListener('click', function(e) {
-        if (e.target === this) closeSubmitModal();
-    });
-    {% endif %}
+    <!-- Configuración del IDE -->
+    <script>
+        const IDE_CONFIG = {
+            projectId: '{{ project.id|default:"" }}',
+            activityId: '{{ activity.id }}',
+            institutionSlug: '{{ institution.slug }}',
+            courseId: '{{ activity.course.id }}',
+            isReadOnly: {{ is_read_only|yesno:"true,false" }},
+            isFrozen: {{ is_frozen|yesno:"true,false" }},
+            canSubmit: {{ can_submit|yesno:"true,false" }},
+            allowResubmit: {{ activity.allow_resubmit|yesno:"true,false" }},
+            autosaveEnabled: !{{ is_read_only|yesno:"true,false" }},
+            autosaveInterval: 30000,
+            submitUrl: '{% url "editor:student_activity_submit" institution_slug=institution.slug activity_id=activity.id %}',
+            csrfToken: '{{ csrf_token }}'
+        };
+        
+        // XML del proyecto si existe
+        const blocklyXml = `{{ project.blockly_xml|default:""|escapejs }}`;
+    </script>
     
-    // Deshabilitar botones de compilar/subir si Agent está offline
-    if (typeof checkAgentStatus === 'function') {
-        checkAgentStatus('{{ institution.slug }}').then(function(isOnline) {
-            if (!isOnline) {
-                document.getElementById('btnCompile')?.setAttribute('disabled', 'true');
-                document.getElementById('btnUpload')?.setAttribute('disabled', 'true');
+    <!-- Scripts del IDE -->
+    <script src="{% static 'editor/js/arduino_blocks.js' %}"></script>
+    <script src="{% static 'editor/js/arduino_generator.js' %}"></script>
+    <script src="{% static 'editor/js/app.js' %}"></script>
+    
+    <script>
+        // Cargar XML del proyecto si existe
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (blocklyXml && blocklyXml.trim() && typeof Blockly !== 'undefined' && window.workspace) {
+                    try {
+                        const xml = Blockly.utils.xml.textToDom(blocklyXml);
+                        Blockly.Xml.domToWorkspace(xml, window.workspace);
+                        console.log('[Activity IDE] Proyecto cargado');
+                    } catch (e) {
+                        console.error('[Activity IDE] Error cargando proyecto:', e);
+                    }
+                }
+            }, 1000);
+        });
+        
+        // Sistema de entrega
+        {% if can_submit and not is_frozen %}
+        document.getElementById('btnSubmitActivity')?.addEventListener('click', function() {
+            document.getElementById('submitModalOverlay').classList.add('active');
+        });
+        
+        document.getElementById('btnCancelSubmit')?.addEventListener('click', function() {
+            document.getElementById('submitModalOverlay').classList.remove('active');
+        });
+        
+        document.getElementById('btnConfirmSubmit')?.addEventListener('click', async function() {
+            const btn = this;
+            const statusMsg = document.getElementById('submitStatusMessage');
+            
+            btn.disabled = true;
+            btn.textContent = 'Entregando...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('project_id', IDE_CONFIG.projectId);
+                
+                const response = await fetch(IDE_CONFIG.submitUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': IDE_CONFIG.csrfToken },
+                    body: formData
+                });
+                
+                statusMsg.className = 'submit-status-message show success';
+                statusMsg.textContent = '✓ ¡Actividad entregada!';
+                btn.textContent = '✓ Entregado';
+                
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (e) {
+                statusMsg.className = 'submit-status-message show error';
+                statusMsg.textContent = '✗ Error: ' + e.message;
+                btn.disabled = false;
+                btn.textContent = 'Reintentar';
             }
         });
-    }
-</script>
-
-<!-- Scripts del IDE -->
-<script src="{% static 'editor/js/app.js' %}"></script>
-<script src="{% static 'editor/js/arduino_blocks.js' %}"></script>
-<script src="{% static 'editor/js/arduino_generator.js' %}"></script>
-{% endblock %}
+        
+        document.getElementById('submitModalOverlay')?.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
