@@ -17,7 +17,7 @@ from django.contrib.auth.models import User
 from django import forms
 from django.http import HttpResponse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from django.db.models import Count, Q
 import csv
 
@@ -758,8 +758,8 @@ class StudentAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     
     def is_active_badge(self, obj):
         if obj.is_active and obj.user.is_active:
-            return format_html('<span style="color:#2ea043;">✓ Activo</span>')
-        return format_html('<span style="color:#f85149;">✗ Inactivo</span>')
+            return mark_safe('<span style="color:#2ea043;">✓ Activo</span>')
+        return mark_safe('<span style="color:#f85149;">✗ Inactivo</span>')
     is_active_badge.short_description = 'Estado'
     
     def get_projects_count(self, obj):
@@ -865,15 +865,15 @@ class CustomUserAdmin(BaseUserAdmin):
     
     def is_active_badge(self, obj):
         if obj.is_active:
-            return format_html('<span style="color:#2ea043;">✓</span>')
-        return format_html('<span style="color:#f85149;">✗</span>')
+            return mark_safe('<span style="color:#2ea043;">✓</span>')
+        return mark_safe('<span style="color:#f85149;">✗</span>')
     is_active_badge.short_description = 'Activo'
     
     def get_roles(self, obj):
         memberships = Membership.objects.filter(user=obj, is_active=True)
         if not memberships.exists():
             if obj.is_superuser:
-                return format_html('<span style="color:#f85149;">🔴 Superuser</span>')
+                return mark_safe('<span style="color:#f85149;">🔴 Superuser</span>')
             return "Sin rol"
         roles = []
         for m in memberships[:2]:
@@ -882,7 +882,7 @@ class CustomUserAdmin(BaseUserAdmin):
             roles.append(f'<span style="color:{color};">{m.get_role_display()}</span>')
         if memberships.count() > 2:
             roles.append(f'<span style="color:#8b949e;">+{memberships.count() - 2}</span>')
-        return format_html(", ".join(roles))
+        return mark_safe(", ".join(roles))
     get_roles.short_description = 'Roles'
     
     actions = ['activate_users', 'deactivate_users']
@@ -979,10 +979,10 @@ class ActivityAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     
     def deadline_badge(self, obj):
         if not obj.deadline:
-            return format_html('<span style="color:#8b949e;">Sin fecha</span>')
+            return mark_safe('<span style="color:#8b949e;">Sin fecha</span>')
         now = timezone.now()
         if obj.deadline < now:
-            return format_html('<span style="color:#f85149;">⏰ Vencida</span>')
+            return mark_safe('<span style="color:#f85149;">⏰ Vencida</span>')
         days_left = (obj.deadline - now).days
         if days_left <= 3:
             return format_html('<span style="color:#e3b341;">⚠️ {} días</span>', days_left)
@@ -1108,8 +1108,8 @@ class SubmissionAdmin(ExportCSVMixin, admin.ModelAdmin):
     
     def is_late_badge(self, obj):
         if obj.is_late:
-            return format_html('<span style="color:#e3b341;">⚠️ Tardía</span>')
-        return format_html('<span style="color:#2ea043;">✓</span>')
+            return mark_safe('<span style="color:#e3b341;">⚠️ Tardía</span>')
+        return mark_safe('<span style="color:#2ea043;">✓</span>')
     is_late_badge.short_description = 'A Tiempo'
     
     def get_institution(self, obj):
@@ -1186,8 +1186,8 @@ class IDEProjectAdmin(ExportCSVMixin, admin.ModelAdmin):
     
     def is_frozen_badge(self, obj):
         if obj.is_frozen():
-            return format_html('<span style="color:#58a6ff;">🧊 Congelado</span>')
-        return format_html('<span style="color:#2ea043;">✓ Editable</span>')
+            return mark_safe('<span style="color:#58a6ff;">🧊 Congelado</span>')
+        return mark_safe('<span style="color:#2ea043;">✓ Editable</span>')
     is_frozen_badge.short_description = 'Estado'
 
 
@@ -1272,8 +1272,8 @@ class AgentInstanceAdmin(ExportCSVMixin, admin.ModelAdmin):
     
     def is_online_display(self, obj):
         if obj.is_online():
-            return format_html('<span style="color:#2ea043;">🟢 Online</span>')
-        return format_html('<span style="color:#8b949e;">⚪ Offline</span>')
+            return mark_safe('<span style="color:#2ea043;">🟢 Online</span>')
+        return mark_safe('<span style="color:#8b949e;">⚪ Offline</span>')
     is_online_display.short_description = 'Conectado'
 
 
@@ -1345,8 +1345,8 @@ class ErrorEventAdmin(ExportCSVMixin, admin.ModelAdmin):
     
     def resolved_badge(self, obj):
         if obj.resolved:
-            return format_html('<span style="color:#2ea043;">✓ Resuelto</span>')
-        return format_html('<span style="color:#f85149;">✗ Pendiente</span>')
+            return mark_safe('<span style="color:#2ea043;">✓ Resuelto</span>')
+        return mark_safe('<span style="color:#f85149;">✗ Pendiente</span>')
     resolved_badge.short_description = 'Resuelto'
     
     actions = ['mark_as_resolved', 'mark_as_unresolved', 'export_as_csv']
