@@ -25,85 +25,159 @@
     </div>
     <div class="card-body">
         {% if activities_with_submissions %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Título</th>
-                        <th>Fecha Límite</th>
-                        <th>Estado</th>
-                        <th>Puntaje</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in activities_with_submissions %}
-                    {% with activity=item.activity submission=item.submission %}
-                    <tr>
-                        <td>
-                            <strong>{{ activity.title }}</strong>
-                            {% if activity.objective %}
-                            <br><small class="text-muted">{{ activity.objective|truncatewords:10 }}</small>
-                            {% endif %}
-                        </td>
-                        <td>
+        <div class="activities-grid">
+            {% for item in activities_with_submissions %}
+            {% with activity=item.activity submission=item.submission %}
+            <div class="activity-card">
+                <div class="activity-card-header">
+                    <h3>{{ activity.title }}</h3>
+                    {% if submission %}
+                        {% if submission.status == 'submitted' %}
+                        <span class="status-badge warning">Entregada</span>
+                        {% elif submission.status == 'graded' %}
+                        <span class="status-badge success">Calificada</span>
+                        {% else %}
+                        <span class="status-badge secondary">En Progreso</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="status-badge danger">Sin entregar</span>
+                    {% endif %}
+                </div>
+                
+                <div class="activity-card-body">
+                    {% if activity.objective %}
+                    <p class="activity-objective">{{ activity.objective|truncatewords:15 }}</p>
+                    {% endif %}
+                    
+                    <div class="activity-meta">
+                        <span>
+                            <i class="fas fa-clock"></i>
                             {% if activity.deadline %}
                             {{ activity.deadline|date:"d/m/Y H:i" }}
                             {% if activity.is_deadline_passed %}
-                            <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Vencida</small>
+                            <span class="text-danger">(Vencida)</span>
                             {% endif %}
                             {% else %}
-                            <span class="text-muted">-</span>
+                            Sin fecha límite
                             {% endif %}
-                        </td>
-                        <td>
-                            {% if submission %}
-                            {% if submission.status == 'submitted' %}
-                            <span class="badge badge-warning">Entregada</span>
-                            {% elif submission.status == 'graded' %}
-                            <span class="badge badge-success">Calificada</span>
-                            {% else %}
-                            <span class="badge badge-secondary">Pendiente</span>
-                            {% endif %}
-                            {% else %}
-                            <span class="badge badge-danger">Sin entregar</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if submission and submission.status == 'graded' %}
-                            {% with feedback=submission.get_latest_feedback %}
-                            {% if feedback and feedback.score %}
-                            <strong>{{ feedback.score }}</strong>
-                            {% if feedback.get_percentage_score %}
-                            <br><small class="text-muted">({{ feedback.get_percentage_score|floatformat:1 }}%)</small>
-                            {% endif %}
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                            {% endwith %}
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <a href="{% url 'editor:student_activity_detail' institution_slug=institution.slug activity_id=activity.id %}" 
-                               class="btn btn-sm btn-primary">
-                                <i class="fas fa-eye"></i> Ver Detalles
-                            </a>
-                        </td>
-                    </tr>
-                    {% endwith %}
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </span>
+                        
+                        {% if submission and submission.status == 'graded' %}
+                        {% with feedback=submission.get_latest_feedback %}
+                        {% if feedback and feedback.score %}
+                        <span class="score">
+                            <i class="fas fa-star"></i>
+                            {{ feedback.score }}
+                        </span>
+                        {% endif %}
+                        {% endwith %}
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="activity-card-actions">
+                    <a href="{% url 'editor:student_activity_ide' institution_slug=institution.slug activity_id=activity.id %}" 
+                       class="btn btn-primary">
+                        <i class="fas fa-code"></i> Abrir IDE
+                    </a>
+                    <a href="{% url 'editor:student_activity_detail' institution_slug=institution.slug activity_id=activity.id %}" 
+                       class="btn btn-secondary">
+                        <i class="fas fa-info-circle"></i> Detalles
+                    </a>
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
         </div>
         {% else %}
-        <div class="empty-state">
-            <i class="fas fa-tasks fa-3x text-muted"></i>
+        <div class="empty-state" style="text-align: center; padding: 3rem;">
+            <i class="fas fa-tasks fa-3x text-muted" style="opacity: 0.5;"></i>
             <h3>No hay actividades disponibles</h3>
             <p class="text-muted">Aún no hay actividades publicadas para este curso.</p>
         </div>
         {% endif %}
     </div>
 </div>
+
+<style>
+.activities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem;
+}
+.activity-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.activity-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+.activity-card-header {
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+.activity-card-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    flex: 1;
+}
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.status-badge.success { background: rgba(34, 197, 94, 0.9); }
+.status-badge.warning { background: rgba(234, 179, 8, 0.9); }
+.status-badge.danger { background: rgba(239, 68, 68, 0.9); }
+.status-badge.secondary { background: rgba(107, 114, 128, 0.9); }
+.activity-card-body {
+    padding: 1.25rem;
+}
+.activity-objective {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+.activity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+}
+.activity-meta i {
+    margin-right: 0.25rem;
+}
+.score {
+    color: var(--color-warning);
+    font-weight: 600;
+}
+.activity-card-actions {
+    padding: 0 1.25rem 1.25rem;
+    display: flex;
+    gap: 0.75rem;
+}
+.activity-card-actions .btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+}
+.text-danger {
+    color: #ef4444;
+}
+</style>
 {% endblock %}
