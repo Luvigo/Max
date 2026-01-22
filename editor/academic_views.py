@@ -405,6 +405,214 @@ def tutor_course_roster(request, institution_slug, course_id):
     return render(request, 'editor/academic/tutor/course_roster.html', context)
 
 
+@login_required
+def tutor_course_create(request, institution_slug):
+    """Tutor crea un nuevo curso"""
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    
+    # Verificar permisos
+    if not UserRoleHelper.user_has_role(request.user, ['admin', 'institution', 'tutor'], institution):
+        messages.error(request, 'No tienes permisos para crear cursos.')
+        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+    
+    if request.method == 'POST':
+        form = CourseForm(request.POST)
+        if form.is_valid():
+            course = form.save(commit=False)
+            course.institution = institution
+            course.tutor = request.user
+            course.save()
+            
+            # Auto-asignar al tutor que lo crea
+            TeachingAssignment.objects.create(
+                course=course,
+                tutor=request.user,
+                status='active'
+            )
+            
+            messages.success(request, f'Curso "{course.name}" creado exitosamente.')
+            return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+    else:
+        form = CourseForm()
+    
+    context = {
+        'institution': institution,
+        'form': form,
+        'action': 'Crear',
+    }
+    return render(request, 'editor/academic/tutor/course_form.html', context)
+
+
+@login_required
+def tutor_student_create(request, institution_slug):
+    """Tutor crea un nuevo estudiante con usuario"""
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    
+    # Verificar permisos
+    if not UserRoleHelper.user_has_role(request.user, ['admin', 'institution', 'tutor'], institution):
+        messages.error(request, 'No tienes permisos para crear estudiantes.')
+        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+    
+    # Obtener cursos del tutor para asignar
+    tutor_courses = Course.objects.filter(
+        institution=institution,
+        teaching_assignments__tutor=request.user,
+        teaching_assignments__status='active'
+    )
+    
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        password = request.POST.get('password', '').strip()
+        student_id = request.POST.get('student_id', '').strip()
+        course_id = request.POST.get('course', '')
+        
+        errors = []
+        
+        if not username:
+            errors.append('El nombre de usuario es requerido.')
+        elif User.objects.filter(username=username).exists():
+            errors.append('El nombre de usuario ya existe.')
+        
+        if not email:
+            errors.append('El email es requerido.')
+        elif User.objects.filter(email=email).exists():
+            errors.append('El email ya está registrado.')
+        
+        if not password or len(password) < 4:
+            errors.append('La contraseña debe tener al menos 4 caracteres.')
+        
+        if not student_id:
+            errors.append('El ID de estudiante es requerido.')
+        
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+        else:
+            try:
+                with transaction.atomic():
+                    # Crear usuario
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        password=password,
+                        first_name=first_name,
+                        last_name=last_name
+                    )
+                    
+                    # Crear membership como estudiante
+                    Membership.objects.create(
+                        user=user,
+                        institution=institution,
+                        role='student',
+                        is_active=True
+                    )
+                    
+                    # Crear perfil de estudiante
+                    from .models import Student
+                    student = Student.objects.create(
+                        user=user,
+                        student_id=student_id,
+                        is_active=True
+                    )
+                    
+                    # Si se seleccionó un curso, matricular
+                    if course_id:
+                        course = Course.objects.get(id=course_id, institution=institution)
+                        Enrollment.objects.create(
+                            course=course,
+                            student=user,
+                            status='active'
+                        )
+                        student.course = course
+                        student.save()
+                    
+                    messages.success(request, f'Estudiante "{username}" creado exitosamente. Puede iniciar sesión con la contraseña que definiste.')
+                    return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+                    
+            except Exception as e:
+                messages.error(request, f'Error al crear estudiante: {str(e)}')
+    
+    context = {
+        'institution': institution,
+        'courses': tutor_courses,
+    }
+    return render(request, 'editor/academic/tutor/student_form.html', context)
+
+
+@login_required
+def tutor_enroll_student(request, institution_slug, course_id):
+    """Tutor matricula estudiante en su curso"""
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    course = get_object_or_404(Course, id=course_id, institution=institution)
+    
+    # Verificar que el tutor está asignado al curso
+    if not TeachingAssignment.objects.filter(
+        course=course,
+        tutor=request.user,
+        status='active'
+    ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
+        messages.error(request, 'No tienes permisos para matricular en este curso.')
+        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+    
+    # Obtener estudiantes de la institución que NO están matriculados en este curso
+    enrolled_ids = Enrollment.objects.filter(course=course).values_list('student_id', flat=True)
+    available_students = User.objects.filter(
+        memberships__institution=institution,
+        memberships__role='student',
+        memberships__is_active=True
+    ).exclude(id__in=enrolled_ids)
+    
+    if request.method == 'POST':
+        student_id = request.POST.get('student')
+        
+        if student_id:
+            try:
+                student = User.objects.get(id=student_id)
+                
+                # Verificar que es estudiante de la institución
+                if not Membership.objects.filter(
+                    user=student,
+                    institution=institution,
+                    role='student',
+                    is_active=True
+                ).exists():
+                    messages.error(request, 'El usuario no es estudiante de esta institución.')
+                else:
+                    # Crear matrícula
+                    Enrollment.objects.get_or_create(
+                        course=course,
+                        student=student,
+                        defaults={'status': 'active'}
+                    )
+                    
+                    # Actualizar Student.course
+                    from .models import Student
+                    try:
+                        student_profile = Student.objects.get(user=student)
+                        if not student_profile.course:
+                            student_profile.course = course
+                            student_profile.save()
+                    except Student.DoesNotExist:
+                        pass
+                    
+                    messages.success(request, f'Estudiante "{student.get_full_name() or student.username}" matriculado exitosamente.')
+                    return redirect('editor:tutor_course_roster', institution_slug=institution_slug, course_id=course_id)
+            except User.DoesNotExist:
+                messages.error(request, 'Estudiante no encontrado.')
+        else:
+            messages.error(request, 'Debes seleccionar un estudiante.')
+    
+    context = {
+        'institution': institution,
+        'course': course,
+        'available_students': available_students,
+    }
+    return render(request, 'editor/academic/tutor/enroll_student.html', context)
+
+
 # ============================================
 # VISTAS DE ESTUDIANTE
 # ============================================

@@ -72,7 +72,10 @@ urlpatterns = [
     
     # Vistas de Tutor
     path('tutor/courses/', academic_views.tutor_courses_list, name='tutor_courses_list'),
+    path('tutor/courses/new/', academic_views.tutor_course_create, name='tutor_course_create'),
     path('tutor/courses/<int:course_id>/roster/', academic_views.tutor_course_roster, name='tutor_course_roster'),
+    path('tutor/courses/<int:course_id>/enroll/', academic_views.tutor_enroll_student, name='tutor_enroll_student'),
+    path('tutor/students/new/', academic_views.tutor_student_create, name='tutor_student_create'),
     
     # Vistas de Estudiante
     path('student/courses/', academic_views.student_courses_list, name='student_courses_list'),

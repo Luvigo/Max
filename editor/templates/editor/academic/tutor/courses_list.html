@@ -4,10 +4,18 @@
 {% block title %}Mis Cursos - {{ institution.name }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
     <div class="page-header-content">
         <h1><i class="fas fa-book"></i> Mis Cursos</h1>
         <p class="text-muted">{{ institution.name }}</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="{% url 'editor:tutor_course_create' institution_slug=institution.slug %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Crear Curso
+        </a>
+        <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-secondary">
+            <i class="fas fa-user-plus"></i> Crear Estudiante
+        </a>
     </div>
 </div>
 
@@ -57,10 +65,13 @@
             </table>
         </div>
         {% else %}
-        <div class="empty-state">
-            <i class="fas fa-book-open fa-3x text-muted"></i>
+        <div class="empty-state" style="text-align: center; padding: 3rem;">
+            <i class="fas fa-book-open fa-3x text-muted" style="opacity: 0.5;"></i>
             <h3>No tienes cursos asignados</h3>
-            <p class="text-muted">Contacta al administrador de la institución para que te asignen cursos.</p>
+            <p class="text-muted">Puedes crear tu propio curso o contactar al administrador.</p>
+            <a href="{% url 'editor:tutor_course_create' institution_slug=institution.slug %}" class="btn btn-primary" style="margin-top: 1rem;">
+                <i class="fas fa-plus"></i> Crear Mi Primer Curso
+            </a>
         </div>
         {% endif %}
     </div>

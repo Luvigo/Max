@@ -1,0 +1,137 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Matricular Estudiante - {{ course.name }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="breadcrumb">
+        <a href="{% url 'tutor_dashboard' slug=institution.slug %}">Dashboard</a>
+        <span class="separator">/</span>
+        <a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a>
+        <span class="separator">/</span>
+        <a href="{% url 'editor:tutor_course_roster' institution_slug=institution.slug course_id=course.id %}">{{ course.name }}</a>
+        <span class="separator">/</span>
+        <span>Matricular</span>
+    </div>
+    <h1 class="page-title">
+        <i class="fas fa-user-plus" style="color: var(--color-primary);"></i>
+        Matricular Estudiante
+    </h1>
+    <p class="page-subtitle">Agregar estudiante existente al curso: <strong>{{ course.name }}</strong></p>
+</div>
+
+<div class="card animate-in">
+    <div class="card-body">
+        {% if available_students %}
+        <form method="post" class="form-modern">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="student">Seleccionar Estudiante *</label>
+                <select id="student" name="student" class="form-control" required>
+                    <option value="">-- Selecciona un estudiante --</option>
+                    {% for student in available_students %}
+                    <option value="{{ student.id }}">
+                        {{ student.get_full_name|default:student.username }} ({{ student.email }})
+                    </option>
+                    {% endfor %}
+                </select>
+                <small class="form-help">Solo se muestran estudiantes no matriculados en este curso</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Matricular
+                </button>
+                <a href="{% url 'editor:tutor_course_roster' institution_slug=institution.slug course_id=course.id %}" class="btn btn-ghost">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-users-slash"></i>
+            <h3>No hay estudiantes disponibles</h3>
+            <p>Todos los estudiantes de la institución ya están matriculados en este curso, o no hay estudiantes creados.</p>
+            <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-primary">
+                <i class="fas fa-user-plus"></i> Crear Nuevo Estudiante
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card animate-in" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-lightbulb" style="color: var(--color-warning);"></i>
+            ¿No encuentras al estudiante?
+        </h3>
+    </div>
+    <div class="card-body">
+        <p>Si el estudiante no aparece en la lista, puedes:</p>
+        <ul style="margin: 1rem 0; padding-left: 1.5rem;">
+            <li>Crear un nuevo estudiante con su cuenta de usuario</li>
+            <li>Verificar que el estudiante pertenezca a esta institución</li>
+        </ul>
+        <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-secondary">
+            <i class="fas fa-user-plus"></i> Crear Nuevo Estudiante
+        </a>
+    </div>
+</div>
+
+<style>
+.form-modern .form-group {
+    margin-bottom: 1.25rem;
+}
+.form-modern label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--color-text);
+}
+.form-modern .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-modern .form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+.empty-state {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--color-text-muted);
+}
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+.empty-state h3 {
+    color: var(--color-text);
+    margin-bottom: 0.5rem;
+}
+.empty-state p {
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}

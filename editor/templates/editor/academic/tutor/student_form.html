@@ -1,0 +1,184 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Crear Estudiante - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="breadcrumb">
+        <a href="{% url 'tutor_dashboard' slug=institution.slug %}">Dashboard</a>
+        <span class="separator">/</span>
+        <a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a>
+        <span class="separator">/</span>
+        <span>Crear Estudiante</span>
+    </div>
+    <h1 class="page-title">
+        <i class="fas fa-user-plus" style="color: var(--color-success);"></i>
+        Crear Nuevo Estudiante
+    </h1>
+    <p class="page-subtitle">Crea una cuenta de estudiante. Podrá iniciar sesión con las credenciales que definas.</p>
+</div>
+
+<div class="card animate-in">
+    <div class="card-body">
+        <form method="post" class="form-modern">
+            {% csrf_token %}
+            
+            <h3 class="form-section-title">
+                <i class="fas fa-user"></i> Datos de Cuenta
+            </h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Nombre de Usuario *</label>
+                    <input type="text" id="username" name="username" class="form-control" 
+                           placeholder="Ej: juan.perez" required autocomplete="off">
+                    <small class="form-help">Este será el nombre para iniciar sesión</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" class="form-control" 
+                           placeholder="estudiante@email.com" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Contraseña *</label>
+                <input type="password" id="password" name="password" class="form-control" 
+                       placeholder="Mínimo 4 caracteres" required minlength="4">
+                <small class="form-help">El estudiante usará esta contraseña para iniciar sesión</small>
+            </div>
+            
+            <h3 class="form-section-title">
+                <i class="fas fa-id-card"></i> Información Personal
+            </h3>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">Nombre</label>
+                    <input type="text" id="first_name" name="first_name" class="form-control" 
+                           placeholder="Juan">
+                </div>
+                
+                <div class="form-group">
+                    <label for="last_name">Apellidos</label>
+                    <input type="text" id="last_name" name="last_name" class="form-control" 
+                           placeholder="Pérez García">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="student_id">ID de Estudiante *</label>
+                <input type="text" id="student_id" name="student_id" class="form-control" 
+                       placeholder="Ej: EST001 o matrícula" required>
+            </div>
+            
+            <h3 class="form-section-title">
+                <i class="fas fa-graduation-cap"></i> Asignación de Curso
+            </h3>
+            
+            <div class="form-group">
+                <label for="course">Matricular en Curso</label>
+                <select id="course" name="course" class="form-control">
+                    <option value="">-- Sin asignar curso aún --</option>
+                    {% for course in courses %}
+                    <option value="{{ course.id }}">{{ course.name }} ({{ course.code }})</option>
+                    {% endfor %}
+                </select>
+                <small class="form-help">Puedes matricularlo en un curso ahora o después</small>
+            </div>
+            
+            {% if not courses %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i>
+                No tienes cursos creados. <a href="{% url 'editor:tutor_course_create' institution_slug=institution.slug %}">Crear un curso primero</a>.
+            </div>
+            {% endif %}
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> Crear Estudiante
+                </button>
+                <a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}" class="btn btn-ghost">
+                    Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-modern .form-group {
+    margin-bottom: 1.25rem;
+}
+.form-modern label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--color-text);
+}
+.form-modern .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-secondary);
+    color: var(--color-text);
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-modern .form-control:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+.form-modern .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+.form-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 1rem;
+    color: var(--color-primary);
+}
+.form-section-title:first-of-type {
+    margin-top: 0;
+}
+.form-help {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+}
+.alert-warning {
+    padding: 1rem;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    color: var(--color-warning);
+    margin-bottom: 1rem;
+}
+.alert-warning a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+@media (max-width: 768px) {
+    .form-modern .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
