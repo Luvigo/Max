@@ -566,6 +566,38 @@ Blockly.Blocks['arduino_logic'] = {
     }
 };
 
+// Bloque AND separado (más intuitivo)
+Blockly.Blocks['arduino_and'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("Y");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("Retorna verdadero si AMBAS condiciones son verdaderas");
+    }
+};
+
+// Bloque OR separado (más intuitivo)
+Blockly.Blocks['arduino_or'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("O");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("Retorna verdadero si AL MENOS UNA condición es verdadera");
+    }
+};
+
 Blockly.Blocks['arduino_not'] = {
     init: function() {
         this.appendValueInput("VALUE")
@@ -1150,6 +1182,61 @@ Blockly.Blocks['max_linea_detectada'] = {
         this.setOutput(true, "Boolean");
         this.setColour(60);
         this.setTooltip("Retorna verdadero si el sensor detecta la línea (valor < umbral)");
+    }
+};
+
+// Bloque avanzado de detección de línea con operador configurable
+Blockly.Blocks['max_linea_comparar'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Sensor línea")
+            .appendField(new Blockly.FieldDropdown([
+                ["izquierdo", "IZQ"],
+                ["centro", "CENT"],
+                ["derecho", "DER"]
+            ]), "SENSOR");
+        this.appendDummyInput()
+            .appendField(new Blockly.FieldDropdown([
+                ["<", "<"],
+                [">", ">"],
+                ["=", "=="],
+                ["≤", "<="],
+                ["≥", ">="],
+                ["≠", "!="]
+            ]), "OP")
+            .appendField("umbral:")
+            .appendField(new Blockly.FieldNumber(500, 0, 1023), "UMBRAL");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(60);
+        this.setTooltip("Compara el valor del sensor de línea con un umbral usando el operador seleccionado");
+    }
+};
+
+// Bloque para leer el valor raw del sensor con comparación variable
+Blockly.Blocks['max_linea_valor_comparar'] = {
+    init: function() {
+        this.appendDummyInput()
+            .appendField("➖ Sensor")
+            .appendField(new Blockly.FieldDropdown([
+                ["izquierdo", "IZQ"],
+                ["centro", "CENT"],
+                ["derecho", "DER"]
+            ]), "SENSOR");
+        this.appendDummyInput()
+            .appendField(new Blockly.FieldDropdown([
+                ["<", "<"],
+                [">", ">"],
+                ["=", "=="],
+                ["≤", "<="],
+                ["≥", ">="]
+            ]), "OP");
+        this.appendValueInput("UMBRAL")
+            .setCheck("Number");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(60);
+        this.setTooltip("Compara el valor del sensor con un umbral variable (útil con variables)");
     }
 };
 

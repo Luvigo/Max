@@ -609,6 +609,8 @@ void loop() {
         
         <category name="⚖️ Lógica" colour="210">
             <block type="arduino_compare"></block>
+            <block type="arduino_and"></block>
+            <block type="arduino_or"></block>
             <block type="arduino_logic"></block>
             <block type="arduino_not"></block>
             <block type="arduino_true"></block>
@@ -782,6 +784,15 @@ void loop() {
                 <block type="max_linea_detectada">
                     <field name="SENSOR">CENT</field>
                     <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_valor_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
                 </block>
             </category>
             

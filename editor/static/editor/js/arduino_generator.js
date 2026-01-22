@@ -325,6 +325,20 @@ arduinoGenerator.forBlock['arduino_logic'] = function(block) {
     return [`(${a} ${op} ${b})`, arduinoGenerator.ORDER_LOGICAL_AND];
 };
 
+// Generador para AND separado
+arduinoGenerator.forBlock['arduino_and'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`(${a} && ${b})`, arduinoGenerator.ORDER_LOGICAL_AND];
+};
+
+// Generador para OR separado
+arduinoGenerator.forBlock['arduino_or'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`(${a} || ${b})`, arduinoGenerator.ORDER_LOGICAL_OR];
+};
+
 arduinoGenerator.forBlock['arduino_not'] = function(block) {
     const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || 'false';
     return [`!${value}`, arduinoGenerator.ORDER_UNARY_PREFIX];
@@ -772,6 +786,24 @@ arduinoGenerator.forBlock['max_linea_detectada'] = function(block) {
     const umbral = block.getFieldValue('UMBRAL');
     const sensorPin = sensor === 'IZQ' ? 'QTR_IZQ' : (sensor === 'CENT' ? 'QTR_CENT' : 'QTR_DER');
     return [`(analogRead(${sensorPin}) < ${umbral})`, arduinoGenerator.ORDER_RELATIONAL];
+};
+
+// Generador para comparación de línea con operador configurable
+arduinoGenerator.forBlock['max_linea_comparar'] = function(block) {
+    const sensor = block.getFieldValue('SENSOR');
+    const op = block.getFieldValue('OP');
+    const umbral = block.getFieldValue('UMBRAL');
+    const sensorPin = sensor === 'IZQ' ? 'QTR_IZQ' : (sensor === 'CENT' ? 'QTR_CENT' : 'QTR_DER');
+    return [`(analogRead(${sensorPin}) ${op} ${umbral})`, arduinoGenerator.ORDER_RELATIONAL];
+};
+
+// Generador para comparación con umbral variable
+arduinoGenerator.forBlock['max_linea_valor_comparar'] = function(block) {
+    const sensor = block.getFieldValue('SENSOR');
+    const op = block.getFieldValue('OP');
+    const umbral = arduinoGenerator.valueToCode(block, 'UMBRAL', arduinoGenerator.ORDER_ATOMIC) || '500';
+    const sensorPin = sensor === 'IZQ' ? 'QTR_IZQ' : (sensor === 'CENT' ? 'QTR_CENT' : 'QTR_DER');
+    return [`(analogRead(${sensorPin}) ${op} ${umbral})`, arduinoGenerator.ORDER_RELATIONAL];
 };
 
 // -------- BUZZER / NOTAS MUSICALES --------

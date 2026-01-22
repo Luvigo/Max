@@ -338,31 +338,172 @@
         </div>
     </div>
     
-    <!-- Blockly Toolbox -->
+    <!-- Blockly Toolbox - Arduino/MAX completo -->
     <xml id="toolbox" style="display: none">
-        <category name="Lógica" colour="#5b80a5">
-            <block type="controls_if"></block>
-            <block type="logic_compare"></block>
-            <block type="logic_operation"></block>
-            <block type="logic_negate"></block>
-            <block type="logic_boolean"></block>
+        <category name="⚙️ Estructura" colour="60">
+            <block type="arduino_setup"></block>
+            <block type="arduino_loop"></block>
         </category>
-        <category name="Bucles" colour="#5ba55b">
-            <block type="controls_repeat_ext"></block>
-            <block type="controls_whileUntil"></block>
-            <block type="controls_for"></block>
+        
+        <category name="🔀 Control" colour="210">
+            <block type="arduino_if"></block>
+            <block type="arduino_if_else"></block>
+            <block type="arduino_if_elseif"></block>
+            <block type="arduino_if_elseif_else"></block>
+            <block type="arduino_for">
+                <field name="VAR">i</field>
+                <field name="FROM">0</field>
+                <field name="TO">10</field>
+            </block>
+            <block type="arduino_while"></block>
         </category>
-        <category name="Matemáticas" colour="#5b67a5">
-            <block type="math_number"></block>
-            <block type="math_arithmetic"></block>
-            <block type="math_random_int"></block>
+        
+        <category name="⚖️ Lógica" colour="210">
+            <block type="arduino_compare"></block>
+            <block type="arduino_and"></block>
+            <block type="arduino_or"></block>
+            <block type="arduino_logic"></block>
+            <block type="arduino_not"></block>
+            <block type="arduino_true"></block>
+            <block type="arduino_false"></block>
         </category>
-        <category name="Texto" colour="#5ba58c">
-            <block type="text"></block>
-            <block type="text_print"></block>
+        
+        <category name="🔢 Matemáticas" colour="200">
+            <block type="arduino_number">
+                <field name="NUM">0</field>
+            </block>
+            <block type="arduino_math"></block>
+            <block type="arduino_map"></block>
+            <block type="arduino_constrain"></block>
+            <block type="arduino_random"></block>
         </category>
-        <category name="Variables" colour="#a55b80" custom="VARIABLE"></category>
-        <category name="Funciones" colour="#995ba5" custom="PROCEDURE"></category>
+        
+        <category name="📝 Texto" colour="160">
+            <block type="arduino_string">
+                <field name="TEXT">Hola</field>
+            </block>
+        </category>
+        
+        <category name="📊 Variables" colour="290">
+            <block type="arduino_variable_int"></block>
+            <block type="arduino_variable_float"></block>
+            <block type="arduino_variable_boolean"></block>
+            <block type="arduino_get_variable"></block>
+            <block type="arduino_set_variable"></block>
+        </category>
+        
+        <category name="⏱️ Tiempo" colour="330">
+            <block type="arduino_delay"></block>
+            <block type="arduino_delay_microseconds"></block>
+            <block type="arduino_millis"></block>
+        </category>
+        
+        <category name="📡 Serial" colour="20">
+            <block type="arduino_serial_begin"></block>
+            <block type="arduino_serial_print"></block>
+            <block type="arduino_serial_println"></block>
+        </category>
+
+        <sep></sep>
+        
+        <!-- CARRITO MAX -->
+        <category name="🚗 MAX Robot" colour="190" expanded="true">
+            <category name="🔧 Inicialización" colour="190">
+                <block type="max_init_motores">
+                    <field name="PIN_IZQ">9</field>
+                    <field name="PIN_DER">10</field>
+                </block>
+                <block type="max_init_distancia">
+                    <field name="PIN_TRIG">6</field>
+                    <field name="PIN_ECHO">7</field>
+                </block>
+                <block type="max_init_lineas">
+                    <field name="PIN_IZQ">0</field>
+                    <field name="PIN_CENT">1</field>
+                    <field name="PIN_DER">2</field>
+                </block>
+                <block type="max_init_buzzer">
+                    <field name="PIN">3</field>
+                </block>
+                <block type="max_init_garra">
+                    <field name="PIN">11</field>
+                </block>
+            </category>
+            
+            <category name="🚗 Movimiento" colour="120">
+                <block type="max_adelante">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_atras">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_izquierda">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_derecha">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_detener"></block>
+                <block type="max_avanzar_tiempo">
+                    <field name="VEL">30</field>
+                    <field name="TIEMPO">1000</field>
+                </block>
+                <block type="max_girar_tiempo">
+                    <field name="DIR">derecha</field>
+                    <field name="VEL">25</field>
+                    <field name="TIEMPO">500</field>
+                </block>
+            </category>
+            
+            <category name="📡 Sensor Distancia" colour="230">
+                <block type="max_medir_distancia"></block>
+                <block type="max_distancia_menor_que">
+                    <field name="CM">20</field>
+                </block>
+                <block type="max_distancia_mayor_que">
+                    <field name="CM">30</field>
+                </block>
+                <block type="max_evitar_obstaculo">
+                    <field name="DISTANCIA">20</field>
+                </block>
+            </category>
+            
+            <category name="➖ Sensor Líneas" colour="60">
+                <block type="max_leer_linea_izq"></block>
+                <block type="max_leer_linea_centro"></block>
+                <block type="max_leer_linea_der"></block>
+                <block type="max_linea_detectada">
+                    <field name="SENSOR">CENT</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_valor_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
+                </block>
+            </category>
+            
+            <category name="🎵 Buzzer/Sonido" colour="300">
+                <block type="max_tocar_nota">
+                    <field name="NOTA">262</field>
+                    <field name="DURACION">300</field>
+                </block>
+                <block type="max_beep"></block>
+                <block type="max_detener_sonido"></block>
+            </category>
+            
+            <category name="🦾 Garra" colour="45">
+                <block type="max_abrir_garra"></block>
+                <block type="max_cerrar_garra"></block>
+                <block type="max_mover_garra">
+                    <field name="ANGULO">90</field>
+                </block>
+            </category>
+        </category>
     </xml>
     
     <script src="{% static 'editor/js/arduino_blocks.js' %}?v={{ request.timestamp|default:'1' }}"></script>
