@@ -1,40 +1,96 @@
 @startuml
+title Módulo 6: Operaciones Globales (Django Admin)
 left to right direction
+
 actor Admin
-actor "Institución" as Inst
-actor Tutor
-actor Estudiante
 
-rectangle "Módulo 6: Observabilidad" {
-  usecase "Registrar ErrorEvent" as UC_ErrorLog
-  usecase "Dashboard Errores (Admin)" as UC_AdminDash
-  usecase "Dashboard Errores (Institución)" as UC_InstDash
-  usecase "Dashboard Errores (Tutor)" as UC_TutorDash
-  usecase "Copiar diagnóstico (IDE)" as UC_CopyDiag
-  usecase "Reportar incidente" as UC_Report
-  usecase "Exportar logs" as UC_Export
-
-  usecase "ERROR: BootloaderSyncFailed" as E_Boot
-  usecase "ERROR: AgentMissing" as E_AgentMissing
-  usecase "ERROR: WorkspaceCorrupt" as E_Corrupt
-  usecase "ERROR: SubmissionRace" as E_Race
-  usecase "ERROR: PortBusy" as E_Port
-  usecase "ERROR: UploadFailed" as E_Upload
+rectangle "Módulo 6: Operaciones Globales en Django Admin" {
+  ' Gestión de Entidades
+  package "Gestión de Entidades" {
+    usecase "Gestionar Instituciones" as UC_Inst
+    usecase "Gestionar Tutores" as UC_Tutor
+    usecase "Gestionar Estudiantes" as UC_Student
+    usecase "Gestionar Grupos" as UC_Group
+    usecase "Gestionar Actividades" as UC_Activity
+    usecase "Gestionar Entregas" as UC_Submission
+  }
+  
+  ' Operaciones Masivas
+  package "Operaciones Masivas" {
+    usecase "Activar/Desactivar masivo" as UC_Bulk
+    usecase "Cambiar estados masivo" as UC_States
+    usecase "Exportar a CSV" as UC_Export
+    usecase "Deshabilitar cuentas" as UC_DisableAccounts
+  }
+  
+  ' Búsqueda y Filtros
+  package "Búsqueda y Filtros" {
+    usecase "Búsqueda avanzada" as UC_Search
+    usecase "Filtros personalizados" as UC_Filter
+    usecase "Filtro por estado de usuario" as UC_FilterUser
+    usecase "Filtro por fecha límite" as UC_FilterDeadline
+    usecase "Filtro por entregas" as UC_FilterSub
+  }
+  
+  ' Auditoría
+  package "Auditoría" {
+    usecase "Ver logs de auditoría" as UC_AuditLog
+    usecase "Ver eventos de error" as UC_ErrorLog
+    usecase "Resolver errores" as UC_ResolveError
+  }
+  
+  ' Errores
+  usecase "ERROR: Conflicto de integridad" as E_Integrity
+  usecase "ERROR: Permiso denegado" as E_Permission
 }
 
-Estudiante --> UC_CopyDiag
-Estudiante --> UC_Report
-Tutor --> UC_TutorDash
-Tutor --> UC_Report
-Inst --> UC_InstDash
-Admin --> UC_AdminDash
-Admin --> UC_Export
+' Conexiones del Admin
+Admin --> UC_Inst
+Admin --> UC_Tutor
+Admin --> UC_Student
+Admin --> UC_Group
+Admin --> UC_Activity
+Admin --> UC_Submission
 
-UC_Report --> UC_ErrorLog : <<include>>
-UC_ErrorLog ..> E_Boot : <<extend>>
-UC_ErrorLog ..> E_AgentMissing : <<extend>>
-UC_ErrorLog ..> E_Corrupt : <<extend>>
-UC_ErrorLog ..> E_Race : <<extend>>
-UC_ErrorLog ..> E_Port : <<extend>>
-UC_ErrorLog ..> E_Upload : <<extend>>
+Admin --> UC_Bulk
+Admin --> UC_States
+Admin --> UC_Export
+Admin --> UC_DisableAccounts
+
+Admin --> UC_Search
+Admin --> UC_Filter
+Admin --> UC_FilterUser
+Admin --> UC_FilterDeadline
+Admin --> UC_FilterSub
+
+Admin --> UC_AuditLog
+Admin --> UC_ErrorLog
+Admin --> UC_ResolveError
+
+' Errores
+UC_Bulk ..> E_Integrity : <<extend>>
+UC_DisableAccounts ..> E_Permission : <<extend>>
+
+note right of Admin
+  **Acceso:**
+  SOLO vía /admin/
+  
+  NO hay templates personalizados
+  NO hay rutas /admin-panel/
+end note
+
+note bottom of UC_Export
+  **Exportación CSV:**
+  - Disponible en todos los modelos
+  - Seleccionar registros
+  - Acción "Exportar a CSV"
+end note
+
+note bottom of UC_Bulk
+  **Acciones Masivas:**
+  - Activar/Desactivar
+  - Cambiar estados
+  - Publicar/Cerrar
+  - Deshabilitar cuentas
+end note
 @enduml

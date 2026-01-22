@@ -1,122 +1,113 @@
-# MÓDULO 6: Observabilidad (ErrorEvent/AuditLog) + Dashboards por Rol
+# Módulo 6: Operaciones Globales (Django Admin)
 
 ## Descripción
-
-Este módulo implementa un sistema completo de observabilidad para el MAX-IDE, permitiendo registrar eventos de error y logs de auditoría con dashboards específicos por rol.
-
-## Componentes Principales
-
-### Modelos
-
-#### `AuditLog`
-Registra todas las acciones del sistema para auditoría:
-- **Actor**: Usuario que realiza la acción
-- **Institución**: Tenant asociado
-- **Acción**: Tipo de acción (create, update, delete, publish, submit, grade, login, logout, access, export, import)
-- **Entidad**: Modelo afectado (Course, Activity, etc.)
-- **Entity ID**: ID de la entidad afectada
-- **Metadata**: Información adicional en JSON
-- **Timestamp**: Fecha y hora del evento
-
-#### `ErrorEvent`
-Registra eventos de error para observabilidad:
-- **Institución**: Tenant asociado (opcional)
-- **Usuario**: Usuario afectado (opcional, para errores del sistema)
-- **Código**: Tipo de error (BootloaderSyncFailed, PortBusy, AgentMissing, UploadFailed, WorkspaceCorrupt, SubmissionRace, CompilationError, SerialError, etc.)
-- **Severidad**: Nivel de severidad (low, medium, high, critical)
-- **Mensaje**: Descripción del error
-- **Contexto**: Información adicional en JSON (institution_slug, activity_id, project_id, agent_status, etc.)
-- **Timestamp**: Fecha y hora del error
-- **Resolución**: Campos para marcar errores como resueltos
+Todas las operaciones de administración global se realizan EXCLUSIVAMENTE desde Django Admin (`/admin/`).
+NO se crean templates ni rutas tipo `/admin-panel/`.
 
 ## Funcionalidades
 
-### APIs
+### 1. list_display Mejorado
+Cada modelo muestra información relevante con badges de colores:
+- Estados con colores semafóricos (verde=activo, amarillo=pendiente, rojo=error)
+- Contadores de relaciones (estudiantes, actividades, entregas)
+- Fechas con indicadores visuales
 
-#### `POST /api/errors/`
-Registra un nuevo evento de error desde el frontend (IDE y dashboards).
-- Permite registrar errores con código, severidad, mensaje y contexto
-- Detecta automáticamente la institución del usuario
-- Retorna el ID del error creado
+### 2. search_fields Avanzado
+Búsqueda en múltiples campos:
+- Usernames, emails, nombres completos
+- Nombres de instituciones, grupos, cursos
+- Códigos y IDs
 
-#### `GET /api/errors/list/`
-Lista errores filtrados por rol/tenant:
-- **Admin**: Ve todos los errores
-- **Institución**: Ve solo errores de su institución
-- **Tutor**: Ve errores de sus cursos/actividades
-- **Estudiante**: Solo diagnóstico propio
+### 3. list_filter Personalizado
+Filtros predefinidos:
+- `IsActiveListFilter`: Filtra por estado de cuenta de usuario
+- `HasSubmissionsFilter`: Filtra actividades con/sin entregas
+- `DeadlineStatusFilter`: Filtra por estado de fecha límite
 
-### Dashboards
+### 4. Acciones Masivas
 
-#### Admin (`/admin-panel/errors/`)
-- Lista global de todos los errores
-- Estadísticas (total, resueltos, sin resolver, críticos)
-- Filtros por código, severidad, estado
-- Top errores por código
-- Detalle de error con opción de marcar como resuelto
+#### Usuarios/Tutores/Estudiantes
+- ✅ Activar seleccionados
+- ⏸️ Desactivar seleccionados
+- 🚫 Suspender seleccionados
+- 🔒 Deshabilitar cuentas de usuario
 
-#### Institución (`/i/<slug>/institution/errors/`)
-- Lista de errores de la institución
-- Estadísticas (total, resueltos, sin resolver, últimas 24h)
-- Agrupación por código de error
-- Filtros por código, severidad, estado
+#### Instituciones/Grupos/Cursos
+- ✅ Activar
+- ⏸️ Desactivar
+- 📦 Archivar
 
-#### Tutor (`/i/<slug>/tutor/errors/`)
-- Lista de errores relacionados con sus cursos
-- Estadísticas básicas
-- Filtros por código y severidad
+#### Actividades
+- ✅ Publicar
+- 🔒 Cerrar
+- 📝 Pasar a borrador
 
-### Integración en IDE
+#### Entregas
+- ✅ Marcar como calificadas
+- 📨 Marcar como entregadas
+- 👁️ Marcar como revisadas
+- 🔄 Resetear a en progreso
 
-#### Botón "Copiar Diagnóstico"
-Permite copiar al portapapeles un diagnóstico completo del estado del IDE:
-- Información de institución, actividad y proyecto
-- Estado del Agent (URL, versión, plataforma)
-- Estado de conexión y últimos errores
-- Timestamp del diagnóstico
+#### Errores
+- ✅ Marcar como resueltos
+- 🔄 Marcar como pendientes
 
-#### Botón "Reportar Error"
-Permite reportar un error al backend con:
-- Código de error seleccionado
-- Descripción del error
-- Contexto completo (institución, actividad, proyecto, estado del Agent, etc.)
-- Severidad determinada automáticamente según el código
+### 5. Exportación CSV
+Disponible en todos los modelos principales:
+- Seleccionar registros
+- Acción "📥 Exportar seleccionados a CSV"
+- Descarga archivo con todos los campos
 
-## Tipos de Error
+### 6. Auditoría
+Campos automáticos en modelos clave:
+- `created_at`: Fecha de creación
+- `updated_at`: Fecha de actualización
+- `created_by`: Usuario que creó el registro
 
-Los siguientes tipos de error están definidos:
-- `BootloaderSyncFailed`: Error de sincronización del bootloader
-- `PortBusy`: Puerto ocupado
-- `AgentMissing`: Agent no disponible
-- `UploadFailed`: Fallo en la subida del código
-- `WorkspaceCorrupt`: Workspace corrupto
-- `SubmissionRace`: Condición de carrera en entrega
-- `CompilationError`: Error de compilación
-- `SerialError`: Error en comunicación serial
-- `AuthenticationError`: Error de autenticación
-- `PermissionError`: Error de permisos
-- `ValidationError`: Error de validación
-- `NetworkError`: Error de red
-- `GenericError`: Error genérico
+## Mixins
 
-## Seguridad
+### ExportCSVMixin
+```python
+class ExportCSVMixin:
+    def export_as_csv(self, request, queryset):
+        # Genera CSV con todos los campos del modelo
+```
 
-- **Cross-tenant protection**: Los usuarios solo ven errores de su institución
-- **Role-based access**: Cada rol tiene acceso a diferentes niveles de información
-- **Audit trail**: Todas las acciones importantes se registran en `AuditLog`
+### AuditMixin
+```python
+class AuditMixin:
+    def save_model(self, request, obj, form, change):
+        # Guarda automáticamente created_by
+```
 
-## Diagramas UML
+## Filtros Personalizados
 
-- `use_cases.puml`: Casos de uso del módulo
-- `class_diagram.puml`: Diagrama de clases mostrando los modelos y sus relaciones
+### IsActiveListFilter
+Filtra por estado de cuenta de usuario (activo/inactivo)
 
-## Entregables
+### HasSubmissionsFilter
+Filtra actividades con o sin entregas
 
-- ✅ Modelos `AuditLog` y `ErrorEvent` en `editor/models.py`
-- ✅ APIs `/api/errors/` y `/api/errors/list/` en `editor/error_views.py`
-- ✅ Vistas de dashboards por rol en `editor/error_views.py`
-- ✅ Templates para dashboards de errores
-- ✅ Integración en IDE (copiar diagnóstico, reportar error) en `app.js`
-- ✅ URLs configuradas en `editor/urls.py` y `arduino_ide/urls.py`
-- ✅ Modelos registrados en `editor/admin.py`
-- ✅ Diagramas UML en `docs/uml/module6/`
+### DeadlineStatusFilter
+- Próximas (7 días)
+- Vencidas
+- Sin fecha límite
+
+## Archivos
+- `editor/admin.py`: Configuración completa del admin
+- `docs/uml/module6/`: Documentación UML
+
+## Acceso
+```
+URL: /admin/
+Usuario: Superusuario o staff
+```
+
+## Badges Visuales
+Los badges usan colores consistentes:
+- 🟢 Verde (#2ea043): Activo, OK, Calificado
+- 🟡 Amarillo (#e3b341): Pendiente, En progreso, Advertencia
+- 🔴 Rojo (#f85149): Error, Suspendido, Vencido
+- 🔵 Azul (#58a6ff): Info, Entregado, Tutor
+- 🟣 Púrpura (#a371f7): Institución, Especial
+- ⚪ Gris (#8b949e): Inactivo, Offline
