@@ -1,66 +1,65 @@
 @startuml
-!theme cerulean
-title Módulo 1: Flujo de Autenticación y Resolución de Tenant
+title Módulo 1: Flujo de Autenticación por Rol
 
 actor Usuario
-participant "Browser" as Browser
-participant "Django\nAuth" as Auth
-participant "Tenant\nMiddleware" as TM
-participant "Dashboard\nView" as DV
-participant "Models" as DB
+participant "Login View" as Login
+participant "Django Auth" as Auth
+database "Membership" as DB
+participant "Redirect Logic" as Redirect
 
-== Login ==
-Usuario -> Browser: Accede a /login/
-Browser -> Auth: GET /login/
-Auth --> Browser: Formulario login
+== Flujo de Login ==
 
-Usuario -> Browser: Ingresa credenciales
-Browser -> Auth: POST /login/
-Auth -> DB: Verificar usuario
-DB --> Auth: Usuario válido
+Usuario -> Login: POST /login/ (username, password)
+Login -> Auth: authenticate(username, password)
 
-alt Usuario válido
-    Auth --> Browser: Redirect /dashboard/
-else Credenciales inválidas
-    Auth --> Browser: Error "Login fallido"
+alt Credenciales inválidas
+    Auth --> Login: None
+    Login --> Usuario: Error: "Credenciales incorrectas"
 end
 
-== Resolución de Dashboard ==
-Browser -> TM: GET /dashboard/
-TM -> DB: get_user_institutions(user)
-DB --> TM: Lista de instituciones
+Auth --> Login: User object
+Login -> Login: Verificar is_superuser/is_staff
 
-alt Solo 1 institución
-    TM -> DB: get_user_role(user, institution)
-    DB --> TM: rol (admin/institution/tutor/student)
-    TM --> Browser: Redirect /i/<slug>/dashboard/<rol>/
-else Múltiples instituciones
-    TM --> Browser: Redirect /select-institution/
+alt Es Admin/Staff
+    Login --> Usuario: redirect("/admin/login/")
+    note right: Admin usa Django Admin exclusivamente
 end
 
-== Acceso a Dashboard con Tenant ==
-Browser -> TM: GET /i/mi-colegio/dashboard/student/
-TM -> DB: Institution.get(slug="mi-colegio")
-DB --> TM: Institution object
+Login -> Auth: login(user)
+Login -> DB: get_user_role(user)
+Login -> DB: get_user_institutions(user)
 
-TM -> DB: Membership.get(user, institution)
-DB --> TM: Membership object
-
-alt Tiene acceso
-    TM -> DV: request (con current_institution)
-    DV -> DB: Queries filtradas por institución
-    DB --> DV: Datos del estudiante
-    DV --> Browser: HTML Dashboard
-else Sin acceso (cross-tenant)
-    TM --> Browser: Redirect + Error 403
+alt Sin instituciones asignadas
+    Login --> Usuario: redirect al IDE básico
+    note right: Usuario sin rol/institución
 end
 
-note over TM
-  El middleware añade:
-  - request.current_institution
-  - request.current_membership
-  - request.user_role
-  - request.user_institutions
-end note
+alt Una institución
+    DB --> Redirect: role, institution
+    
+    alt role == 'institution'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/")
+    else role == 'tutor'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/tutor/")
+    else role == 'student'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/student/")
+    end
+end
+
+alt Múltiples instituciones
+    Redirect --> Usuario: redirect("select_institution")
+end
+
+== Verificación de Acceso (Decorators) ==
+
+Usuario -> Login: GET /i/<slug>/tutor/some-view/
+Login -> Auth: @tutor_required decorator
+Auth -> DB: Check user_role in ['admin', 'institution', 'tutor']
+
+alt Rol permitido
+    Auth --> Usuario: Render vista
+else Rol no permitido
+    Auth --> Usuario: redirect("dashboard") + Error 403
+end
 
 @enduml

@@ -1,5 +1,6 @@
 """
 Mixins y Decorators para RBAC y Tenant Scoping
+MÓDULO 1: Auth + Roles (Admin, Tutor, Estudiante)
 """
 from functools import wraps
 from django.shortcuts import redirect, get_object_or_404
@@ -65,6 +66,107 @@ def role_required(*allowed_roles):
     return decorator
 
 
+def admin_required(view_func):
+    """
+    Decorator específico para vistas que requieren rol de admin.
+    Redirige al Django Admin en lugar de un dashboard custom.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.warning(request, 'Debes iniciar sesión para acceder.')
+            return redirect('login')
+        
+        # Solo superuser o staff puede acceder
+        if not (request.user.is_superuser or request.user.is_staff):
+            messages.error(request, 'Acceso denegado. Esta sección es solo para administradores.')
+            return redirect('dashboard')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def tutor_required(view_func):
+    """
+    Decorator específico para vistas que requieren rol de tutor o superior.
+    
+    Roles permitidos: admin, institution, tutor
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.warning(request, 'Debes iniciar sesión para acceder.')
+            return redirect('login')
+        
+        # Superuser siempre tiene acceso
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        user_role = getattr(request, 'user_role', None)
+        allowed_roles = ['admin', 'institution', 'tutor']
+        
+        if user_role not in allowed_roles:
+            messages.error(request, 'Acceso denegado. Esta sección es solo para tutores.')
+            return redirect('dashboard')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def student_required(view_func):
+    """
+    Decorator específico para vistas que requieren rol de estudiante o superior.
+    
+    Roles permitidos: admin, institution, tutor, student
+    (básicamente cualquier usuario autenticado con membresía)
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.warning(request, 'Debes iniciar sesión para acceder.')
+            return redirect('login')
+        
+        # Superuser siempre tiene acceso
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        user_role = getattr(request, 'user_role', None)
+        
+        if user_role is None:
+            messages.error(request, 'Acceso denegado. No tienes un rol asignado en ninguna institución.')
+            return redirect('login')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def institution_admin_required(view_func):
+    """
+    Decorator para vistas que requieren rol de administrador de institución.
+    
+    Roles permitidos: admin, institution
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            messages.warning(request, 'Debes iniciar sesión para acceder.')
+            return redirect('login')
+        
+        # Superuser siempre tiene acceso
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        user_role = getattr(request, 'user_role', None)
+        allowed_roles = ['admin', 'institution']
+        
+        if user_role not in allowed_roles:
+            messages.error(request, 'Acceso denegado. Esta sección es solo para administradores de institución.')
+            return redirect('dashboard')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 def institution_required(view_func):
     """
     Decorator que requiere una institución activa en el contexto.
@@ -86,6 +188,20 @@ def institution_required(view_func):
             messages.info(request, 'Por favor selecciona una institución.')
             return redirect('select_institution')
         
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def deny_if_admin(view_func):
+    """
+    Decorator que deniega acceso a administradores.
+    Los admins deben usar /admin/ en lugar de vistas personalizadas.
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if request.user.is_authenticated and (request.user.is_superuser or request.user.is_staff):
+            messages.info(request, 'Como administrador, usa el panel de Django Admin.')
+            return redirect('/admin/')
         return view_func(request, *args, **kwargs)
     return wrapper
 

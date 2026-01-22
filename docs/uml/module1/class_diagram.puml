@@ -1,133 +1,107 @@
 @startuml
-!theme cerulean
-title Módulo 1: Diagrama de Clases - Multi-tenant + RBAC
+title Módulo 1: Diagrama de Clases - Auth + Roles
 
-skinparam classAttributeIconSize 0
-
-package "django.contrib.auth" <<Database>> {
+package "Django Auth" {
     class User {
         +id: int
         +username: str
+        +password: str
         +email: str
-        +first_name: str
-        +last_name: str
         +is_superuser: bool
+        +is_staff: bool
         +is_active: bool
+        +authenticate()
+        +login()
+        +logout()
     }
 }
 
-package "editor.models" <<Database>> {
-    
+package "Modelos Multi-tenant" {
     class Institution {
         +id: UUID
         +name: str
-        +slug: str {unique}
-        +code: str {unique}
-        +description: str
-        +logo: URL
-        +status: enum(active, inactive, suspended)
-        +created_at: datetime
-        +updated_at: datetime
-        +is_active: bool
-        --
-        +save(): void
-        +get_members_count(): int
-        +get_courses_count(): int
-        +get_students_count(): int
+        +slug: str
+        +code: str
+        +status: str
+        +agent_token: str
     }
     
     class Membership {
         +id: UUID
         +user: FK(User)
         +institution: FK(Institution)
-        +role: enum(admin, institution, tutor, student)
+        +role: str ['admin', 'institution', 'tutor', 'student']
         +is_active: bool
-        +created_at: datetime
-        +updated_at: datetime
-        +notes: str
         --
-        +is_admin: bool {property}
-        +is_institution_admin: bool {property}
-        +is_tutor_or_above: bool {property}
-        +is_student: bool {property}
-    }
-    
-    class Course {
-        +id: int
-        +institution: FK(Institution)
-        +tutor: FK(User) {nullable}
-        +name: str
-        +code: str
-        +description: str
-        +academic_year: str
-        +is_active: bool
-        +created_at: datetime
-        +updated_at: datetime
-        --
-        +get_students_count(): int
-    }
-    
-    class Student {
-        +id: int
-        +user: FK(User) {1:1}
-        +student_id: str {unique}
-        +course: FK(Course) {nullable}
-        +phone: str
-        +is_active: bool
-        +created_at: datetime
-        +updated_at: datetime
-        --
-        +get_projects_count(): int
-        +institution: Institution {property}
-    }
-    
-    class Project {
-        +id: int
-        +student: FK(Student)
-        +name: str
-        +description: str
-        +xml_content: text
-        +arduino_code: text
-        +is_active: bool
-        +created_at: datetime
-        +updated_at: datetime
-        --
-        +get_last_modified(): str
-        +institution: Institution {property}
+        +is_admin(): bool
+        +is_institution_admin(): bool
+        +is_tutor_or_above(): bool
+        +is_student(): bool
     }
     
     class UserRoleHelper <<utility>> {
-        {static} +get_user_role(user, institution?): str
+        {static} +get_user_role(user): str
         {static} +get_user_institutions(user): QuerySet
-        {static} +user_has_role(user, roles, institution?): bool
-        {static} +get_single_institution(user): Institution?
+        {static} +get_single_institution(user): Institution
+        {static} +user_has_role(user, roles, institution): bool
     }
 }
 
-' Relaciones
-User "1" -- "0..*" Membership : tiene >
-Institution "1" -- "0..*" Membership : tiene >
-Institution "1" -- "0..*" Course : contiene >
-Course "0..1" -- "0..*" Student : asignado a >
-User "1" -- "0..*" Course : tutora >
-User "1" -- "0..1" Student : perfil >
-Student "1" -- "0..*" Project : crea >
+package "Decorators" {
+    class "@login_required" <<decorator>> {
+        Requiere usuario autenticado
+    }
+    
+    class "@role_required(*roles)" <<decorator>> {
+        Requiere uno de los roles especificados
+    }
+    
+    class "@admin_required" <<decorator>> {
+        Solo superuser/staff
+        Redirige a /admin/
+    }
+    
+    class "@tutor_required" <<decorator>> {
+        Roles: admin, institution, tutor
+    }
+    
+    class "@student_required" <<decorator>> {
+        Cualquier usuario con membresía
+    }
+    
+    class "@institution_required" <<decorator>> {
+        Requiere institución en contexto URL
+    }
+}
 
-note right of Membership
-  **unique_together**
-  (user, institution)
-  
-  Un usuario puede tener
-  diferentes roles en
-  diferentes instituciones.
+package "Middleware" {
+    class TenantMiddleware {
+        +current_institution: Institution
+        +current_membership: Membership
+        +user_role: str
+        +user_institutions: QuerySet
+        --
+        +__call__(request)
+    }
+}
+
+User "1" -- "*" Membership
+Institution "1" -- "*" Membership
+TenantMiddleware ..> Institution
+TenantMiddleware ..> Membership
+UserRoleHelper ..> Membership
+UserRoleHelper ..> User
+
+note bottom of Membership
+  **Roles disponibles:**
+  - admin: Administrador Global
+  - institution: Admin de Institución
+  - tutor: Tutor/Docente
+  - student: Estudiante
 end note
 
-note bottom of Institution
-  **Tenant principal**
-  Todos los datos están
-  scoped a una institución.
-  El slug se usa en URLs:
-  /i/<slug>/...
+note bottom of "@admin_required"
+  El Admin NO tiene dashboard custom.
+  Usa exclusivamente /admin/
 end note
-
 @enduml

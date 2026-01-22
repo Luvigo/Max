@@ -18,10 +18,11 @@ urlpatterns = [
     # Admin de Django
     path('admin/', admin.site.urls),
     
-    # Autenticación global (vista personalizada)
+    # MÓDULO 1: Autenticación global (vista personalizada)
     # Los admins deben usar /admin/login/, los usuarios normales usan /login/
     path('login/', auth_views.user_login, name='login'),
     path('logout/', auth_views.user_logout, name='logout'),
+    path('403/', auth_views.access_denied, name='access_denied'),
     
     # Dashboard principal (redirige según rol)
     path('dashboard/', dashboard_views.dashboard_redirect, name='dashboard'),
