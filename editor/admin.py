@@ -139,7 +139,7 @@ class InstitutionAdmin(ExportCSVMixin, admin.ModelAdmin):
     Admin de Instituciones - Centro de gestión global
     """
     list_display = [
-        'name', 'code', 'city', 'status_badge', 
+        'name', 'code', 'city', 'status', 'status_badge', 
         'get_tutors_count', 'get_students_count', 'get_courses_count', 
         'get_groups_count', 'get_activities_count', 'created_at'
     ]
@@ -301,7 +301,7 @@ class MembershipAdmin(ExportCSVMixin, admin.ModelAdmin):
 @admin.register(Course)
 class CourseAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     list_display = [
-        'name', 'code', 'institution', 'grade_level', 'status_badge', 
+        'name', 'code', 'institution', 'grade_level', 'status', 'status_badge', 
         'academic_year', 'get_students_count', 'get_activities_count', 'is_active'
     ]
     list_filter = ['institution', 'status', 'grade_level', 'academic_year', 'is_active', 'created_at']
