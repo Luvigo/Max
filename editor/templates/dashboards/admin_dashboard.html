@@ -1,174 +1,51 @@
 {% extends "base_dashboard.html" %}
+{# 
+    LIMPIEZA ARQUITECTÓNICA
+    
+    ❌ TEMPLATE DEPRECADO
+    El Admin usa EXCLUSIVAMENTE Django Admin (/admin/)
+    
+    Este template solo muestra un mensaje de redirección.
+#}
 
-{% block title %}Dashboard Administrador - MAX-IDE{% endblock %}
+{% block title %}Acceso Administrador - MAX-IDE{% endblock %}
 
 {% block content %}
 <div class="page-header">
     <h1 class="page-title">
-        <i class="fas fa-crown" style="color: var(--color-warning);"></i>
-        Panel de Administración Global
+        <i class="fas fa-shield-alt" style="color: var(--color-warning);"></i>
+        Área de Administración
     </h1>
-    <p class="page-subtitle">Vista general de todas las instituciones y usuarios del sistema</p>
 </div>
 
-<!-- Métricas Globales -->
-<div class="metrics-grid">
-    <div class="metric-card animate-in">
-        <div class="metric-icon purple">
-            <i class="fas fa-building"></i>
+<div class="card animate-in">
+    <div class="card-body" style="text-align: center; padding: 3rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">
+            <i class="fas fa-user-shield" style="color: var(--color-primary);"></i>
         </div>
-        <div class="metric-value">{{ metrics.institutions }}</div>
-        <div class="metric-label">Instituciones Activas</div>
-    </div>
-    
-    <div class="metric-card animate-in">
-        <div class="metric-icon blue">
-            <i class="fas fa-users"></i>
-        </div>
-        <div class="metric-value">{{ metrics.users }}</div>
-        <div class="metric-label">Usuarios Totales</div>
-    </div>
-    
-    <div class="metric-card animate-in">
-        <div class="metric-icon orange">
-            <i class="fas fa-graduation-cap"></i>
-        </div>
-        <div class="metric-value">{{ metrics.courses }}</div>
-        <div class="metric-label">Cursos Activos</div>
-    </div>
-    
-    <div class="metric-card animate-in">
-        <div class="metric-icon green">
-            <i class="fas fa-user-graduate"></i>
-        </div>
-        <div class="metric-value">{{ metrics.students }}</div>
-        <div class="metric-label">Estudiantes</div>
-    </div>
-    
-    <div class="metric-card animate-in">
-        <div class="metric-icon cyan">
-            <i class="fas fa-project-diagram"></i>
-        </div>
-        <div class="metric-value">{{ metrics.projects }}</div>
-        <div class="metric-label">Proyectos Creados</div>
-    </div>
-</div>
-
-<!-- Grids de Datos -->
-<div class="data-grid">
-    <!-- Instituciones Recientes -->
-    <div class="card animate-in">
-        <div class="card-header">
-            <h3 class="card-title">
-                <i class="fas fa-building" style="color: var(--color-purple);"></i>
-                Instituciones Recientes
-            </h3>
-            <a href="/admin/institutions/" class="btn btn-ghost">Ver todas</a>
-        </div>
-        <div class="card-body" style="padding: 0;">
-            {% if recent_institutions %}
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Institución</th>
-                        <th>Estado</th>
-                        <th>Miembros</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for inst in recent_institutions %}
-                    <tr>
-                        <td>
-                            <strong>{{ inst.name }}</strong>
-                            <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ inst.code }}</div>
-                        </td>
-                        <td>
-                            <span class="status-badge {% if inst.status == 'active' %}active{% else %}inactive{% endif %}">
-                                <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
-                                {{ inst.get_status_display }}
-                            </span>
-                        </td>
-                        <td>{{ inst.get_members_count }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="empty-state">
-                <i class="fas fa-building"></i>
-                <p>No hay instituciones registradas</p>
-                <a href="/admin/institutions/create/" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> Crear Institución
-                </a>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- Actividad Reciente -->
-    <div class="card animate-in">
-        <div class="card-header">
-            <h3 class="card-title">
-                <i class="fas fa-clock" style="color: var(--color-primary);"></i>
-                Actividad Reciente
-            </h3>
-        </div>
-        <div class="card-body" style="padding: 0;">
-            {% if recent_activity %}
-            <div class="activity-list">
-                {% for project in recent_activity %}
-                <div class="activity-item">
-                    <div class="activity-icon project">
-                        <i class="fas fa-code"></i>
-                    </div>
-                    <div class="activity-content">
-                        <div class="activity-title">{{ project.name }}</div>
-                        <div class="activity-meta">
-                            {{ project.student.user.get_full_name|default:project.student.user.username }}
-                            {% if project.student.course %}
-                            - {{ project.student.course.institution.name }}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="activity-time">
-                        {{ project.updated_at|timesince }} ago
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">
-                <i class="fas fa-history"></i>
-                <p>No hay actividad reciente</p>
-            </div>
-            {% endif %}
+        <h2 style="margin-bottom: 1rem;">Panel de Administración</h2>
+        <p style="color: var(--color-text-muted); margin-bottom: 2rem;">
+            Como administrador, debes usar el panel de Django Admin para gestionar el sistema.
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="/admin/" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.75rem 1.5rem;">
+                <i class="fas fa-cog"></i> Ir a Django Admin
+            </a>
+            <a href="{% url 'logout' %}" class="btn btn-secondary">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+            </a>
         </div>
     </div>
 </div>
 
-<!-- Acciones Rápidas -->
-<div class="card animate-in" style="margin-top: 1.5rem;">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="fas fa-bolt" style="color: var(--color-warning);"></i>
-            Acciones Rápidas
-        </h3>
-    </div>
-    <div class="card-body">
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="/admin/institutions/create/" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Nueva Institución
-            </a>
-            <a href="/admin/courses/create/" class="btn btn-secondary">
-                <i class="fas fa-plus"></i> Nuevo Curso
-            </a>
-            <a href="/admin/students/create/" class="btn btn-secondary">
-                <i class="fas fa-user-plus"></i> Nuevo Estudiante
-            </a>
-            <a href="{% url 'admin:index' %}" class="btn btn-ghost">
-                <i class="fas fa-cog"></i> Django Admin
-            </a>
-        </div>
-    </div>
+<div class="alert alert-info" style="margin-top: 2rem;">
+    <i class="fas fa-info-circle"></i>
+    <span>
+        <strong>¿Qué puedes hacer en Django Admin?</strong><br>
+        • Gestionar instituciones, tutores y estudiantes<br>
+        • Administrar grupos, cursos y actividades<br>
+        • Ver entregas y calificaciones<br>
+        • Revisar logs de errores y auditoría
+    </span>
 </div>
 {% endblock %}

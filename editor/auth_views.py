@@ -1,11 +1,14 @@
 """
-MÓDULO 1: Vistas de autenticación
-Auth + Roles (Admin, Tutor, Estudiante)
+LIMPIEZA ARQUITECTÓNICA - Autenticación
 
-Reglas:
-- Admin usa SOLO Django Admin (/admin/)
-- Tutor -> /i/<slug>/tutor/
-- Estudiante -> /i/<slug>/student/
+ROLES VÁLIDOS ÚNICOS:
+- Admin: SOLO usa Django Admin (/admin/)
+- Tutor: Dashboard y vistas en plataforma
+- Estudiante: Dashboard y vistas en plataforma
+
+❌ ELIMINADOS:
+- Rol "institution" - La institución es solo información
+- Dashboard de admin fuera de /admin/
 """
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
@@ -19,52 +22,84 @@ def get_post_login_redirect(user):
     """
     Determina la URL de redirección según el rol del usuario.
     
+    ROLES:
+    - Admin/Staff -> /admin/
+    - Tutor -> /i/<slug>/dashboard/tutor/
+    - Estudiante -> /i/<slug>/dashboard/student/
+    
+    ❌ ELIMINADO: Rol "institution"
+    
     Returns:
-        tuple: (url, role_name) o (None, None) si no tiene rol
+        tuple: (url, role_name) o (None, None) si no tiene rol válido
     """
     # Admin/Staff -> Django Admin
     if user.is_superuser or user.is_staff:
         return '/admin/', 'admin'
     
-    # Obtener rol y primera institución
-    role = UserRoleHelper.get_user_role(user)
-    institutions = UserRoleHelper.get_user_institutions(user)
+    # Obtener membresías válidas (solo tutor o student)
+    memberships = Membership.objects.filter(
+        user=user,
+        is_active=True,
+        role__in=['tutor', 'student']
+    ).select_related('institution')
     
-    if not institutions.exists():
+    if not memberships.exists():
+        # Verificar si tiene rol "institution" deprecado
+        old_membership = Membership.objects.filter(
+            user=user,
+            is_active=True,
+            role='institution'
+        ).first()
+        if old_membership:
+            return None, 'institution_deprecated'
         return None, None
     
-    # Si tiene una sola institución, redirigir directamente
-    if institutions.count() == 1:
-        inst = institutions.first()
-        
-        if role == 'institution':
-            return f'/i/{inst.slug}/dashboard/', 'institution'
-        elif role == 'tutor':
-            return f'/i/{inst.slug}/dashboard/tutor/', 'tutor'
-        elif role == 'student':
-            return f'/i/{inst.slug}/dashboard/student/', 'student'
+    # Priorizar tutor sobre estudiante
+    tutor_membership = memberships.filter(role='tutor').first()
+    student_membership = memberships.filter(role='student').first()
+    
+    if memberships.count() == 1:
+        m = memberships.first()
+        if m.role == 'tutor':
+            return f'/i/{m.institution.slug}/dashboard/tutor/', 'tutor'
+        else:
+            return f'/i/{m.institution.slug}/dashboard/student/', 'student'
     
     # Múltiples instituciones -> selector
-    return 'select_institution', role
+    return 'select_institution', tutor_membership.role if tutor_membership else student_membership.role
 
 
 def user_login(request):
     """
-    Página de login principal para usuarios normales (estudiantes, tutores, instituciones).
-    Los administradores deben usar /admin/login/
+    Página de login principal para Tutores y Estudiantes.
     
-    Flujo post-login:
-    - Admin -> /admin/
+    FLUJO:
+    - Admin/Staff -> Redirigir a /admin/login/
     - Tutor -> /i/<slug>/dashboard/tutor/
     - Estudiante -> /i/<slug>/dashboard/student/
+    
+    ❌ Rol "institution" DEPRECADO
     """
     # Si ya está autenticado, redirigir según rol
     if request.user.is_authenticated:
-        redirect_url, role = get_post_login_redirect(request.user)
+        user = request.user
+        
+        # Admin va al admin
+        if user.is_superuser or user.is_staff:
+            return redirect('/admin/')
+        
+        redirect_url, role = get_post_login_redirect(user)
+        
+        if role == 'institution_deprecated':
+            messages.warning(request, 'Tu rol de "institución" ha sido deprecado. Contacta al administrador.')
+            logout(request)
+            return render(request, 'editor/login.html')
+        
         if redirect_url:
             if redirect_url == 'select_institution':
                 return redirect('select_institution')
             return redirect(redirect_url)
+        
         return redirect('editor:index')  # Fallback al IDE
     
     if request.method == 'POST':
@@ -82,23 +117,45 @@ def user_login(request):
             messages.error(request, 'Por favor, introduzca un nombre de usuario y clave correctos. Observe que ambos campos pueden ser sensibles a mayúsculas.')
             return render(request, 'editor/login.html')
         
-        # Verificar si es admin/staff - redirigir al login de admin
+        # Admin/Staff -> Redirigir a login de admin
         if user.is_superuser or user.is_staff:
             messages.info(request, 'Los administradores deben usar el panel de administración.')
             return redirect('/admin/login/')
         
-        # Usuario normal - hacer login
+        # Verificar que tiene rol válido (tutor o student)
+        valid_membership = Membership.objects.filter(
+            user=user,
+            is_active=True,
+            role__in=['tutor', 'student']
+        ).exists()
+        
+        if not valid_membership:
+            # Verificar si tiene rol deprecado
+            old_membership = Membership.objects.filter(
+                user=user,
+                is_active=True,
+                role='institution'
+            ).exists()
+            
+            if old_membership:
+                messages.error(request, 'Tu rol de "institución" ha sido deprecado. Contacta al administrador para obtener acceso como Tutor o Estudiante.')
+                return render(request, 'editor/login.html')
+            
+            messages.error(request, 'No tienes un rol válido asignado. Contacta al administrador.')
+            return render(request, 'editor/login.html')
+        
+        # Login exitoso
         login(request, user)
         
-        # Obtener nombre para el mensaje de bienvenida
+        # Mensaje de bienvenida
         display_name = user.get_full_name() or user.username
-        role = UserRoleHelper.get_user_role(user)
-        role_display = {
-            'institution': 'Administrador de Institución',
-            'tutor': 'Tutor',
-            'student': 'Estudiante'
-        }.get(role, 'Usuario')
+        membership = Membership.objects.filter(
+            user=user,
+            is_active=True,
+            role__in=['tutor', 'student']
+        ).first()
         
+        role_display = 'Tutor' if membership and membership.role == 'tutor' else 'Estudiante'
         messages.success(request, f'¡Bienvenido, {display_name}! ({role_display})')
         
         # Redirigir según next_url o rol
@@ -113,7 +170,6 @@ def user_login(request):
                 return redirect('select_institution')
             return redirect(redirect_url)
         
-        # Fallback: dashboard general
         return redirect('dashboard')
     
     # GET - mostrar formulario
@@ -139,7 +195,6 @@ def admin_login(request):
         else:
             return redirect('dashboard')
     
-    # Redirigir al login del admin de Django
     return redirect('/admin/login/')
 
 

@@ -1,21 +1,26 @@
 """
-Vistas de Dashboards por Rol
+LIMPIEZA ARQUITECTÓNICA - Dashboards por Rol
+
+ROLES VÁLIDOS ÚNICOS:
+- Admin: SOLO usa Django Admin (/admin/)
+- Tutor: Dashboard en plataforma
+- Estudiante: Dashboard en plataforma
+
+❌ ELIMINADOS:
+- Dashboard de Admin (fuera de /admin/)
+- Dashboard de Institución
+- Rol "institution" como usuario
 """
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
 
 from .models import (
-    Institution, Membership, Course, Student, Project, 
-    UserRoleHelper
-)
-from .mixins import (
-    role_required, institution_required, login_required_with_institution,
-    InstitutionScopedMixin, AdminRequiredMixin, InstitutionAdminRequiredMixin,
-    TutorRequiredMixin
+    Institution, Membership, Course, Student, Project, StudentGroup,
+    Activity, Submission, UserRoleHelper
 )
 
 
@@ -23,66 +28,83 @@ from .mixins import (
 def dashboard_redirect(request):
     """
     Redirige al dashboard correspondiente según el rol del usuario.
+    
+    ROLES:
+    - Admin/Superuser/Staff -> /admin/ (Django Admin)
+    - Tutor -> /i/<slug>/dashboard/tutor/
+    - Estudiante -> /i/<slug>/dashboard/student/
+    
+    ❌ NO existe dashboard de "institución" ni de "admin" en templates
     """
     user = request.user
     
-    # Superuser va al dashboard admin
-    if user.is_superuser:
-        return redirect('admin_dashboard')
+    # Admin/Superuser/Staff -> Redirigir a Django Admin
+    if user.is_superuser or user.is_staff:
+        messages.info(request, 'Como administrador, usa Django Admin para gestionar el sistema.')
+        return redirect('/admin/')
     
-    # Staff users (is_staff=True) también van al admin dashboard
-    if user.is_staff:
-        return redirect('admin_dashboard')
+    # Obtener membresías activas del usuario
+    memberships = Membership.objects.filter(
+        user=user,
+        is_active=True
+    ).select_related('institution')
     
-    # Obtener rol del usuario
-    role = UserRoleHelper.get_user_role(user)
+    if not memberships.exists():
+        messages.warning(request, 'No tienes acceso a ninguna institución. Contacta a tu administrador.')
+        return redirect('login')
     
-    if role == 'admin':
-        return redirect('admin_dashboard')
+    # Determinar rol principal (tutor tiene prioridad sobre estudiante)
+    tutor_membership = memberships.filter(role='tutor').first()
+    student_membership = memberships.filter(role='student').first()
     
-    # Para otros roles, necesitamos una institución
-    institutions = UserRoleHelper.get_user_institutions(user)
+    # Si es tutor
+    if tutor_membership:
+        return redirect('tutor_dashboard', slug=tutor_membership.institution.slug)
     
-    if not institutions.exists():
-        # No tiene instituciones asignadas, mostrar mensaje pero ir al IDE básico
-        messages.warning(request, 'No tienes acceso a ninguna institución. Puedes usar el IDE básico.')
-        return redirect('editor:index')
+    # Si es estudiante
+    if student_membership:
+        return redirect('student_dashboard', slug=student_membership.institution.slug)
     
-    # Si solo tiene una institución, redirigir directamente
-    if institutions.count() == 1:
-        inst = institutions.first()
-        if role == 'institution':
-            return redirect('institution_dashboard', slug=inst.slug)
-        elif role == 'tutor':
-            return redirect('tutor_dashboard', slug=inst.slug)
-        else:  # student
-            return redirect('student_dashboard', slug=inst.slug)
+    # Rol "institution" obsoleto -> redirigir a admin si aplica
+    institution_membership = memberships.filter(role='institution').first()
+    if institution_membership:
+        messages.warning(request, 'El rol de institución ha sido deprecado. Contacta al administrador.')
+        return redirect('login')
     
-    # Múltiples instituciones - mostrar selector
-    return redirect('select_institution')
+    # Fallback
+    messages.warning(request, 'No tienes un rol válido asignado.')
+    return redirect('login')
 
 
 @login_required
 def select_institution(request):
     """
     Vista para seleccionar institución cuando el usuario tiene múltiples.
+    Solo aplica para Tutores y Estudiantes.
     """
-    institutions = UserRoleHelper.get_user_institutions(request.user)
+    user = request.user
     
-    if not institutions.exists():
+    # Admin va a /admin/
+    if user.is_superuser or user.is_staff:
+        return redirect('/admin/')
+    
+    # Obtener membresías válidas (solo tutor/student)
+    memberships = Membership.objects.filter(
+        user=user,
+        is_active=True,
+        role__in=['tutor', 'student']
+    ).select_related('institution')
+    
+    if not memberships.exists():
         messages.warning(request, 'No tienes acceso a ninguna institución.')
         return redirect('login')
     
-    if institutions.count() == 1:
-        inst = institutions.first()
-        return redirect('institution_dashboard', slug=inst.slug)
-    
-    # Obtener membresías para mostrar roles
-    memberships = Membership.objects.filter(
-        user=request.user,
-        institution__in=institutions,
-        is_active=True
-    ).select_related('institution')
+    if memberships.count() == 1:
+        m = memberships.first()
+        if m.role == 'tutor':
+            return redirect('tutor_dashboard', slug=m.institution.slug)
+        else:
+            return redirect('student_dashboard', slug=m.institution.slug)
     
     context = {
         'memberships': memberships,
@@ -91,136 +113,64 @@ def select_institution(request):
     return render(request, 'dashboards/select_institution.html', context)
 
 
-@login_required
-@role_required('admin')
+# ============================================
+# ❌ ELIMINADO: admin_dashboard
+# El Admin usa EXCLUSIVAMENTE Django Admin (/admin/)
+# ============================================
+
 def admin_dashboard(request):
     """
-    Dashboard para administradores globales.
-    Muestra métricas de todas las instituciones.
+    DEPRECATED: El admin usa Django Admin.
+    Esta vista redirige a /admin/
     """
-    # Métricas globales
-    total_institutions = Institution.objects.filter(status='active').count()
-    total_users = Membership.objects.filter(is_active=True).values('user').distinct().count()
-    total_courses = Course.objects.filter(is_active=True).count()
-    total_students = Student.objects.filter(is_active=True).count()
-    total_projects = Project.objects.filter(is_active=True).count()
-    
-    # Instituciones recientes
-    recent_institutions = Institution.objects.filter(
-        status='active'
-    ).order_by('-created_at')[:5]
-    
-    # Actividad reciente (proyectos)
-    recent_activity = Project.objects.filter(
-        is_active=True
-    ).select_related(
-        'student__user', 'student__course__institution'
-    ).order_by('-updated_at')[:10]
-    
-    # Estadísticas por institución
-    institutions_stats = Institution.objects.filter(
-        status='active'
-    ).annotate(
-        members_count=Count('memberships', filter=models.Q(memberships__is_active=True)),
-        courses_count=Count('courses', filter=models.Q(courses__is_active=True))
-    ).order_by('-members_count')[:10]
-    
-    context = {
-        'page_title': 'Dashboard Administrador',
-        'user_role': 'admin',
-        'metrics': {
-            'institutions': total_institutions,
-            'users': total_users,
-            'courses': total_courses,
-            'students': total_students,
-            'projects': total_projects,
-        },
-        'recent_institutions': recent_institutions,
-        'recent_activity': recent_activity,
-        'institutions_stats': institutions_stats,
-    }
-    return render(request, 'dashboards/admin_dashboard.html', context)
+    return redirect('/admin/')
 
 
-@login_required
+# ============================================
+# ❌ ELIMINADO: institution_dashboard  
+# La institución es SOLO información, no tiene cuenta/login/dashboard
+# ============================================
+
 def institution_dashboard(request, slug):
     """
-    Dashboard para administradores de institución.
+    DEPRECATED: No existe dashboard de institución.
+    Redirige según el rol real del usuario.
     """
-    try:
-        institution = Institution.objects.get(slug=slug, status='active')
-    except Institution.DoesNotExist:
-        messages.error(request, 'Institución no encontrada.')
+    user = request.user
+    
+    if not user.is_authenticated:
+        return redirect('login')
+    
+    if user.is_superuser or user.is_staff:
+        return redirect('/admin/')
+    
+    # Verificar membresía real
+    membership = Membership.objects.filter(
+        user=user,
+        institution__slug=slug,
+        is_active=True
+    ).first()
+    
+    if not membership:
+        messages.error(request, 'No tienes acceso a esta institución.')
         return redirect('dashboard')
     
-    # Verificar acceso
-    if not request.user.is_superuser:
-        membership = Membership.objects.filter(
-            user=request.user,
-            institution=institution,
-            is_active=True,
-            role__in=['admin', 'institution']
-        ).first()
-        
-        if not membership:
-            # Verificar si tiene otro rol
-            other_membership = Membership.objects.filter(
-                user=request.user,
-                institution=institution,
-                is_active=True
-            ).first()
-            
-            if other_membership:
-                if other_membership.role == 'tutor':
-                    return redirect('tutor_dashboard', slug=slug)
-                else:
-                    return redirect('student_dashboard', slug=slug)
-            
-            messages.error(request, 'No tienes acceso a esta institución.')
-            return redirect('dashboard')
-    
-    # Métricas de la institución
-    total_members = Membership.objects.filter(institution=institution, is_active=True).count()
-    total_courses = Course.objects.filter(institution=institution, is_active=True).count()
-    total_students = Student.objects.filter(course__institution=institution, is_active=True).count()
-    total_projects = Project.objects.filter(
-        student__course__institution=institution, is_active=True
-    ).count()
-    
-    # Cursos
-    courses = Course.objects.filter(
-        institution=institution, is_active=True
-    ).annotate(
-        students_count=Count('students', filter=models.Q(students__is_active=True))
-    ).order_by('-created_at')[:5]
-    
-    # Actividad reciente
-    recent_activity = Project.objects.filter(
-        student__course__institution=institution,
-        is_active=True
-    ).select_related('student__user', 'student__course').order_by('-updated_at')[:10]
-    
-    # Membresías por rol
-    memberships_by_role = Membership.objects.filter(
-        institution=institution, is_active=True
-    ).values('role').annotate(count=Count('id'))
-    
-    context = {
-        'page_title': f'Dashboard - {institution.name}',
-        'user_role': 'institution',
-        'institution': institution,
-        'metrics': {
-            'members': total_members,
-            'courses': total_courses,
-            'students': total_students,
-            'projects': total_projects,
-        },
-        'courses': courses,
-        'recent_activity': recent_activity,
-        'memberships_by_role': memberships_by_role,
-    }
-    return render(request, 'dashboards/institution_dashboard.html', context)
+    # Redirigir según rol real
+    if membership.role == 'tutor':
+        return redirect('tutor_dashboard', slug=slug)
+    elif membership.role == 'student':
+        return redirect('student_dashboard', slug=slug)
+    elif membership.role == 'institution':
+        # Rol deprecado
+        messages.warning(request, 'El rol de institución ha sido deprecado.')
+        return redirect('login')
+    else:
+        return redirect('dashboard')
 
+
+# ============================================
+# ✅ TUTOR DASHBOARD
+# ============================================
 
 @login_required
 def tutor_dashboard(request, slug):
@@ -233,67 +183,92 @@ def tutor_dashboard(request, slug):
         messages.error(request, 'Institución no encontrada.')
         return redirect('dashboard')
     
-    # Verificar acceso
-    if not request.user.is_superuser:
+    user = request.user
+    
+    # Superuser puede ver cualquier institución
+    if not user.is_superuser:
         membership = Membership.objects.filter(
-            user=request.user,
+            user=user,
             institution=institution,
             is_active=True,
-            role__in=['admin', 'institution', 'tutor']
+            role='tutor'
         ).first()
         
         if not membership:
+            # Verificar si tiene otro rol
+            other_membership = Membership.objects.filter(
+                user=user,
+                institution=institution,
+                is_active=True
+            ).first()
+            
+            if other_membership and other_membership.role == 'student':
+                return redirect('student_dashboard', slug=slug)
+            
             messages.error(request, 'No tienes acceso como tutor a esta institución.')
             return redirect('dashboard')
     
-    # Cursos del tutor
-    my_courses = Course.objects.filter(
+    # Grupos del tutor
+    my_groups = StudentGroup.objects.filter(
         institution=institution,
-        tutor=request.user,
-        is_active=True
+        tutor=user,
+        status='active'
     ).annotate(
-        students_count=Count('students', filter=models.Q(students__is_active=True))
+        students_count=Count('students', filter=Q(students__is_active=True))
     )
     
-    # Total estudiantes en mis cursos
+    # Total estudiantes en mis grupos
     total_students = Student.objects.filter(
-        course__in=my_courses,
+        group__in=my_groups,
         is_active=True
     ).count()
     
-    # Total proyectos de mis estudiantes
-    total_projects = Project.objects.filter(
-        student__course__in=my_courses,
-        is_active=True
+    # Actividades del tutor
+    my_activities = Activity.objects.filter(
+        Q(group__tutor=user) | Q(created_by=user),
+        Q(group__institution=institution) | Q(course__institution=institution)
+    ).order_by('-created_at')
+    
+    total_activities = my_activities.count()
+    
+    # Entregas pendientes de calificar
+    pending_submissions = Submission.objects.filter(
+        activity__in=my_activities,
+        status='submitted'
     ).count()
     
-    # Actividad reciente de mis estudiantes
-    recent_activity = Project.objects.filter(
-        student__course__in=my_courses,
-        is_active=True
-    ).select_related('student__user', 'student__course').order_by('-updated_at')[:10]
+    # Actividad reciente
+    recent_submissions = Submission.objects.filter(
+        activity__in=my_activities,
+        status__in=['submitted', 'graded']
+    ).select_related('student', 'activity').order_by('-submitted_at')[:10]
     
     # Estudiantes recientes
     recent_students = Student.objects.filter(
-        course__in=my_courses,
+        group__in=my_groups,
         is_active=True
-    ).select_related('user', 'course').order_by('-created_at')[:5]
+    ).select_related('user', 'group').order_by('-created_at')[:5]
     
     context = {
         'page_title': f'Dashboard Tutor - {institution.name}',
         'user_role': 'tutor',
         'institution': institution,
         'metrics': {
-            'courses': my_courses.count(),
+            'groups': my_groups.count(),
             'students': total_students,
-            'projects': total_projects,
+            'activities': total_activities,
+            'pending': pending_submissions,
         },
-        'my_courses': my_courses,
-        'recent_activity': recent_activity,
+        'my_groups': my_groups,
+        'recent_submissions': recent_submissions,
         'recent_students': recent_students,
     }
     return render(request, 'dashboards/tutor_dashboard.html', context)
 
+
+# ============================================
+# ✅ STUDENT DASHBOARD
+# ============================================
 
 @login_required
 def student_dashboard(request, slug):
@@ -306,23 +281,74 @@ def student_dashboard(request, slug):
         messages.error(request, 'Institución no encontrada.')
         return redirect('dashboard')
     
+    user = request.user
+    
     # Verificar acceso
-    if not request.user.is_superuser:
+    if not user.is_superuser:
         membership = Membership.objects.filter(
-            user=request.user,
+            user=user,
             institution=institution,
-            is_active=True
+            is_active=True,
+            role='student'
         ).first()
         
         if not membership:
-            messages.error(request, 'No tienes acceso a esta institución.')
+            # Verificar si tiene otro rol
+            other_membership = Membership.objects.filter(
+                user=user,
+                institution=institution,
+                is_active=True
+            ).first()
+            
+            if other_membership and other_membership.role == 'tutor':
+                return redirect('tutor_dashboard', slug=slug)
+            
+            messages.error(request, 'No tienes acceso como estudiante a esta institución.')
             return redirect('dashboard')
     
     # Obtener perfil de estudiante
     try:
-        student = Student.objects.get(user=request.user, is_active=True)
+        student = Student.objects.get(user=user, institution=institution, is_active=True)
     except Student.DoesNotExist:
-        student = None
+        try:
+            student = Student.objects.get(user=user, is_active=True)
+        except Student.DoesNotExist:
+            student = None
+    
+    # Grupo del estudiante
+    my_group = student.group if student else None
+    my_tutor = my_group.tutor if my_group else None
+    
+    # Actividades del grupo
+    if my_group:
+        my_activities = Activity.objects.filter(
+            group=my_group,
+            status='published'
+        ).order_by('-deadline', '-created_at')
+        
+        # Entregas del estudiante
+        my_submissions = Submission.objects.filter(
+            student=user,
+            activity__group=my_group
+        ).select_related('activity')
+        
+        # Actividades pendientes
+        submitted_activity_ids = my_submissions.filter(
+            status__in=['submitted', 'graded']
+        ).values_list('activity_id', flat=True)
+        
+        pending_activities = my_activities.exclude(id__in=submitted_activity_ids).count()
+        
+        # Calificaciones
+        graded_submissions = my_submissions.filter(status='graded', score__isnull=False)
+        total_graded = graded_submissions.count()
+        
+    else:
+        my_activities = Activity.objects.none()
+        my_submissions = Submission.objects.none()
+        pending_activities = 0
+        graded_submissions = Submission.objects.none()
+        total_graded = 0
     
     # Proyectos del estudiante
     if student:
@@ -337,22 +363,20 @@ def student_dashboard(request, slug):
         total_projects = 0
         recent_projects = []
     
-    # Curso actual
-    current_course = student.course if student else None
-    
     context = {
         'page_title': f'Mi Dashboard - {institution.name}',
         'user_role': 'student',
         'institution': institution,
         'student': student,
-        'current_course': current_course,
+        'my_group': my_group,
+        'my_tutor': my_tutor,
         'metrics': {
+            'activities': my_activities.count() if my_group else 0,
+            'pending': pending_activities,
+            'graded': total_graded,
             'projects': total_projects,
         },
         'recent_projects': recent_projects,
+        'my_activities': my_activities[:5] if my_group else [],
     }
     return render(request, 'dashboards/student_dashboard.html', context)
-
-
-# Necesitamos importar models para los filtros
-from django.db import models

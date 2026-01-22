@@ -8,108 +8,172 @@
         <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
         ¡Hola, {{ user.first_name|default:user.username }}!
     </h1>
-    <p class="page-subtitle">{{ institution.name }} {% if current_course %}- {{ current_course.name }}{% endif %}</p>
+    <p class="page-subtitle">{{ institution.name }}</p>
 </div>
 
 <!-- Métricas del Estudiante -->
 <div class="metrics-grid">
     <div class="metric-card animate-in">
         <div class="metric-icon cyan">
+            <i class="fas fa-tasks"></i>
+        </div>
+        <div class="metric-value">{{ metrics.activities }}</div>
+        <div class="metric-label">Actividades</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon orange">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="metric-value">{{ metrics.pending }}</div>
+        <div class="metric-label">Pendientes</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon green">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="metric-value">{{ metrics.graded }}</div>
+        <div class="metric-label">Calificadas</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon purple">
             <i class="fas fa-project-diagram"></i>
         </div>
         <div class="metric-value">{{ metrics.projects }}</div>
-        <div class="metric-label">Mis Proyectos</div>
+        <div class="metric-label">Proyectos</div>
     </div>
-    
-    {% if current_course %}
-    <div class="metric-card animate-in">
-        <div class="metric-icon orange">
-            <i class="fas fa-book-open"></i>
-        </div>
-        <div class="metric-value">1</div>
-        <div class="metric-label">Mi Curso</div>
-    </div>
-    {% endif %}
 </div>
 
-<!-- Info del Curso -->
-{% if current_course %}
+<!-- Info del Grupo y Tutor -->
+{% if my_group %}
 <div class="card animate-in" style="margin-bottom: 1.5rem;">
     <div class="card-header">
         <h3 class="card-title">
-            <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
-            Mi Curso
+            <i class="fas fa-users" style="color: var(--color-warning);"></i>
+            Mi Grupo
         </h3>
     </div>
     <div class="card-body">
         <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
             <div>
-                <div style="font-size: 1.25rem; font-weight: 600;">{{ current_course.name }}</div>
-                <div style="color: var(--color-text-muted);">Código: {{ current_course.code }}</div>
+                <div style="font-size: 1.25rem; font-weight: 600;">{{ my_group.name }}</div>
+                <div style="color: var(--color-text-muted);">Código: {{ my_group.code }}</div>
             </div>
+            {% if my_tutor %}
             <div>
-                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Año Académico</div>
-                <div style="font-weight: 500;">{{ current_course.academic_year }}</div>
-            </div>
-            {% if current_course.tutor %}
-            <div>
-                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Tutor</div>
-                <div style="font-weight: 500;">{{ current_course.tutor.get_full_name|default:current_course.tutor.username }}</div>
+                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Mi Tutor</div>
+                <div style="font-weight: 500;">
+                    <i class="fas fa-chalkboard-teacher" style="color: var(--color-warning);"></i>
+                    {{ my_tutor.get_full_name|default:my_tutor.username }}
+                </div>
             </div>
             {% endif %}
+            <div>
+                <div style="font-size: 0.85rem; color: var(--color-text-muted);">Año</div>
+                <div style="font-weight: 500;">{{ my_group.academic_year }}</div>
+            </div>
         </div>
     </div>
 </div>
 {% else %}
 <div class="alert alert-warning">
     <i class="fas fa-exclamation-triangle"></i>
-    <span>No estás asignado a ningún curso. Contacta a tu tutor o administrador.</span>
+    <span>No estás asignado a ningún grupo. Contacta a tu tutor.</span>
 </div>
 {% endif %}
 
-<!-- Proyectos Recientes -->
-<div class="card animate-in">
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="fas fa-folder-open" style="color: var(--color-primary);"></i>
-            Mis Proyectos Recientes
-        </h3>
-        <a href="/i/{{ institution.slug }}/student/courses/" class="btn btn-ghost">Ver Cursos</a>
-    </div>
-    <div class="card-body" style="padding: 0;">
-        {% if recent_projects %}
-        <div class="activity-list">
-            {% for project in recent_projects %}
-            <div class="activity-item">
-                <div class="activity-icon project">
-                    <i class="fas fa-code"></i>
-                </div>
-                <div class="activity-content">
-                    <div class="activity-title">{{ project.name }}</div>
-                    <div class="activity-meta">
-                        {% if project.description %}
-                        {{ project.description|truncatechars:50 }}
-                        {% else %}
-                        Sin descripción
-                        {% endif %}
+<!-- Grids de Datos -->
+<div class="data-grid">
+    <!-- Mis Actividades Pendientes -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-tasks" style="color: var(--color-primary);"></i>
+                Mis Actividades
+            </h3>
+            <a href="/i/{{ institution.slug }}/student/activities/" class="btn btn-ghost">Ver todas</a>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            {% if my_activities %}
+            <div class="activity-list">
+                {% for activity in my_activities %}
+                <div class="activity-item">
+                    <div class="activity-icon {% if activity.is_deadline_passed %}danger{% else %}project{% endif %}">
+                        <i class="fas {% if activity.is_deadline_passed %}fa-exclamation{% else %}fa-clipboard-check{% endif %}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">{{ activity.title }}</div>
+                        <div class="activity-meta">
+                            {% if activity.deadline %}
+                            Fecha límite: {{ activity.deadline|date:"d/m/Y H:i" }}
+                            {% if activity.is_deadline_passed %}
+                            <span style="color: var(--color-danger);">(Vencida)</span>
+                            {% endif %}
+                            {% else %}
+                            Sin fecha límite
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <a href="/i/{{ institution.slug }}/student/activities/{{ activity.id }}/ide/" class="btn btn-sm btn-primary">
+                            <i class="fas fa-code"></i> Abrir
+                        </a>
                     </div>
                 </div>
-                <div class="activity-time">
-                    {{ project.updated_at|timesince }}
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-clipboard-check"></i>
+                <p>No tienes actividades asignadas</p>
+                <p style="font-size: 0.85rem;">Tu tutor aún no ha creado actividades para tu grupo</p>
+            </div>
+            {% endif %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <i class="fas fa-rocket"></i>
-            <p>¡Aún no tienes proyectos!</p>
-            <p style="font-size: 0.85rem; margin-bottom: 1rem;">Comienza creando tu primer proyecto en el IDE</p>
-            <a href="/?editor=true" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Crear Proyecto
-            </a>
+    </div>
+    
+    <!-- Mis Proyectos Recientes -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-folder-open" style="color: var(--color-success);"></i>
+                Mis Proyectos
+            </h3>
         </div>
-        {% endif %}
+        <div class="card-body" style="padding: 0;">
+            {% if recent_projects %}
+            <div class="activity-list">
+                {% for project in recent_projects %}
+                <div class="activity-item">
+                    <div class="activity-icon project">
+                        <i class="fas fa-code"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">{{ project.name }}</div>
+                        <div class="activity-meta">
+                            {% if project.description %}
+                            {{ project.description|truncatechars:50 }}
+                            {% else %}
+                            Sin descripción
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="activity-time">
+                        {{ project.updated_at|timesince }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-rocket"></i>
+                <p>¡Aún no tienes proyectos!</p>
+                <p style="font-size: 0.85rem;">Comienza desde el IDE</p>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
 
@@ -126,8 +190,11 @@
             <a href="/?editor=true" class="btn btn-primary">
                 <i class="fas fa-code"></i> Abrir IDE
             </a>
-            <a href="/i/{{ institution.slug }}/student/courses/" class="btn btn-secondary">
-                <i class="fas fa-folder-open"></i> Mis Cursos
+            <a href="/i/{{ institution.slug }}/student/activities/" class="btn btn-secondary">
+                <i class="fas fa-tasks"></i> Mis Actividades
+            </a>
+            <a href="/i/{{ institution.slug }}/student/my-info/" class="btn btn-secondary">
+                <i class="fas fa-id-card"></i> Mi Información
             </a>
         </div>
         

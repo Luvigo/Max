@@ -8,17 +8,17 @@
         <i class="fas fa-chalkboard-teacher" style="color: var(--color-warning);"></i>
         Mi Dashboard de Tutor
     </h1>
-    <p class="page-subtitle">{{ institution.name }} - Vista de tus cursos y estudiantes</p>
+    <p class="page-subtitle">{{ institution.name }}</p>
 </div>
 
 <!-- Métricas del Tutor -->
 <div class="metrics-grid">
     <div class="metric-card animate-in">
         <div class="metric-icon orange">
-            <i class="fas fa-book-open"></i>
+            <i class="fas fa-users"></i>
         </div>
-        <div class="metric-value">{{ metrics.courses }}</div>
-        <div class="metric-label">Mis Cursos</div>
+        <div class="metric-value">{{ metrics.groups }}</div>
+        <div class="metric-label">Mis Grupos</div>
     </div>
     
     <div class="metric-card animate-in">
@@ -31,46 +31,62 @@
     
     <div class="metric-card animate-in">
         <div class="metric-icon cyan">
-            <i class="fas fa-project-diagram"></i>
+            <i class="fas fa-clipboard-list"></i>
         </div>
-        <div class="metric-value">{{ metrics.projects }}</div>
-        <div class="metric-label">Proyectos de Estudiantes</div>
+        <div class="metric-value">{{ metrics.activities }}</div>
+        <div class="metric-label">Mis Actividades</div>
+    </div>
+    
+    <div class="metric-card animate-in">
+        <div class="metric-icon red">
+            <i class="fas fa-clock"></i>
+        </div>
+        <div class="metric-value">{{ metrics.pending }}</div>
+        <div class="metric-label">Pendientes de Calificar</div>
     </div>
 </div>
 
 <!-- Grids de Datos -->
 <div class="data-grid">
-    <!-- Mis Cursos -->
+    <!-- Mis Grupos -->
     <div class="card animate-in">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="fas fa-book-open" style="color: var(--color-warning);"></i>
-                Mis Cursos
+                <i class="fas fa-users" style="color: var(--color-warning);"></i>
+                Mis Grupos
             </h3>
+            <a href="/i/{{ institution.slug }}/tutor/groups/" class="btn btn-ghost">Ver todos</a>
         </div>
         <div class="card-body" style="padding: 0;">
-            {% if my_courses %}
+            {% if my_groups %}
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Curso</th>
-                        <th>Año</th>
+                        <th>Grupo</th>
                         <th>Estudiantes</th>
+                        <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for course in my_courses %}
+                    {% for group in my_groups %}
                     <tr>
                         <td>
-                            <strong>{{ course.name }}</strong>
-                            <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ course.code }}</div>
+                            <strong>{{ group.name }}</strong>
+                            <div style="font-size: 0.8rem; color: var(--color-text-muted);">{{ group.code }}</div>
                         </td>
-                        <td>{{ course.academic_year }}</td>
                         <td>
                             <span class="status-badge active">
                                 <i class="fas fa-users"></i>
-                                {{ course.students_count }}
+                                {{ group.students_count }}
                             </span>
+                        </td>
+                        <td>
+                            <a href="/i/{{ institution.slug }}/tutor/groups/{{ group.id }}/" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="/i/{{ institution.slug }}/tutor/groups/{{ group.id }}/activities/" class="btn btn-sm btn-primary">
+                                <i class="fas fa-tasks"></i>
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -78,41 +94,41 @@
             </table>
             {% else %}
             <div class="empty-state">
-                <i class="fas fa-book-open"></i>
-                <p>No tienes cursos asignados</p>
-                <p style="font-size: 0.85rem;">Contacta al administrador para que te asigne cursos</p>
+                <i class="fas fa-layer-group"></i>
+                <p>No tienes grupos creados</p>
+                <a href="/i/{{ institution.slug }}/tutor/groups/new/" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Grupo
+                </a>
             </div>
             {% endif %}
         </div>
     </div>
     
-    <!-- Actividad de Estudiantes -->
+    <!-- Entregas Recientes -->
     <div class="card animate-in">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="fas fa-clock" style="color: var(--color-primary);"></i>
-                Actividad de Estudiantes
+                <i class="fas fa-inbox" style="color: var(--color-primary);"></i>
+                Entregas Recientes
             </h3>
         </div>
         <div class="card-body" style="padding: 0;">
-            {% if recent_activity %}
+            {% if recent_submissions %}
             <div class="activity-list">
-                {% for project in recent_activity %}
+                {% for submission in recent_submissions %}
                 <div class="activity-item">
-                    <div class="activity-icon project">
-                        <i class="fas fa-code"></i>
+                    <div class="activity-icon {% if submission.status == 'graded' %}success{% else %}warning{% endif %}">
+                        <i class="fas {% if submission.status == 'graded' %}fa-check{% else %}fa-clock{% endif %}"></i>
                     </div>
                     <div class="activity-content">
-                        <div class="activity-title">{{ project.name }}</div>
+                        <div class="activity-title">{{ submission.activity.title }}</div>
                         <div class="activity-meta">
-                            {{ project.student.user.get_full_name|default:project.student.user.username }}
-                            {% if project.student.course %}
-                            - {{ project.student.course.name }}
-                            {% endif %}
+                            {{ submission.student.get_full_name|default:submission.student.username }}
+                            - {% if submission.status == 'graded' %}Calificada{% else %}Pendiente{% endif %}
                         </div>
                     </div>
                     <div class="activity-time">
-                        {{ project.updated_at|timesince }}
+                        {{ submission.submitted_at|timesince }}
                     </div>
                 </div>
                 {% endfor %}
@@ -120,7 +136,7 @@
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-history"></i>
-                <p>No hay actividad reciente de tus estudiantes</p>
+                <p>No hay entregas recientes</p>
             </div>
             {% endif %}
         </div>
@@ -134,6 +150,7 @@
             <i class="fas fa-user-graduate" style="color: var(--color-success);"></i>
             Estudiantes Recientes
         </h3>
+        <a href="/i/{{ institution.slug }}/tutor/students/" class="btn btn-ghost">Ver todos</a>
     </div>
     <div class="card-body" style="padding: 0;">
         {% if recent_students %}
@@ -141,7 +158,7 @@
             <thead>
                 <tr>
                     <th>Estudiante</th>
-                    <th>Curso</th>
+                    <th>Grupo</th>
                     <th>ID</th>
                 </tr>
             </thead>
@@ -159,7 +176,7 @@
                             </div>
                         </div>
                     </td>
-                    <td>{{ student.course.name }}</td>
+                    <td>{{ student.group.name|default:"-" }}</td>
                     <td><code style="font-family: var(--font-mono); font-size: 0.85rem;">{{ student.student_id }}</code></td>
                 </tr>
                 {% endfor %}
@@ -168,7 +185,10 @@
         {% else %}
         <div class="empty-state">
             <i class="fas fa-users"></i>
-            <p>No tienes estudiantes en tus cursos</p>
+            <p>No tienes estudiantes en tus grupos</p>
+            <a href="/i/{{ institution.slug }}/tutor/students/new/" class="btn btn-primary">
+                <i class="fas fa-user-plus"></i> Crear Estudiante
+            </a>
         </div>
         {% endif %}
     </div>
@@ -187,8 +207,14 @@
             <a href="/?editor=true" class="btn btn-primary">
                 <i class="fas fa-code"></i> Abrir IDE
             </a>
-            <a href="#" class="btn btn-secondary">
-                <i class="fas fa-eye"></i> Ver Proyectos
+            <a href="/i/{{ institution.slug }}/tutor/groups/new/" class="btn btn-secondary">
+                <i class="fas fa-layer-group"></i> Nuevo Grupo
+            </a>
+            <a href="/i/{{ institution.slug }}/tutor/students/new/" class="btn btn-secondary">
+                <i class="fas fa-user-plus"></i> Nuevo Estudiante
+            </a>
+            <a href="/i/{{ institution.slug }}/tutor/activities/new/" class="btn btn-secondary">
+                <i class="fas fa-clipboard-list"></i> Nueva Actividad
             </a>
         </div>
     </div>

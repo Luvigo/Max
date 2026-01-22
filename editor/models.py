@@ -1346,33 +1346,67 @@ class AgentInstance(models.Model):
 # ============================================
 
 class UserRoleHelper:
-    """Helper para obtener información de roles de usuario"""
+    """
+    Helper para obtener información de roles de usuario
+    
+    LIMPIEZA ARQUITECTÓNICA:
+    - ROLES VÁLIDOS: admin, tutor, student
+    - ROL DEPRECADO: institution (solo información, no cuenta)
+    """
+    
+    # Roles válidos en la plataforma
+    VALID_ROLES = ['tutor', 'student']
+    DEPRECATED_ROLES = ['institution']
     
     @staticmethod
     def get_user_role(user, institution=None):
-        """Obtener el rol del usuario en una institución específica o el rol más alto"""
+        """
+        Obtener el rol del usuario.
+        
+        PRIORIDAD:
+        - admin (superuser/staff)
+        - tutor
+        - student
+        
+        ❌ 'institution' es DEPRECADO y se ignora
+        """
         if not user.is_authenticated:
             return None
         
-        # Superuser siempre es admin
-        if user.is_superuser:
+        # Superuser/Staff siempre es admin -> usa Django Admin
+        if user.is_superuser or user.is_staff:
             return 'admin'
         
         memberships = Membership.objects.filter(user=user, is_active=True)
         
         if institution:
             membership = memberships.filter(institution=institution).first()
-            return membership.role if membership else None
+            if membership:
+                # Si tiene rol deprecado, retornarlo para mostrar mensaje
+                if membership.role in UserRoleHelper.DEPRECATED_ROLES:
+                    return 'institution_deprecated'
+                return membership.role
+            return None
         
-        # Sin institución específica, retornar el rol más alto
-        role_priority = {'admin': 0, 'institution': 1, 'tutor': 2, 'student': 3}
+        # Sin institución específica, retornar el rol más alto VÁLIDO
+        # Prioridad: tutor > student (ignorar institution)
+        role_priority = {'tutor': 1, 'student': 2}
         best_role = None
         best_priority = 999
         
         for m in memberships:
+            # Ignorar roles deprecados
+            if m.role in UserRoleHelper.DEPRECATED_ROLES:
+                continue
             if role_priority.get(m.role, 999) < best_priority:
                 best_priority = role_priority[m.role]
                 best_role = m.role
+        
+        # Si no tiene roles válidos pero tiene rol deprecado, indicarlo
+        if best_role is None:
+            deprecated = memberships.filter(role__in=UserRoleHelper.DEPRECATED_ROLES).exists()
+            if deprecated:
+                return 'institution_deprecated'
         
         return best_role
     
