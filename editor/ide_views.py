@@ -320,3 +320,219 @@ def api_ide_load_project(request, project_id):
         
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+# ============================================
+# APIs para Mis Proyectos (Borradores)
+# ============================================
+
+@login_required
+def api_ide_list_projects(request):
+    """API para listar proyectos del usuario actual"""
+    try:
+        # Obtener proyectos del usuario ordenados por última modificación
+        projects = IDEProject.objects.filter(
+            owner=request.user
+        ).exclude(
+            # Excluir proyectos vinculados a actividades (workspaces)
+            activity_workspaces__isnull=False
+        ).order_by('-updated_at')[:20]  # Últimos 20 proyectos
+        
+        projects_list = [{
+            'id': str(p.id),
+            'name': p.name,
+            'updated_at': p.updated_at.strftime('%d/%m/%Y %H:%M'),
+            'is_frozen': p.is_frozen(),
+        } for p in projects]
+        
+        return JsonResponse({
+            'ok': True,
+            'projects': projects_list,
+            'count': len(projects_list)
+        })
+        
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def api_ide_create_project(request):
+    """API para crear un nuevo proyecto"""
+    try:
+        import json
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        name = data.get('name', '').strip()
+        blockly_xml = data.get('blockly_xml', '')
+        arduino_code = data.get('arduino_code', '')
+        institution_slug = data.get('institution_slug', '')
+        
+        if not name:
+            name = f"Proyecto {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+        
+        # Obtener institución (opcional)
+        institution = None
+        if institution_slug:
+            institution = Institution.objects.filter(slug=institution_slug, status='active').first()
+        
+        # Si no hay institución, intentar obtener la del usuario
+        if not institution:
+            from .models import Membership
+            membership = Membership.objects.filter(user=request.user, is_active=True).first()
+            if membership:
+                institution = membership.institution
+        
+        if not institution:
+            return JsonResponse({'ok': False, 'error': 'No se pudo determinar la institución'}, status=400)
+        
+        # Crear proyecto
+        project = IDEProject.objects.create(
+            owner=request.user,
+            institution=institution,
+            name=name,
+            blockly_xml=blockly_xml,
+            arduino_code=arduino_code
+        )
+        
+        return JsonResponse({
+            'ok': True,
+            'message': 'Proyecto creado exitosamente',
+            'project': {
+                'id': str(project.id),
+                'name': project.name,
+                'updated_at': project.updated_at.strftime('%d/%m/%Y %H:%M')
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def api_ide_rename_project(request, project_id):
+    """API para renombrar un proyecto"""
+    try:
+        import json
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        new_name = data.get('name', '').strip()
+        
+        if not new_name:
+            return JsonResponse({'ok': False, 'error': 'El nombre no puede estar vacío'}, status=400)
+        
+        project = get_object_or_404(IDEProject, id=project_id)
+        
+        # Verificar permisos
+        if project.owner != request.user:
+            return JsonResponse({'ok': False, 'error': 'No tienes permisos para renombrar este proyecto'}, status=403)
+        
+        project.name = new_name
+        project.save()
+        
+        return JsonResponse({
+            'ok': True,
+            'message': 'Proyecto renombrado exitosamente',
+            'name': project.name
+        })
+        
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST
+def api_ide_delete_project(request, project_id):
+    """API para eliminar un proyecto"""
+    try:
+        project = get_object_or_404(IDEProject, id=project_id)
+        
+        # Verificar permisos
+        if project.owner != request.user:
+            return JsonResponse({'ok': False, 'error': 'No tienes permisos para eliminar este proyecto'}, status=403)
+        
+        # Verificar que no esté vinculado a una actividad
+        if project.activity_workspaces.exists():
+            return JsonResponse({'ok': False, 'error': 'No puedes eliminar un proyecto vinculado a una actividad'}, status=400)
+        
+        project_name = project.name
+        project.delete()
+        
+        return JsonResponse({
+            'ok': True,
+            'message': f'Proyecto "{project_name}" eliminado exitosamente'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@require_POST  
+def api_ide_save_as(request):
+    """API para guardar proyecto actual como nuevo (Guardar como...)"""
+    try:
+        import json
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+        else:
+            data = request.POST
+        
+        name = data.get('name', '').strip()
+        blockly_xml = data.get('blockly_xml', '')
+        arduino_code = data.get('arduino_code', '')
+        source_project_id = data.get('source_project_id', '')
+        institution_slug = data.get('institution_slug', '')
+        
+        if not name:
+            return JsonResponse({'ok': False, 'error': 'El nombre es requerido'}, status=400)
+        
+        # Obtener institución
+        institution = None
+        if institution_slug:
+            institution = Institution.objects.filter(slug=institution_slug, status='active').first()
+        
+        # Intentar obtener del proyecto fuente
+        if not institution and source_project_id:
+            source_project = IDEProject.objects.filter(id=source_project_id).first()
+            if source_project:
+                institution = source_project.institution
+        
+        # Si no hay institución, usar la del membership
+        if not institution:
+            from .models import Membership
+            membership = Membership.objects.filter(user=request.user, is_active=True).first()
+            if membership:
+                institution = membership.institution
+        
+        if not institution:
+            return JsonResponse({'ok': False, 'error': 'No se pudo determinar la institución'}, status=400)
+        
+        # Crear nuevo proyecto
+        project = IDEProject.objects.create(
+            owner=request.user,
+            institution=institution,
+            name=name,
+            blockly_xml=blockly_xml,
+            arduino_code=arduino_code
+        )
+        
+        return JsonResponse({
+            'ok': True,
+            'message': f'Proyecto "{name}" guardado exitosamente',
+            'project': {
+                'id': str(project.id),
+                'name': project.name,
+                'updated_at': project.updated_at.strftime('%d/%m/%Y %H:%M')
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)

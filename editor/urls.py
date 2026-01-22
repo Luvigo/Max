@@ -214,6 +214,13 @@ urlpatterns = [
     path('api/ide/snapshot/', ide_views.api_ide_create_snapshot, name='api_ide_create_snapshot'),
     path('api/ide/project/<str:project_id>/', ide_views.api_ide_load_project, name='api_ide_load_project'),
     
+    # APIs de Mis Proyectos (Borradores)
+    path('api/ide/projects/', ide_views.api_ide_list_projects, name='api_ide_list_projects'),
+    path('api/ide/projects/create/', ide_views.api_ide_create_project, name='api_ide_create_project'),
+    path('api/ide/projects/save-as/', ide_views.api_ide_save_as, name='api_ide_save_as'),
+    path('api/ide/projects/<str:project_id>/rename/', ide_views.api_ide_rename_project, name='api_ide_rename_project'),
+    path('api/ide/projects/<str:project_id>/delete/', ide_views.api_ide_delete_project, name='api_ide_delete_project'),
+    
     # ============================================
     # APIs de Agent (sin autenticación de usuario)
     # ============================================

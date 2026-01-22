@@ -16,6 +16,195 @@
     
     <!-- Estilos -->
     <link rel="stylesheet" href="{% static 'editor/css/style.css' %}">
+    
+    <!-- Estilos de Proyectos -->
+    <style>
+        /* Dropdown de Proyectos */
+        .projects-dropdown {
+            position: relative;
+        }
+        
+        .projects-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
+            min-width: 320px;
+            background: var(--color-bg-card, #161b22);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            margin-top: 8px;
+        }
+        
+        .projects-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border, #30363d);
+            font-weight: 600;
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .projects-menu-header .btn-close {
+            background: none;
+            border: none;
+            color: var(--color-text-muted, #8b949e);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        
+        .projects-menu-header .btn-close:hover {
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .projects-menu-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border, #30363d);
+        }
+        
+        .projects-menu-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .projects-loading, .projects-empty {
+            padding: 24px 16px;
+            text-align: center;
+            color: var(--color-text-muted, #8b949e);
+        }
+        
+        .project-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid var(--color-border-muted, #21262d);
+        }
+        
+        .project-item:hover {
+            background: var(--color-bg-hover, #1c2128);
+        }
+        
+        .project-item:last-child {
+            border-bottom: none;
+        }
+        
+        .project-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .project-item-name {
+            font-weight: 500;
+            color: var(--color-text, #e6edf3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .project-item-date {
+            font-size: 11px;
+            color: var(--color-text-muted, #8b949e);
+            margin-top: 2px;
+        }
+        
+        .project-item-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        
+        .project-item:hover .project-item-actions {
+            opacity: 1;
+        }
+        
+        .project-item-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: var(--color-bg, #0d1117);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 4px;
+            color: var(--color-text-muted, #8b949e);
+            cursor: pointer;
+        }
+        
+        .project-item-actions button:hover {
+            background: var(--color-bg-hover, #1c2128);
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .project-item-actions button.btn-delete:hover {
+            color: var(--color-danger, #f85149);
+            border-color: var(--color-danger, #f85149);
+        }
+        
+        /* Modal de Guardar Proyecto */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--color-bg-card, #161b22);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .modal-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--color-bg, #0d1117);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 6px;
+            color: var(--color-text, #e6edf3);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--color-accent, #58a6ff);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        #currentProjectName {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -28,6 +217,29 @@
             </div>
             
             <div class="header-controls">
+                <!-- Mis Proyectos Dropdown -->
+                <div class="control-group projects-dropdown">
+                    <button class="btn btn-ghost" id="btnProjectsMenu" title="Mis Proyectos">
+                        <span>📁</span>
+                        <span id="currentProjectName">Nuevo Proyecto</span>
+                        <span style="font-size: 10px;">▼</span>
+                    </button>
+                    <div class="projects-menu" id="projectsMenu" style="display: none;">
+                        <div class="projects-menu-header">
+                            <span>📁 Mis Proyectos</span>
+                            <button class="btn-close" id="btnCloseProjectsMenu">×</button>
+                        </div>
+                        <div class="projects-menu-actions">
+                            <button class="btn btn-sm btn-primary" id="btnNewProject">➕ Nuevo</button>
+                            <button class="btn btn-sm btn-secondary" id="btnSaveProject">💾 Guardar</button>
+                            <button class="btn btn-sm btn-secondary" id="btnSaveAsProject">📝 Guardar como...</button>
+                        </div>
+                        <div class="projects-menu-list" id="projectsList">
+                            <div class="projects-loading">Cargando proyectos...</div>
+                        </div>
+                    </div>
+                </div>
+                
                 <!-- Activity Status Badge (solo visible si hay actividad) -->
                 <div id="activityStatusContainer" class="activity-status-container" style="display: none;">
                     <span class="activity-badge" id="submissionStatusBadge">
@@ -843,6 +1055,351 @@ void loop() {
     <script src="{% static 'editor/js/arduino_blocks.js' %}?v=2026012601"></script>
     <script src="{% static 'editor/js/arduino_generator.js' %}?v=2026012601"></script>
     <script src="{% static 'editor/js/app.js' %}?v=2026012601"></script>
+    
+    <!-- Sistema de Mis Proyectos -->
+    <script>
+    (function() {
+        // Variables de estado
+        let currentProjectId = null;
+        let currentProjectName = 'Nuevo Proyecto';
+        let projectsMenuOpen = false;
+        
+        // Elementos del DOM
+        const btnProjectsMenu = document.getElementById('btnProjectsMenu');
+        const projectsMenu = document.getElementById('projectsMenu');
+        const btnCloseProjectsMenu = document.getElementById('btnCloseProjectsMenu');
+        const projectsList = document.getElementById('projectsList');
+        const currentProjectNameEl = document.getElementById('currentProjectName');
+        const btnNewProject = document.getElementById('btnNewProject');
+        const btnSaveProject = document.getElementById('btnSaveProject');
+        const btnSaveAsProject = document.getElementById('btnSaveAsProject');
+        
+        // Toggle menú de proyectos
+        if (btnProjectsMenu) {
+            btnProjectsMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+                projectsMenuOpen = !projectsMenuOpen;
+                projectsMenu.style.display = projectsMenuOpen ? 'block' : 'none';
+                if (projectsMenuOpen) {
+                    loadProjectsList();
+                }
+            });
+        }
+        
+        // Cerrar menú
+        if (btnCloseProjectsMenu) {
+            btnCloseProjectsMenu.addEventListener('click', function() {
+                projectsMenu.style.display = 'none';
+                projectsMenuOpen = false;
+            });
+        }
+        
+        // Cerrar al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (projectsMenuOpen && !projectsMenu.contains(e.target) && !btnProjectsMenu.contains(e.target)) {
+                projectsMenu.style.display = 'none';
+                projectsMenuOpen = false;
+            }
+        });
+        
+        // Cargar lista de proyectos
+        function loadProjectsList() {
+            projectsList.innerHTML = '<div class="projects-loading">Cargando proyectos...</div>';
+            
+            fetch('/api/ide/projects/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok && data.projects.length > 0) {
+                        projectsList.innerHTML = data.projects.map(p => `
+                            <div class="project-item" data-id="${p.id}">
+                                <div class="project-item-info" onclick="loadProject('${p.id}')">
+                                    <div class="project-item-name">${escapeHtml(p.name)}</div>
+                                    <div class="project-item-date">${p.updated_at}</div>
+                                </div>
+                                <div class="project-item-actions">
+                                    <button onclick="renameProject('${p.id}', '${escapeHtml(p.name)}')" title="Renombrar">✏️</button>
+                                    <button class="btn-delete" onclick="deleteProject('${p.id}', '${escapeHtml(p.name)}')" title="Eliminar">🗑️</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        projectsList.innerHTML = '<div class="projects-empty">No tienes proyectos guardados.<br>¡Crea uno nuevo!</div>';
+                    }
+                })
+                .catch(err => {
+                    projectsList.innerHTML = '<div class="projects-empty">Error al cargar proyectos</div>';
+                    console.error('Error cargando proyectos:', err);
+                });
+        }
+        
+        // Nuevo proyecto
+        if (btnNewProject) {
+            btnNewProject.addEventListener('click', function() {
+                if (confirm('¿Crear un nuevo proyecto? Se perderán los cambios no guardados.')) {
+                    if (typeof workspace !== 'undefined') {
+                        workspace.clear();
+                    }
+                    currentProjectId = null;
+                    currentProjectName = 'Nuevo Proyecto';
+                    currentProjectNameEl.textContent = currentProjectName;
+                    projectsMenu.style.display = 'none';
+                    projectsMenuOpen = false;
+                }
+            });
+        }
+        
+        // Guardar proyecto actual
+        if (btnSaveProject) {
+            btnSaveProject.addEventListener('click', function() {
+                if (currentProjectId) {
+                    // Autosave al proyecto actual
+                    saveCurrentProject();
+                } else {
+                    // Si no hay proyecto, mostrar "Guardar como..."
+                    showSaveAsModal();
+                }
+            });
+        }
+        
+        // Guardar como...
+        if (btnSaveAsProject) {
+            btnSaveAsProject.addEventListener('click', showSaveAsModal);
+        }
+        
+        // Modal de guardar como
+        function showSaveAsModal(defaultName) {
+            const name = defaultName || currentProjectName;
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'saveAsModal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-title">💾 Guardar Proyecto</div>
+                    <input type="text" class="modal-input" id="projectNameInput" value="${escapeHtml(name)}" placeholder="Nombre del proyecto">
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeSaveAsModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="confirmSaveAs()">Guardar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('projectNameInput').focus();
+            document.getElementById('projectNameInput').select();
+        }
+        
+        // Cerrar modal
+        window.closeSaveAsModal = function() {
+            const modal = document.getElementById('saveAsModal');
+            if (modal) modal.remove();
+        };
+        
+        // Confirmar guardar como
+        window.confirmSaveAs = function() {
+            const nameInput = document.getElementById('projectNameInput');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('El nombre no puede estar vacío');
+                return;
+            }
+            
+            // Obtener XML y código actual
+            let blocklyXml = '';
+            let arduinoCode = '';
+            
+            if (typeof workspace !== 'undefined') {
+                const xml = Blockly.Xml.workspaceToDom(workspace);
+                blocklyXml = Blockly.Xml.domToText(xml);
+            }
+            if (typeof arduinoGenerator !== 'undefined') {
+                arduinoCode = arduinoGenerator.workspaceToCode(workspace);
+            }
+            
+            fetch('/api/ide/projects/save-as/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({
+                    name: name,
+                    blockly_xml: blocklyXml,
+                    arduino_code: arduinoCode,
+                    source_project_id: currentProjectId || ''
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    currentProjectId = data.project.id;
+                    currentProjectName = data.project.name;
+                    currentProjectNameEl.textContent = currentProjectName;
+                    closeSaveAsModal();
+                    projectsMenu.style.display = 'none';
+                    projectsMenuOpen = false;
+                    showNotification('✅ Proyecto guardado: ' + currentProjectName);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error('Error guardando:', err);
+                alert('Error al guardar el proyecto');
+            });
+        };
+        
+        // Guardar proyecto actual
+        function saveCurrentProject() {
+            if (!currentProjectId) return;
+            
+            let blocklyXml = '';
+            let arduinoCode = '';
+            
+            if (typeof workspace !== 'undefined') {
+                const xml = Blockly.Xml.workspaceToDom(workspace);
+                blocklyXml = Blockly.Xml.domToText(xml);
+            }
+            if (typeof arduinoGenerator !== 'undefined') {
+                arduinoCode = arduinoGenerator.workspaceToCode(workspace);
+            }
+            
+            fetch('/api/ide/autosave/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({
+                    project_id: currentProjectId,
+                    blockly_xml: blocklyXml,
+                    arduino_code: arduinoCode
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showNotification('💾 Proyecto guardado');
+                }
+            });
+        }
+        
+        // Cargar proyecto
+        window.loadProject = function(projectId) {
+            fetch('/api/ide/project/' + projectId + '/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        currentProjectId = data.project.id;
+                        currentProjectName = data.project.name;
+                        currentProjectNameEl.textContent = currentProjectName;
+                        
+                        // Cargar en workspace
+                        if (typeof workspace !== 'undefined' && data.project.blockly_xml) {
+                            workspace.clear();
+                            const xml = Blockly.utils.xml.textToDom(data.project.blockly_xml);
+                            Blockly.Xml.domToWorkspace(xml, workspace);
+                        }
+                        
+                        projectsMenu.style.display = 'none';
+                        projectsMenuOpen = false;
+                        showNotification('📂 Proyecto cargado: ' + currentProjectName);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error cargando proyecto:', err);
+                    alert('Error al cargar el proyecto');
+                });
+        };
+        
+        // Renombrar proyecto
+        window.renameProject = function(projectId, currentName) {
+            const newName = prompt('Nuevo nombre del proyecto:', currentName);
+            if (newName && newName.trim() !== currentName) {
+                fetch('/api/ide/projects/' + projectId + '/rename/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ name: newName.trim() })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        loadProjectsList();
+                        if (currentProjectId === projectId) {
+                            currentProjectName = data.name;
+                            currentProjectNameEl.textContent = currentProjectName;
+                        }
+                        showNotification('✏️ Proyecto renombrado');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        };
+        
+        // Eliminar proyecto
+        window.deleteProject = function(projectId, projectName) {
+            if (confirm('¿Eliminar el proyecto "' + projectName + '"?\nEsta acción no se puede deshacer.')) {
+                fetch('/api/ide/projects/' + projectId + '/delete/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        loadProjectsList();
+                        if (currentProjectId === projectId) {
+                            currentProjectId = null;
+                            currentProjectName = 'Nuevo Proyecto';
+                            currentProjectNameEl.textContent = currentProjectName;
+                        }
+                        showNotification('🗑️ Proyecto eliminado');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        };
+        
+        // Helpers
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function getCSRFToken() {
+            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+            return cookie ? cookie.split('=')[1] : '';
+        }
+        
+        function showNotification(message) {
+            // Crear notificación temporal
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#238636;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+        
+        // Exponer funciones globalmente para app.js
+        window.setCurrentProject = function(id, name) {
+            currentProjectId = id;
+            currentProjectName = name || 'Proyecto';
+            if (currentProjectNameEl) {
+                currentProjectNameEl.textContent = currentProjectName;
+            }
+        };
+        
+        window.getCurrentProjectId = function() {
+            return currentProjectId;
+        };
+    })();
+    </script>
     
     {% if project_xml %}
     <script>
