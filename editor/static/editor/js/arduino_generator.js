@@ -339,6 +339,38 @@ arduinoGenerator.forBlock['arduino_or'] = function(block) {
     return [`(${a} || ${b})`, arduinoGenerator.ORDER_LOGICAL_OR];
 };
 
+// Generador para AND con 3 condiciones
+arduinoGenerator.forBlock['arduino_and3'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const c = arduinoGenerator.valueToCode(block, 'C', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`(${a} && ${b} && ${c})`, arduinoGenerator.ORDER_LOGICAL_AND];
+};
+
+// Generador para OR con 3 condiciones
+arduinoGenerator.forBlock['arduino_or3'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const c = arduinoGenerator.valueToCode(block, 'C', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`(${a} || ${b} || ${c})`, arduinoGenerator.ORDER_LOGICAL_OR];
+};
+
+// Generador para AND-OR combinado (A AND B) OR C
+arduinoGenerator.forBlock['arduino_and_or'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const c = arduinoGenerator.valueToCode(block, 'C', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`((${a} && ${b}) || ${c})`, arduinoGenerator.ORDER_LOGICAL_OR];
+};
+
+// Generador para OR-AND combinado A OR (B AND C)
+arduinoGenerator.forBlock['arduino_or_and'] = function(block) {
+    const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    const c = arduinoGenerator.valueToCode(block, 'C', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    return [`(${a} || (${b} && ${c}))`, arduinoGenerator.ORDER_LOGICAL_OR];
+};
+
 arduinoGenerator.forBlock['arduino_not'] = function(block) {
     const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || 'false';
     return [`!${value}`, arduinoGenerator.ORDER_UNARY_PREFIX];

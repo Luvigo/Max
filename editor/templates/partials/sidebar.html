@@ -19,21 +19,6 @@
     </div>
     
     <nav class="sidebar-nav">
-        <!-- Principal -->
-        <div class="nav-section">
-            <div class="nav-section-title">Principal</div>
-            
-            <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                <i class="fas fa-home"></i>
-                <span>Dashboard</span>
-            </a>
-            
-            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
-                <i class="fas fa-code"></i>
-                <span>Editor IDE</span>
-            </a>
-        </div>
-        
         {% if institution %}
         
         {% if user_role == 'tutor' %}
@@ -45,7 +30,12 @@
             
             <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'tutor_dashboard' %}active{% endif %}">
                 <i class="fas fa-chalkboard-teacher"></i>
-                <span>Mi Dashboard</span>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
             </a>
             
             <a href="/i/{{ institution.slug }}/tutor/profile/" class="nav-item {% if request.resolver_match.url_name == 'tutor_profile' %}active{% endif %}">
@@ -116,7 +106,12 @@
             
             <a href="{% url 'student_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
                 <i class="fas fa-user"></i>
-                <span>Mi Dashboard</span>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
             </a>
             
             <a href="/i/{{ institution.slug }}/student/my-info/" class="nav-item {% if request.resolver_match.url_name == 'student_my_context' %}active{% endif %}">

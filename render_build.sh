@@ -12,10 +12,13 @@ pip install -r requirements.txt
 echo "==> Ejecutando migraciones..."
 python manage.py migrate
 
-echo "==> Creando datos de prueba (usuarios, cursos, etc.)..."
-python manage.py create_test_data || echo "Datos de prueba ya existen o error al crear"
+# ⚠️ DESACTIVADO: Los datos de prueba se recreaban en cada deploy
+# Si necesitas crear datos de prueba, ejecuta manualmente:
+# python manage.py create_test_data
+# echo "==> Creando datos de prueba (usuarios, cursos, etc.)..."
+# python manage.py create_test_data || echo "Datos de prueba ya existen o error al crear"
 
-echo "==> Creando usuario admin..."
+echo "==> Verificando/creando usuario admin..."
 python manage.py create_admin --username admin --email admin@maxide.com --password admin123 || echo "Usuario admin ya existe"
 
 echo "==> Recopilando archivos estáticos..."

@@ -598,6 +598,86 @@ Blockly.Blocks['arduino_or'] = {
     }
 };
 
+// Bloque AND con 3 condiciones
+Blockly.Blocks['arduino_and3'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("Y");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("Y");
+        this.appendValueInput("C")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("Retorna verdadero si LAS TRES condiciones son verdaderas");
+    }
+};
+
+// Bloque OR con 3 condiciones
+Blockly.Blocks['arduino_or3'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("O");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("O");
+        this.appendValueInput("C")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("Retorna verdadero si AL MENOS UNA de las tres condiciones es verdadera");
+    }
+};
+
+// Bloque combinado AND-OR (A AND B OR C)
+Blockly.Blocks['arduino_and_or'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("Y");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("O");
+        this.appendValueInput("C")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("(A Y B) O C - Primero evalúa A Y B, luego el resultado O C");
+    }
+};
+
+// Bloque combinado OR-AND (A OR B AND C)
+Blockly.Blocks['arduino_or_and'] = {
+    init: function() {
+        this.appendValueInput("A")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("O");
+        this.appendValueInput("B")
+            .setCheck("Boolean");
+        this.appendDummyInput()
+            .appendField("Y");
+        this.appendValueInput("C")
+            .setCheck("Boolean");
+        this.setInputsInline(true);
+        this.setOutput(true, "Boolean");
+        this.setColour(210);
+        this.setTooltip("A O (B Y C) - Primero evalúa B Y C, luego A O el resultado");
+    }
+};
+
 Blockly.Blocks['arduino_not'] = {
     init: function() {
         this.appendValueInput("VALUE")

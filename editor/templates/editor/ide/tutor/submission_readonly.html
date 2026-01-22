@@ -149,9 +149,117 @@
     </main>
 </div>
 
-<!-- Toolbox XML -->
+<!-- Toolbox XML - Completo con bloques Arduino y MAX (read-only) -->
 <xml id="toolbox" style="display: none;">
-    <!-- El toolbox se carga desde el template base o desde un archivo separado -->
+    <category name="⚙️ Estructura" colour="60">
+        <block type="arduino_setup"></block>
+        <block type="arduino_loop"></block>
+    </category>
+    
+    <category name="📌 Digital" colour="230">
+        <block type="arduino_pin_mode"></block>
+        <block type="arduino_digital_write"></block>
+        <block type="arduino_digital_read"></block>
+    </category>
+    
+    <category name="📊 Analógico" colour="180">
+        <block type="arduino_analog_read"></block>
+        <block type="arduino_analog_write"></block>
+    </category>
+    
+    <category name="⏱️ Tiempo" colour="330">
+        <block type="arduino_delay"></block>
+        <block type="arduino_millis"></block>
+    </category>
+    
+    <category name="📡 Serial" colour="20">
+        <block type="arduino_serial_begin"></block>
+        <block type="arduino_serial_print"></block>
+        <block type="arduino_serial_println"></block>
+    </category>
+    
+    <category name="🔀 Control" colour="210">
+        <block type="arduino_if"></block>
+        <block type="arduino_if_else"></block>
+        <block type="arduino_for"></block>
+        <block type="arduino_while"></block>
+    </category>
+    
+    <category name="⚖️ Lógica" colour="210">
+        <block type="arduino_compare"></block>
+        <block type="arduino_and"></block>
+        <block type="arduino_or"></block>
+        <block type="arduino_and3"></block>
+        <block type="arduino_or3"></block>
+        <block type="arduino_and_or"></block>
+        <block type="arduino_or_and"></block>
+        <block type="arduino_logic"></block>
+        <block type="arduino_not"></block>
+        <block type="arduino_true"></block>
+        <block type="arduino_false"></block>
+    </category>
+    
+    <category name="🔢 Matemáticas" colour="200">
+        <block type="arduino_number"></block>
+        <block type="arduino_math"></block>
+        <block type="arduino_map"></block>
+    </category>
+    
+    <category name="📝 Variables" colour="290">
+        <block type="arduino_variable_int"></block>
+        <block type="arduino_get_variable"></block>
+        <block type="arduino_set_variable"></block>
+    </category>
+    
+    <category name="🦾 Servos" colour="270">
+        <block type="arduino_servo_attach"></block>
+        <block type="arduino_servo_write"></block>
+        <block type="arduino_servo_read"></block>
+    </category>
+    
+    <!-- CARRITO MAX -->
+    <category name="🚗 Carrito MAX" colour="190">
+        <category name="⚙️ Inicialización" colour="190">
+            <block type="max_init_motores"></block>
+            <block type="max_init_distancia"></block>
+            <block type="max_init_lineas"></block>
+            <block type="max_init_buzzer"></block>
+            <block type="max_init_garra"></block>
+        </category>
+        
+        <category name="🏎️ Movimiento" colour="120">
+            <block type="max_adelante"></block>
+            <block type="max_atras"></block>
+            <block type="max_izquierda"></block>
+            <block type="max_derecha"></block>
+            <block type="max_detener"></block>
+        </category>
+        
+        <category name="📡 Sensor Distancia" colour="230">
+            <block type="max_medir_distancia"></block>
+            <block type="max_distancia_menor_que"></block>
+            <block type="max_distancia_mayor_que"></block>
+        </category>
+        
+        <category name="➖ Sensor Líneas" colour="60">
+            <block type="max_leer_linea_izq"></block>
+            <block type="max_leer_linea_centro"></block>
+            <block type="max_leer_linea_der"></block>
+            <block type="max_linea_detectada"></block>
+            <block type="max_linea_comparar"></block>
+            <block type="max_linea_valor_comparar"></block>
+        </category>
+        
+        <category name="🎵 Buzzer/Sonido" colour="300">
+            <block type="max_tocar_nota"></block>
+            <block type="max_beep"></block>
+        </category>
+        
+        <category name="🦾 Garra" colour="45">
+            <block type="max_abrir_garra"></block>
+            <block type="max_cerrar_garra"></block>
+        </category>
+    </category>
 </xml>
 
 <script>
