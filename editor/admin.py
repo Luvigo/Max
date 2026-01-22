@@ -280,20 +280,18 @@ class MembershipAdmin(ExportCSVMixin, admin.ModelAdmin):
         )
     role_badge.short_description = 'Rol'
     role_badge.admin_order_field = 'role'
-
     
     def save_model(self, request, obj, form, change):
         """
-        Al guardar una membresía con rol 'student', crear automáticamente
-        el perfil de Student si no existe.
+        Al guardar una membresía:
+        - Si rol es 'student', crear automáticamente el perfil de Student
+        - Si rol es 'tutor', crear automáticamente el perfil de TutorProfile
         """
         super().save_model(request, obj, form, change)
         
         # Si el rol es estudiante, crear Student automáticamente
         if obj.role == 'student':
-            # Verificar si ya existe un Student para este usuario
             if not hasattr(obj.user, 'student_profile'):
-                # Generar un student_id único
                 import uuid as uuid_module
                 student_id = f"EST-{obj.user.id}-{str(uuid_module.uuid4())[:4].upper()}"
                 
@@ -306,7 +304,22 @@ class MembershipAdmin(ExportCSVMixin, admin.ModelAdmin):
                 )
                 self.message_user(
                     request, 
-                    f'✅ Se creó automáticamente el perfil de Estudiante para {obj.user.username}',
+                    f'Se creó automáticamente el perfil de Estudiante para {obj.user.username}',
+                    level='SUCCESS'
+                )
+        
+        # Si el rol es tutor, crear TutorProfile automáticamente
+        if obj.role == 'tutor':
+            if not hasattr(obj.user, 'tutor_profile'):
+                TutorProfile.objects.create(
+                    user=obj.user,
+                    institution=obj.institution,
+                    status='active' if obj.is_active else 'inactive',
+                    created_by=request.user
+                )
+                self.message_user(
+                    request, 
+                    f'Se creó automáticamente el perfil de Tutor para {obj.user.username}',
                     level='SUCCESS'
                 )
     
@@ -327,7 +340,7 @@ class MembershipAdmin(ExportCSVMixin, admin.ModelAdmin):
 # COURSE ADMIN (Mejorado)
 # ============================================
 
-# @admin.register(Course)  # LEGACY - Reemplazado por StudentGroup
+@admin.register(Course)
 class CourseAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     list_display = [
         'name', 'code', 'institution', 'grade_level', 'status', 'status_badge', 
@@ -379,7 +392,7 @@ class CourseAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
 # ENROLLMENT ADMIN (Mejorado)
 # ============================================
 
-# @admin.register(Enrollment)  # LEGACY
+@admin.register(Enrollment)
 class EnrollmentAdmin(ExportCSVMixin, admin.ModelAdmin):
     list_display = ['student', 'get_student_email', 'course', 'status_badge', 'enrolled_at', 'get_institution']
     list_filter = ['status', 'enrolled_at', 'course__institution', 'course']
@@ -427,7 +440,7 @@ class EnrollmentAdmin(ExportCSVMixin, admin.ModelAdmin):
 # TEACHING ASSIGNMENT ADMIN
 # ============================================
 
-# @admin.register(TeachingAssignment)  # LEGACY
+@admin.register(TeachingAssignment)
 class TeachingAssignmentAdmin(ExportCSVMixin, admin.ModelAdmin):
     list_display = ['tutor', 'get_tutor_email', 'course', 'status_badge', 'assigned_at', 'get_institution']
     list_filter = ['status', 'assigned_at', 'course__institution']
@@ -650,6 +663,21 @@ class TutorProfileAdmin(ExportCSVMixin, admin.ModelAdmin):
 # STUDENT GROUP ADMIN (Mejorado)
 # ============================================
 
+# Inline de estudiantes para agregar al crear/editar grupo
+class StudentInlineForGroup(admin.TabularInline):
+    model = Student
+    fk_name = 'group'
+    extra = 0
+    fields = ['user', 'student_id', 'is_active']
+    raw_id_fields = ['user']
+    verbose_name = "Estudiante en el grupo"
+    verbose_name_plural = "Estudiantes en el grupo"
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('user')
+
+
 @admin.register(StudentGroup)
 class StudentGroupAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     """
@@ -666,6 +694,7 @@ class StudentGroupAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     ordering = ['institution', '-academic_year', 'name']
     list_per_page = 25
     date_hierarchy = 'created_at'
+    inlines = [StudentInlineForGroup]
     
     fieldsets = (
         ('Institución y Tutor', {
@@ -828,7 +857,7 @@ class StudentAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
 # PROJECT ADMIN
 # ============================================
 
-# @admin.register(Project)  # LEGACY - Reemplazado por IDEProject
+@admin.register(Project)
 class ProjectAdmin(ExportCSVMixin, admin.ModelAdmin):
     list_display = ['name', 'student', 'get_group', 'get_institution', 'created_at', 'updated_at', 'is_active']
     list_filter = ['is_active', 'student__institution', 'student__group', 'created_at']
@@ -1173,7 +1202,7 @@ class SubmissionAdmin(ExportCSVMixin, admin.ModelAdmin):
 # RUBRIC & FEEDBACK ADMIN
 # ============================================
 
-# @admin.register(Rubric)  # SIN UI ACTIVA
+@admin.register(Rubric)
 class RubricAdmin(admin.ModelAdmin):
     list_display = ['activity', 'get_total_max_score', 'created_at']
     list_filter = ['created_at', 'activity__group__institution', 'activity__course__institution']
@@ -1182,7 +1211,7 @@ class RubricAdmin(admin.ModelAdmin):
     raw_id_fields = ['activity']
 
 
-# @admin.register(Feedback)  # SIN UI ACTIVA
+@admin.register(Feedback)
 class FeedbackAdmin(ExportCSVMixin, admin.ModelAdmin):
     list_display = ['submission', 'tutor', 'score', 'get_percentage_score', 'created_at', 'get_institution']
     list_filter = ['created_at', 'submission__activity__group__institution', 'submission__activity__course__institution']
@@ -1220,7 +1249,7 @@ class IDEProjectAdmin(ExportCSVMixin, admin.ModelAdmin):
     is_frozen_badge.short_description = 'Estado'
 
 
-# @admin.register(ProjectSnapshot)  # SIN UI ACTIVA
+@admin.register(ProjectSnapshot)
 class ProjectSnapshotAdmin(admin.ModelAdmin):
     list_display = ['project', 'label', 'created_at', 'get_institution']
     list_filter = ['created_at', 'project__institution']
@@ -1234,7 +1263,7 @@ class ProjectSnapshotAdmin(admin.ModelAdmin):
     get_institution.short_description = 'Institución'
 
 
-# @admin.register(ActivityWorkspace)  # SIN UI ACTIVA
+@admin.register(ActivityWorkspace)
 class ActivityWorkspaceAdmin(admin.ModelAdmin):
     list_display = ['activity', 'student', 'project', 'status_badge', 'frozen_at', 'get_institution']
     list_filter = ['status', 'frozen_at', 'created_at', 'activity__group__institution', 'activity__course__institution']
@@ -1389,6 +1418,25 @@ class ErrorEventAdmin(ExportCSVMixin, admin.ModelAdmin):
     def mark_as_unresolved(self, request, queryset):
         queryset.update(resolved=False, resolved_at=None, resolved_by=None)
         self.message_user(request, f'{queryset.count()} error(es) marcado(s) como pendiente(s).')
+
+
+# ============================================
+# OCULTAR MODELOS LEGACY/NO USADOS
+# ============================================
+
+# Estos modelos son legacy o no se usan activamente en la plataforma.
+# Course fue reemplazado por StudentGroup
+# Project fue reemplazado por IDEProject
+# Rubric, Feedback, ProjectSnapshot, ActivityWorkspace no tienen UI
+
+admin.site.unregister(Course)
+admin.site.unregister(Enrollment)
+admin.site.unregister(TeachingAssignment)
+admin.site.unregister(Project)
+admin.site.unregister(Rubric)
+admin.site.unregister(Feedback)
+admin.site.unregister(ProjectSnapshot)
+admin.site.unregister(ActivityWorkspace)
 
 
 # ============================================
