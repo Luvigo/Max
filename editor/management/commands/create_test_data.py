@@ -1,9 +1,13 @@
 """
-Comando de Django para crear datos de prueba
+Comando de Django para crear datos de prueba.
 Uso: python manage.py create_test_data
+
+REGLA DE PRODUCCIÓN: Este comando NUNCA debe ejecutarse en staging/producción.
+Solo crear usuarios desde Django Admin o comandos controlados.
 """
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User
+import os
 from django.utils import timezone
 from datetime import timedelta
 import random
@@ -25,6 +29,15 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Protección: NUNCA crear usuarios de prueba en producción/staging
+        render = os.environ.get('RENDER') == 'true'
+        env = os.environ.get('ENV', '').lower()
+        if render or env == 'production' or env == 'staging':
+            raise CommandError(
+                'create_test_data no puede ejecutarse en producción o staging. '
+                'Los usuarios solo se crean desde Django Admin o comandos controlados.'
+            )
+
         if options['clear']:
             self.stdout.write(self.style.WARNING('Eliminando datos de prueba existentes...'))
             # Eliminar datos de prueba (cuidado con datos reales)

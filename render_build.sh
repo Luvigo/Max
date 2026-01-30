@@ -12,14 +12,14 @@ pip install -r requirements.txt
 echo "==> Ejecutando migraciones..."
 python manage.py migrate
 
-# ⚠️ DESACTIVADO: Los datos de prueba se recreaban en cada deploy
-# Si necesitas crear datos de prueba, ejecuta manualmente:
-# python manage.py create_test_data
-# echo "==> Creando datos de prueba (usuarios, cursos, etc.)..."
-# python manage.py create_test_data || echo "Datos de prueba ya existen o error al crear"
+# ═══════════════════════════════════════════════════════════════════════════
+# ⛔ NUNCA ejecutar create_test_data en este script (staging/producción).
+#    Los usuarios se crean solo desde Django Admin. create_test_data está
+#    bloqueado por entorno (RENDER/ENV) y no debe desprotegerse aquí.
+# ═══════════════════════════════════════════════════════════════════════════
 
-echo "==> Verificando/creando usuario admin..."
-python manage.py create_admin --username admin --email admin@maxide.com --password admin123 || echo "Usuario admin ya existe"
+echo "==> Verificando/creando usuario admin (solo si no existe; no resetea contraseña)..."
+python manage.py create_admin --username admin --email admin@maxide.com --password admin123 || true
 
 echo "==> Recopilando archivos estáticos..."
 python manage.py collectstatic --noinput

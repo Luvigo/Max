@@ -25,6 +25,7 @@ gunicorn arduino_ide.wsgi:application
 | `SECRET_KEY` | (generar nuevo) | Secret key de Django para producción |
 | `DEBUG` | `False` | Desactivar modo debug |
 | `ALLOWED_HOSTS` | `tu-app.onrender.com` | Tu dominio de Render |
+| **`DATABASE_URL`** | *(PostgreSQL de Render)* | **OBLIGATORIO en producción.** Sin esto se usa SQLite en disco efímero: la base de datos se borra en cada deploy y se pierden usuarios y credenciales. |
 | `RENDER` | `true` | Detecta que está en Render (opcional, se detecta automáticamente) |
 
 ### Generar SECRET_KEY:
@@ -69,6 +70,18 @@ El proyecto está configurado para detectar automáticamente si está corriendo 
 - ✅ Configura `STATIC_ROOT` para archivos estáticos
 - ✅ Usa variables de entorno para configuración sensible
 
+## 🗄️ Base de datos y persistencia (crítico)
+
+**En producción debes usar una base de datos persistente.**
+
+- **Recomendado:** Crear un **PostgreSQL** en Render (Dashboard → New → PostgreSQL) y añadir la variable de entorno **`DATABASE_URL`** que Render te da. Así la base de datos persiste entre deploys.
+- **Sin `DATABASE_URL`:** Django usa SQLite (`db.sqlite3`). En Render el sistema de archivos del servicio es **efímero**: en cada deploy se pierde el archivo y la base de datos se recrea vacía. Eso provoca:
+  - Pérdida de todos los usuarios creados
+  - Reseteo de la contraseña del admin a la del primer deploy
+  - Reaparición aparente de “usuarios de prueba” si en algún momento se ejecutó `create_test_data` en ese entorno
+
+**Regla:** No uses SQLite en producción en Render. Configura siempre `DATABASE_URL` (PostgreSQL) para que usuarios y credenciales persistan.
+
 ## 🔒 Seguridad
 
 En Render, el proyecto automáticamente:
@@ -95,6 +108,10 @@ Render proporciona HTTPS automáticamente, por lo que Web Serial API funcionará
 3. El Arduino debe estar conectado al PC del cliente (no al servidor)
 
 ## 🐛 Troubleshooting
+
+### Usuarios o contraseñas se pierden después de cada deploy
+- **Causa:** No hay `DATABASE_URL` y se está usando SQLite en disco efímero.
+- **Solución:** Crea una base PostgreSQL en Render y configura la variable `DATABASE_URL`. Tras el siguiente deploy, los usuarios y credenciales persistirán.
 
 ### Error: "DisallowedHost"
 - Verifica que `ALLOWED_HOSTS` incluya tu dominio de Render

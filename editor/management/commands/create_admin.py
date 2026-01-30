@@ -1,13 +1,15 @@
 """
-Comando de Django para crear usuarios admin
+Comando de Django para crear usuarios admin.
 Uso: python manage.py create_admin --username admin --email admin@example.com --password admin123
 
 NOTA: Este comando SOLO crea el usuario si NO existe.
 Si el usuario ya existe, NO modifica nada (preserva contraseña y datos).
+En producción/staging, --force está deshabilitado para no resetear contraseñas.
 """
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User
 import getpass
+import os
 
 
 class Command(BaseCommand):
@@ -55,7 +57,16 @@ class Command(BaseCommand):
         first_name = options['first_name']
         last_name = options['last_name']
         force = options.get('force', False)
-        
+
+        # En producción/staging no permitir --force (evitar reseteo de contraseña)
+        render = os.environ.get('RENDER') == 'true'
+        env = os.environ.get('ENV', '').lower()
+        if force and (render or env in ('production', 'staging')):
+            raise CommandError(
+                'No se puede usar --force en producción o staging. '
+                'Cambia la contraseña desde Django Admin.'
+            )
+
         # Verificar si el usuario ya existe
         if User.objects.filter(username=username).exists():
             if force:
