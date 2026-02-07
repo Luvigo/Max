@@ -7,20 +7,151 @@ Tests para:
 - Vistas de tutor para grupos y estudiantes
 - Vista de estudiante para contexto
 - Segregacion de datos
+- Admin form: InstitutionIdOrCodeField (acepta UUID o institution.code)
 """
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth.models import User
 from editor.models import Institution, Membership, TutorProfile, StudentGroup, Student
+from editor.forms import InstitutionIdOrCodeField, _institution_from_value
+
+
+class InstitutionIdOrCodeFieldTest(TestCase):
+    """Tests para InstitutionIdOrCodeField - acepta UUID o institution.code"""
+
+    def setUp(self):
+        self.institution = Institution.objects.create(
+            name='La Concepción',
+            slug='la-concepcion',
+            code='LCONCEPT',
+            status='active'
+        )
+        self.queryset = Institution.objects.all()
+
+    def test_resolves_by_uuid(self):
+        """Acepta UUID (pk) de la institución"""
+        inst = _institution_from_value(str(self.institution.pk), self.queryset)
+        self.assertEqual(inst, self.institution)
+
+    def test_resolves_by_code(self):
+        """Acepta institution.code cuando no es UUID"""
+        inst = _institution_from_value('LCONCEPT', self.queryset)
+        self.assertEqual(inst, self.institution)
+
+    def test_returns_none_for_empty(self):
+        """Valores vacíos retornan None"""
+        self.assertIsNone(_institution_from_value('', self.queryset))
+        self.assertIsNone(_institution_from_value(None, self.queryset))
+
+    def test_returns_none_for_invalid_code(self):
+        """Código inexistente retorna None"""
+        self.assertIsNone(_institution_from_value('NOEXIST', self.queryset))
+
+    def test_field_valid_with_uuid(self):
+        """InstitutionIdOrCodeField valida correctamente con UUID"""
+        field = InstitutionIdOrCodeField(queryset=self.queryset, required=True)
+        result = field.clean(str(self.institution.pk))
+        self.assertEqual(result, self.institution)
+
+    def test_field_valid_with_code(self):
+        """InstitutionIdOrCodeField valida correctamente con institution.code"""
+        field = InstitutionIdOrCodeField(queryset=self.queryset, required=True)
+        result = field.clean('LCONCEPT')
+        self.assertEqual(result, self.institution)
+
+    def test_field_invalid_raises(self):
+        """InstitutionIdOrCodeField levanta ValidationError para valor inválido"""
+        from django import forms
+        field = InstitutionIdOrCodeField(queryset=self.queryset, required=True)
+        with self.assertRaises(forms.ValidationError):
+            field.clean('CODIGO_INEXISTENTE')
+
+
+class StudentGroupAdminFormTest(TestCase):
+    """Tests para creación de Grupo de Estudiantes desde admin"""
+
+    def setUp(self):
+        self.institution = Institution.objects.create(
+            name='La Concepción',
+            slug='la-concepcion',
+            code='LCONCEPT',
+            status='active'
+        )
+        self.tutor_user = User.objects.create_user(
+            username='tutor_admin',
+            email='tutor@test.com',
+            password='test123'
+        )
+        self.admin_user = User.objects.create_superuser(
+            username='admin',
+            email='admin@test.com',
+            password='admin123'
+        )
+
+    def test_create_group_with_institution_by_uuid(self):
+        """Crear grupo con institución seleccionada por UUID guarda sin error"""
+        from editor.forms import StudentGroupAdminForm
+        data = {
+            'institution': str(self.institution.pk),
+            'tutor': self.tutor_user.pk,
+            'name': 'Grupo A',
+            'code': 'G1-2026',
+            'academic_year': '2026',
+            'max_students': 30,
+            'status': 'active',
+        }
+        form = StudentGroupAdminForm(data=data)
+        self.assertTrue(form.is_valid(), msg=form.errors)
+        group = form.save()
+        self.assertEqual(group.institution, self.institution)
+
+    def test_create_group_with_institution_by_code(self):
+        """Crear grupo con institución por código (no UUID) guarda sin error"""
+        from editor.forms import StudentGroupAdminForm
+        data = {
+            'institution': 'LCONCEPT',
+            'tutor': self.tutor_user.pk,
+            'name': 'Grupo B',
+            'code': 'G2-2026',
+            'academic_year': '2026',
+            'max_students': 30,
+            'status': 'active',
+        }
+        form = StudentGroupAdminForm(data=data)
+        self.assertTrue(form.is_valid(), msg=form.errors)
+        group = form.save()
+        self.assertEqual(group.institution, self.institution)
+
+    def test_group_code_unique_per_institution(self):
+        """Constraint unique_together (institution, code) se respeta"""
+        StudentGroup.objects.create(
+            institution=self.institution,
+            tutor=self.tutor_user,
+            name='Grupo Original',
+            code='G1-2026',
+            academic_year='2026',
+            status='active',
+        )
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            StudentGroup.objects.create(
+                institution=self.institution,
+                tutor=self.tutor_user,
+                name='Otro Grupo',
+                code='G1-2026',
+                academic_year='2026',
+                status='active',
+            )
 
 
 class StudentGroupModelTest(TestCase):
     """Tests para el modelo StudentGroup"""
-    
+
     def setUp(self):
         self.institution = Institution.objects.create(
             name='Test Institution',
             slug='test-inst',
+            code='TEST001',
             status='active'
         )
         
@@ -120,11 +251,12 @@ class StudentGroupModelTest(TestCase):
 
 class StudentModelTest(TestCase):
     """Tests para el modelo Student extendido"""
-    
+
     def setUp(self):
         self.institution = Institution.objects.create(
             name='Test Institution',
             slug='test-inst',
+            code='TEST002',
             status='active'
         )
         
@@ -214,13 +346,14 @@ class StudentModelTest(TestCase):
 
 class TutorGroupViewsTest(TestCase):
     """Tests para vistas de grupos del tutor"""
-    
+
     def setUp(self):
         self.client = Client()
-        
+
         self.institution = Institution.objects.create(
             name='Test Institution',
             slug='test-inst',
+            code='TEST003',
             status='active'
         )
         
@@ -305,13 +438,14 @@ class TutorGroupViewsTest(TestCase):
 
 class StudentContextViewTest(TestCase):
     """Tests para vista de contexto del estudiante"""
-    
+
     def setUp(self):
         self.client = Client()
-        
+
         self.institution = Institution.objects.create(
             name='Test Institution',
             slug='test-inst',
+            code='TEST004',
             status='active'
         )
         

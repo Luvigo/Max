@@ -7,8 +7,48 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from .models import (
     Course, Enrollment, TeachingAssignment, Institution, Membership,
-    Activity, Submission, Rubric, Feedback
+    Activity, Submission, Rubric, Feedback, StudentGroup
 )
+
+
+def _institution_from_value(value, queryset):
+    """Resuelve valor a Institution: acepta UUID (pk) o institution.code."""
+    import uuid as uuid_module
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    raw = str(value).strip()
+    try:
+        uuid_module.UUID(raw)
+        return queryset.filter(pk=raw).first()
+    except (ValueError, TypeError):
+        return queryset.filter(code=raw).first()
+
+
+class InstitutionIdOrCodeField(forms.ModelChoiceField):
+    """
+    ModelChoiceField que acepta UUID (pk) o institution.code.
+    Fix para raw_id_fields cuando el usuario ingresa el código en vez del UUID.
+    """
+    def to_python(self, value):
+        if value in self.empty_values:
+            return None
+        inst = _institution_from_value(value, self.queryset)
+        if inst:
+            return inst
+        raise forms.ValidationError(
+            self.error_messages['invalid_choice'],
+            code='invalid_choice',
+            params={'value': value},
+        )
+
+
+class StudentGroupAdminForm(forms.ModelForm):
+    """Formulario para Grupos de Estudiantes en Django Admin. Acepta institution por UUID o por code."""
+    institution = InstitutionIdOrCodeField(queryset=Institution.objects.all())
+
+    class Meta:
+        model = StudentGroup
+        fields = '__all__'
 
 
 class CourseForm(forms.ModelForm):

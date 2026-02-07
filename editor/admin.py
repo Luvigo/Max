@@ -29,6 +29,7 @@ from .models import (
     AgentInstance,
     AuditLog, ErrorEvent
 )
+from .forms import StudentGroupAdminForm
 
 
 # ============================================
@@ -283,45 +284,10 @@ class MembershipAdmin(ExportCSVMixin, admin.ModelAdmin):
     
     def save_model(self, request, obj, form, change):
         """
-        Al guardar una membresía:
-        - Si rol es 'student', crear automáticamente el perfil de Student
-        - Si rol es 'tutor', crear automáticamente el perfil de TutorProfile
+        La señal post_save (membership_post_save_ensure_profile) garantiza
+        la creación automática de Student/TutorProfile según el rol.
         """
         super().save_model(request, obj, form, change)
-        
-        # Si el rol es estudiante, crear Student automáticamente
-        if obj.role == 'student':
-            if not hasattr(obj.user, 'student_profile'):
-                import uuid as uuid_module
-                student_id = f"EST-{obj.user.id}-{str(uuid_module.uuid4())[:4].upper()}"
-                
-                Student.objects.create(
-                    user=obj.user,
-                    student_id=student_id,
-                    institution=obj.institution,
-                    is_active=obj.is_active,
-                    created_by=request.user
-                )
-                self.message_user(
-                    request, 
-                    f'Se creó automáticamente el perfil de Estudiante para {obj.user.username}',
-                    level='SUCCESS'
-                )
-        
-        # Si el rol es tutor, crear TutorProfile automáticamente
-        if obj.role == 'tutor':
-            if not hasattr(obj.user, 'tutor_profile'):
-                TutorProfile.objects.create(
-                    user=obj.user,
-                    institution=obj.institution,
-                    status='active' if obj.is_active else 'inactive',
-                    created_by=request.user
-                )
-                self.message_user(
-                    request, 
-                    f'Se creó automáticamente el perfil de Tutor para {obj.user.username}',
-                    level='SUCCESS'
-                )
     
     actions = ['activate_memberships', 'deactivate_memberships', 'export_as_csv']
     
@@ -683,6 +649,7 @@ class StudentGroupAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     """
     Admin de Grupos - Supervisión global
     """
+    form = StudentGroupAdminForm
     list_display = [
         'name', 'code', 'institution', 'tutor', 'academic_year', 
         'status_badge', 'get_students_count', 'max_students', 'get_activities_count'
@@ -695,7 +662,7 @@ class StudentGroupAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
     list_per_page = 25
     date_hierarchy = 'created_at'
     inlines = [StudentInlineForGroup]
-    
+
     fieldsets = (
         ('Institución y Tutor', {
             'fields': ('institution', 'tutor'),
