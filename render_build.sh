@@ -13,9 +13,9 @@ echo "==> Ejecutando migraciones..."
 python manage.py migrate
 
 # ═══════════════════════════════════════════════════════════════════════════
-# ⛔ NUNCA ejecutar create_test_data en este script (staging/producción).
-#    Los usuarios se crean solo desde Django Admin. create_test_data está
-#    bloqueado por entorno (RENDER/ENV) y no debe desprotegerse aquí.
+# ⛔ NUNCA ejecutar create_test_data ni configurar SEED_DEMO_DATA aquí.
+#    Los usuarios demo solo se crean si SEED_DEMO_DATA=1 (solo desarrollo).
+#    En Render esa variable NO debe estar configurada.
 # ═══════════════════════════════════════════════════════════════════════════
 
 echo "==> Verificando/creando usuario admin (solo si no existe; no resetea contraseña)..."

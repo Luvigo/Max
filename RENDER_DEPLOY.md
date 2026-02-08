@@ -16,6 +16,12 @@ gunicorn arduino_ide.wsgi:application
 
 > **Nota:** El script `render_build.sh` instala Python deps, arduino-cli y los cores de Arduino AVR.
 
+## 🌱 Seed de usuarios demo
+
+**DEMO_SEED_SOURCE:** Los usuarios demo se recreaban en `arduino_ide/wsgi.py` al cargar el WSGI (gunicorn Start Command). Ya no hay auto-seed.
+
+**Fix:** El seed se movió a comando manual: `SEED_DEMO_DATA=1 python manage.py seed_demo_data`. En producción nunca se ejecuta. En los logs verás `[DEMO_SEED] disabled (ENV=production)`.
+
 ## 🔧 Configuración en Render Dashboard
 
 ### Variables de Entorno Requeridas:
@@ -27,6 +33,8 @@ gunicorn arduino_ide.wsgi:application
 | `ALLOWED_HOSTS` | `tu-app.onrender.com` | Tu dominio de Render |
 | **`DATABASE_URL`** | *(PostgreSQL de Render)* | **OBLIGATORIO en producción.** Sin esto se usa SQLite en disco efímero: la base de datos se borra en cada deploy y se pierden usuarios y credenciales. |
 | `RENDER` | `true` | Detecta que está en Render (opcional, se detecta automáticamente) |
+| `ENV` | `production` | Recomendado. Evita que seed_demo_data corra. Usuarios se crean desde Django Admin. |
+| `SEED_DEMO_DATA` | *(no configurar)* | **NO** configurar en producción. Solo para desarrollo local. |
 
 ### Generar SECRET_KEY:
 
@@ -78,7 +86,7 @@ El proyecto está configurado para detectar automáticamente si está corriendo 
 - **Sin `DATABASE_URL`:** Django usa SQLite (`db.sqlite3`). En Render el sistema de archivos del servicio es **efímero**: en cada deploy se pierde el archivo y la base de datos se recrea vacía. Eso provoca:
   - Pérdida de todos los usuarios creados
   - Reseteo de la contraseña del admin a la del primer deploy
-  - Reaparición aparente de “usuarios de prueba” si en algún momento se ejecutó `create_test_data` en ese entorno
+  - Reaparición aparente de “usuarios de prueba” si SEED_DEMO_DATA=1 está configurada (en producción no debe estar)
 
 **Regla:** No uses SQLite en producción en Render. Configura siempre `DATABASE_URL` (PostgreSQL) para que usuarios y credenciales persistan.
 
@@ -108,6 +116,10 @@ Render proporciona HTTPS automáticamente, por lo que Web Serial API funcionará
 3. El Arduino debe estar conectado al PC del cliente (no al servidor)
 
 ## 🐛 Troubleshooting
+
+### Usuarios de prueba reaparecen después de cada deploy
+- **Causa:** El seed se ejecutaba en wsgi.py al arrancar. Ahora está bloqueado si `RENDER=true` (automático en Render) o `ENV=production`.
+- **Solución:** Configura `ENV=production` en Render si aún ves usuarios demo. Elimina `SEED_DEMO_DATA` si está configurada.
 
 ### Usuarios o contraseñas se pierden después de cada deploy
 - **Causa:** No hay `DATABASE_URL` y se está usando SQLite en disco efímero.

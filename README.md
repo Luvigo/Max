@@ -57,7 +57,18 @@ python manage.py migrate
 
 # Shell de Django
 python manage.py shell
+
+# Datos demo (solo desarrollo, opt-in)
+# SEED_DEMO_DATA=1 python manage.py seed_demo_data
+# O: python manage.py create_test_data (más datos)
 ```
+
+### Usuarios de prueba en desarrollo
+Por defecto **no** se crean usuarios demo. Para crearlos manualmente:
+- `SEED_DEMO_DATA=1 python manage.py seed_demo_data` (idempotente)
+- `python manage.py create_test_data` (más datos, solo dev)
+
+En producción (Render): **no** configurar `SEED_DEMO_DATA`. Usar `ENV=production`.
 
 ## ✨ Características
 
