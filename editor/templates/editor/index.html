@@ -612,6 +612,10 @@ void loop() {
                                 <div class="agent-terminal" style="margin-top: 10px;">
                                     <code>cd ~/Downloads/maxide-agent<br>bash start_agent.sh</code>
                                 </div>
+                                <div class="step-note" style="margin-top: 12px;">⚠️ Si ves <strong>«command not found»</strong> o <strong>«syntax error near unexpected token 'elif'»</strong>, ejecuta primero este comando (repara el script) y después <code>bash start_agent.sh</code>:</div>
+                                <div class="agent-terminal" style="margin-top: 8px;">
+                                    <code>cd ~/Downloads/maxide-agent &amp;&amp; sed -i '' 's/\r$//' start_agent.sh &amp;&amp; sed -i '' 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -670,6 +674,10 @@ void loop() {
                                     <code>unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>
                                 </div>
                                 <div class="step-note">Si prefieres usar la ruta completa: <strong>Descargas</strong> (español) → <code>cd ~/Descargas && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>. <strong>Downloads</strong> (inglés) → <code>cd ~/Downloads && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>.</div>
+                                <div class="step-note" style="margin-top: 12px;">⚠️ Si ves <strong>«orden no encontrada»</strong> (<code>$'\r'</code>) o <strong>«syntax error near unexpected token 'elif'»</strong>, ejecuta primero (en la carpeta maxide-agent) y después <code>bash start_agent.sh</code>:</div>
+                                <div class="agent-terminal" style="margin-top: 8px;">
+                                    <code>cd maxide-agent &amp;&amp; sed -i.bak 's/\r$//' start_agent.sh &amp;&amp; sed -i.bak 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
+                                </div>
                             </div>
                         </div>
                     </div>

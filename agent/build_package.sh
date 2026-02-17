@@ -93,6 +93,13 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
 
 ❓ PROBLEMAS COMUNES
 ─────────────────────
+   • "command not found" o "syntax error" al ejecutar start_agent.sh (Mac/Linux)
+     → En la carpeta maxide-agent ejecuta (luego: bash start_agent.sh):
+       Mac:  sed -i '' 's/\r$//' start_agent.sh
+             sed -i '' 's/&> \/dev\/null/> \/dev\/null 2>\&1/g' start_agent.sh
+       Linux: sed -i.bak 's/\r$//' start_agent.sh
+             sed -i.bak 's/&> \/dev\/null/> \/dev\/null 2>\&1/g' start_agent.sh
+   
    • "Permission denied" en Linux
      → NO uses snap. Desinstala con: sudo snap remove arduino-cli
      → Instala la versión binaria oficial (ver arriba)

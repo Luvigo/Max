@@ -11,8 +11,10 @@ chmod +x render_build.sh && ./render_build.sh
 
 ### Start Command:
 ```bash
-gunicorn arduino_ide.wsgi:application
+gunicorn arduino_ide.wsgi:application --bind 0.0.0.0:$PORT
 ```
+
+> **Importante:** En Render debes usar `--bind 0.0.0.0:$PORT`. Sin esto, Gunicorn escucha en 127.0.0.1:8000 y Render no detecta el puerto → "No open HTTP ports detected" y la página no carga.
 
 > **Nota:** El script `render_build.sh` instala Python deps, arduino-cli y los cores de Arduino AVR.
 
@@ -57,7 +59,7 @@ python manage.py shell -c "from django.core.management.utils import get_random_s
    - **Name:** `max-ide` (o el nombre que prefieras)
    - **Environment:** `Python 3`
    - **Build Command:** `pip install -r requirements.txt && python manage.py migrate && python manage.py collectstatic --noinput`
-   - **Start Command:** `gunicorn arduino_ide.wsgi:application`
+   - **Start Command:** `gunicorn arduino_ide.wsgi:application --bind 0.0.0.0:$PORT`
 
 3. **Agregar Variables de Entorno:**
    - `SECRET_KEY`: (generar uno nuevo)
