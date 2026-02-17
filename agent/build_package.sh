@@ -22,7 +22,8 @@ mkdir -p "$PACKAGE_DIR"
 cp "$SCRIPT_DIR/agent.py" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/install.py" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$PACKAGE_DIR/"
-cp "$SCRIPT_DIR/start_agent.sh" "$PACKAGE_DIR/"
+# Normalizar start_agent.sh a LF (evitar CRLF que rompe en Linux/macOS)
+sed 's/\r$//' "$SCRIPT_DIR/start_agent.sh" > "$PACKAGE_DIR/start_agent.sh"
 cp "$SCRIPT_DIR/start_agent.bat" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/install_autostart.bat" "$PACKAGE_DIR/"
 
