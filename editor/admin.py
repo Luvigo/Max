@@ -623,6 +623,48 @@ class TutorProfileAdmin(ExportCSVMixin, admin.ModelAdmin):
             tutor.user.save()
             count += 1
         self.message_user(request, f'{count} cuenta(s) de usuario deshabilitada(s).')
+    
+    def _delete_tutor_and_user_if_safe(self, tutor_profile, request=None):
+        """
+        Elimina TutorProfile, Membership y User (si es seguro).
+        El User solo se elimina si no tiene grupos, actividades, estudiantes asignados, etc.
+        Retorna True si se eliminó el User, False si se mantuvo.
+        """
+        user = tutor_profile.user
+        institution = tutor_profile.institution
+        tutor_profile.delete()
+        Membership.objects.filter(user=user, institution=institution).delete()
+        # Eliminar User solo si no tiene otros datos asociados
+        if (
+            not Student.objects.filter(user=user).exists()
+            and not StudentGroup.objects.filter(tutor=user).exists()
+            and not TeachingAssignment.objects.filter(tutor=user).exists()
+            and not Activity.objects.filter(created_by=user).exists()
+            and not Membership.objects.filter(user=user).exists()
+        ):
+            user.delete()
+            return True
+        return False
+    
+    def delete_model(self, request, obj):
+        """Al eliminar un TutorProfile, también eliminar User si no tiene otros datos."""
+        deleted_user = self._delete_tutor_and_user_if_safe(obj)
+        if deleted_user:
+            self.message_user(request, 'Perfil de tutor y usuario eliminados. Puedes crear un nuevo tutor con el mismo nombre de usuario.', level=25)  # SUCCESS
+        else:
+            self.message_user(request, 'Perfil de tutor eliminado. El usuario se mantiene porque tiene grupos, actividades u otros datos asociados.', level=30)  # WARNING
+    
+    def delete_queryset(self, request, queryset):
+        """Al eliminar varios TutorProfiles, también eliminar Users cuando sea seguro."""
+        tutors = list(queryset)
+        deleted_count = sum(1 for t in tutors if self._delete_tutor_and_user_if_safe(t))
+        total = len(tutors)
+        if deleted_count == total:
+            self.message_user(request, f'{total} perfil(es) de tutor y usuario(s) eliminados.', level=25)
+        elif deleted_count > 0:
+            self.message_user(request, f'{deleted_count} usuario(s) eliminado(s). {total - deleted_count} usuario(s) se mantuvieron por tener datos asociados.', level=25)
+        else:
+            self.message_user(request, f'{total} perfil(es) eliminado(s). Los usuarios se mantienen por tener grupos, actividades u otros datos asociados.', level=30)
 
 
 # ============================================
