@@ -1,0 +1,8 @@
+[
+  {"label": "Arduino UNO", "fqbn": "arduino:avr:uno", "family": "avr", "notes": ""},
+  {"label": "Arduino Nano", "fqbn": "arduino:avr:nano", "family": "avr", "notes": ""},
+  {"label": "Arduino Nano (Old Bootloader)", "fqbn": "arduino:avr:nano:cpu=atmega328old", "family": "avr", "notes": "Clones CH340 suelen necesitarlo"},
+  {"label": "Arduino Mega", "fqbn": "arduino:avr:mega", "family": "avr", "notes": ""},
+  {"label": "Arduino Leonardo", "fqbn": "arduino:avr:leonardo", "family": "avr", "notes": ""},
+  {"label": "ESP32 DevKit V1", "fqbn": "esp32:esp32:esp32", "family": "esp32", "notes": "Estándar"}
+]

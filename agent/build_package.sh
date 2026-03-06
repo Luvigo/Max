@@ -20,6 +20,7 @@ mkdir -p "$PACKAGE_DIR"
 
 # Copy agent files
 cp "$SCRIPT_DIR/agent.py" "$PACKAGE_DIR/"
+cp "$SCRIPT_DIR/boards_registry.json" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/install.py" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$PACKAGE_DIR/"
 # Normalizar start_agent.sh a LF (evitar CRLF que rompe en Linux/macOS)
@@ -30,6 +31,12 @@ cp "$SCRIPT_DIR/install_autostart.bat" "$PACKAGE_DIR/"
 # Make scripts executable
 chmod +x "$PACKAGE_DIR/start_agent.sh"
 chmod +x "$PACKAGE_DIR/install.py"
+
+# Sincronizar board registry al static del IDE (fuente única: agent/boards_registry.json)
+STATIC_JSON_DIR="$SCRIPT_DIR/../editor/static/editor/json"
+mkdir -p "$STATIC_JSON_DIR"
+cp "$SCRIPT_DIR/boards_registry.json" "$STATIC_JSON_DIR/boards.json"
+echo "  + boards_registry.json → editor/static/editor/json/boards.json"
 
 # Create README
 cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'

@@ -59,10 +59,24 @@ const AgentConfig = {
     // Endpoints del Agent
     endpoints: {
         health: '/health',
+        compile: '/compile',
         upload: '/upload',
-        ports: '/ports'
+        ports: '/ports',
+        boards: '/boards'
     }
 };
+
+// Board registry: fuente única agent/boards_registry.json, copia en /static/editor/json/boards.json
+// Fallback embebido para cuando Agent y static no están disponibles
+const BOARDS_FALLBACK = [
+    { label: 'Arduino UNO', fqbn: 'arduino:avr:uno', family: 'avr', notes: '' },
+    { label: 'Arduino Nano', fqbn: 'arduino:avr:nano', family: 'avr', notes: '' },
+    { label: 'Arduino Nano (Old Bootloader)', fqbn: 'arduino:avr:nano:cpu=atmega328old', family: 'avr', notes: 'Clones CH340 suelen necesitarlo' },
+    { label: 'Arduino Mega', fqbn: 'arduino:avr:mega', family: 'avr', notes: '' },
+    { label: 'Arduino Leonardo', fqbn: 'arduino:avr:leonardo', family: 'avr', notes: '' },
+    { label: 'ESP32 DevKit V1', fqbn: 'esp32:esp32:esp32', family: 'esp32', notes: 'Estándar' }
+];
+let boardsRegistry = BOARDS_FALLBACK.slice();
 
 // Diagnóstico del sistema
 const DiagnosticInfo = {
@@ -74,6 +88,107 @@ const DiagnosticInfo = {
     browserInfo: '',
     timestamp: null
 };
+
+/**
+ * Obtiene el label de una placa por FQBN desde el registry
+ */
+function getBoardLabel(fqbn) {
+    const b = boardsRegistry.find(x => x.fqbn === fqbn);
+    return b ? b.label : fqbn;
+}
+
+/**
+ * Obtiene la family (avr/esp32) de una placa por FQBN
+ */
+function getBoardFamily(fqbn) {
+    const b = boardsRegistry.find(x => x.fqbn === fqbn);
+    return b ? (b.family || 'avr') : 'avr';
+}
+
+/**
+ * Muestra/oculta hint ESP32 (BOOT/EN) según la placa seleccionada
+ */
+function updateBoardHint(fqbn) {
+    let hintEl = document.getElementById('boardHint');
+    if (!hintEl) {
+        const sel = document.getElementById('boardSelect');
+        if (!sel || !sel.parentElement) return;
+        hintEl = document.createElement('span');
+        hintEl.id = 'boardHint';
+        hintEl.className = 'board-hint';
+        hintEl.style.cssText = 'display:none;font-size:0.75rem;color:var(--text-muted, #666);margin-top:2px;';
+        sel.parentElement.appendChild(hintEl);
+    }
+    const family = getBoardFamily(fqbn);
+    if (family === 'esp32') {
+        hintEl.textContent = 'ESP32 puede requerir BOOT/EN en algunos equipos';
+        hintEl.style.display = 'block';
+    } else {
+        hintEl.style.display = 'none';
+    }
+}
+
+/**
+ * Carga el board registry: Agent /boards → static JSON → fallback embebido
+ */
+async function loadBoardsRegistry() {
+    // 1) Agent (si está disponible)
+    try {
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 3000);
+        const r = await fetch(AgentConfig.baseUrl + AgentConfig.endpoints.boards, { signal: ac.signal });
+        clearTimeout(t);
+        if (r.ok) {
+            const data = await r.json();
+            if (data.boards && Array.isArray(data.boards) && data.boards.length > 0) {
+                boardsRegistry = data.boards;
+                return boardsRegistry;
+            }
+        }
+    } catch (_) {}
+    // 2) Static JSON (misma fuente que Agent, copia en /static/editor/json/boards.json)
+    try {
+        const r = await fetch('/static/editor/json/boards.json');
+        if (r.ok) {
+            const data = await r.json();
+            const arr = Array.isArray(data) ? data : (data.boards || []);
+            if (arr.length > 0) {
+                boardsRegistry = arr;
+                return boardsRegistry;
+            }
+        }
+    } catch (_) {}
+    // 3) Fallback embebido
+    boardsRegistry = BOARDS_FALLBACK.slice();
+    return boardsRegistry;
+}
+
+/**
+ * Pobla el selector de placas desde el registry. Retrocompatible con el HTML actual.
+ */
+function populateBoardSelect() {
+    const sel = document.getElementById('boardSelect');
+    if (!sel) return;
+    const prevVal = sel.value || currentBoard;
+    sel.innerHTML = '';
+    boardsRegistry.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.fqbn;
+        opt.textContent = b.label;
+        sel.appendChild(opt);
+    });
+    // Restaurar selección si sigue existiendo
+    if (boardsRegistry.some(b => b.fqbn === prevVal)) {
+        sel.value = prevVal;
+        currentBoard = prevVal;
+    } else {
+        sel.value = boardsRegistry[0].fqbn;
+        currentBoard = boardsRegistry[0].fqbn;
+    }
+    const boardInfo = document.getElementById('boardInfo');
+    if (boardInfo) boardInfo.innerHTML = `<span>🎯</span><span>${getBoardLabel(currentBoard)}</span>`;
+    updateBoardHint(currentBoard);
+}
 
 /**
  * Actualiza la información de diagnóstico
@@ -235,87 +350,127 @@ async function getAgentPorts() {
     return [];
 }
 
+/** Máximo de líneas de log a mostrar en consola (evitar spam) */
+const UPLOAD_LOG_LIMIT = 12;
+
 /**
- * Sube código al Arduino via Agent local
- * El Agent compila y sube el código localmente usando arduino-cli
- * 
+ * Sube código al Arduino via Agent local.
+ * Flujo: 1) /compile con fqbn → 2) /upload con fqbn + port + job_id
+ *
  * @param {string} code - Código Arduino
  * @param {string} port - Puerto serial (ej: /dev/ttyUSB0, COM3)
  * @param {string} fqbn - Board FQBN (ej: arduino:avr:uno)
- * @param {Function} onLog - Callback para logs
- * @returns {Promise<{success: boolean, message?: string, error?: string, logs?: Array}>}
+ * @param {Function} onLog - Callback para logs (sin spamear)
+ * @returns {Promise<{success: boolean, message?: string, error?: string, errorCode?: string, hint?: string, family?: string}>}
  */
 async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
-    onLog('[UPLOAD-AGENT] Iniciando proceso de upload...');
-    onLog(`[UPLOAD-AGENT] Puerto: ${port}, Placa: ${fqbn}`);
-    
-    // ========================================
-    // Enviar código directamente al Agent
-    // El Agent compila y sube localmente
-    // ========================================
-    const agentUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
-    onLog('[UPLOAD-AGENT] Enviando código al Agent local...');
-    
+    const renderLogs = (logs, prefix) => {
+        if (!logs || !Array.isArray(logs)) return;
+        const slice = logs.slice(-UPLOAD_LOG_LIMIT);
+        slice.forEach(log => onLog(`${prefix} ${log}`));
+    };
+
+    onLog('[UPLOAD] Compilando...');
     try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 min timeout para compilar+upload
-        
-        const response = await fetch(agentUrl, {
+        // 1) Compilar
+        const compileUrl = AgentConfig.baseUrl + AgentConfig.endpoints.compile;
+        const compileCtrl = new AbortController();
+        const compileTimeout = setTimeout(() => compileCtrl.abort(), 120000);
+
+        const compileRes = await fetch(compileUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                port: port,
-                fqbn: fqbn,
-                code: code  // Enviar código directamente, el Agent compila localmente
+                fqbn,
+                sketch: { code },
+                return_job_id: true
             }),
-            signal: controller.signal
+            signal: compileCtrl.signal
         });
-        
-        clearTimeout(timeoutId);
-        
-        const data = await response.json();
-        
-        // Log de respuesta del Agent
-        if (data.logs && Array.isArray(data.logs)) {
-            data.logs.forEach(log => onLog(`[AGENT] ${log}`));
-        }
-        
-        if (response.ok && (data.ok || data.success)) {
-            onLog('[UPLOAD-AGENT] ✓ Upload completado exitosamente');
-            return {
-                success: true,
-                message: data.message || 'Código subido exitosamente',
-                logs: data.logs
-            };
-        } else {
-            const errorMsg = data.error || `HTTP ${response.status}`;
-            onLog(`[UPLOAD-AGENT] ✗ Error: ${errorMsg}`);
-            
-            // Mostrar hint si existe
-            if (data.hint) {
-                onLog(`[UPLOAD-AGENT] 💡 Sugerencia: ${data.hint}`);
-            }
-            
+        clearTimeout(compileTimeout);
+        const compileData = await compileRes.json();
+
+        renderLogs(compileData.logs, '[COMPILE]');
+
+        if (!compileRes.ok || !compileData.ok) {
+            const err = compileData.error || `HTTP ${compileRes.status}`;
+            onLog(`[UPLOAD] ✗ Compilación fallida: ${err}`);
             return {
                 success: false,
-                error: errorMsg,
-                errorCode: data.error_code,
-                hint: data.hint,
-                logs: data.logs
+                error: err,
+                errorCode: compileData.error_code || 'COMPILE_FAIL',
+                hint: compileData.hint,
+                family: compileData.family
             };
         }
-    } catch (error) {
-        const errorMsg = error.name === 'AbortError' 
-            ? 'Timeout - El Agent no respondió a tiempo (¿compilación muy larga?)'
-            : error.message;
-        onLog(`[UPLOAD-AGENT] ✗ Error de conexión: ${errorMsg}`);
+
+        const jobId = compileData.job_id;
+        const family = compileData.family || getBoardFamily(fqbn);
+        onLog(`[UPLOAD] ✓ Compilado (${compileData.size || '?'} bytes). Subiendo...`);
+
+        // 2) Upload
+        const uploadUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
+        const uploadCtrl = new AbortController();
+        const uploadTimeout = setTimeout(() => uploadCtrl.abort(), 120000);
+
+        const uploadRes = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fqbn, port, job_id: jobId }),
+            signal: uploadCtrl.signal
+        });
+        clearTimeout(uploadTimeout);
+        const uploadData = await uploadRes.json();
+
+        renderLogs(uploadData.logs, '[UPLOAD]');
+
+        if (uploadRes.ok && (uploadData.ok || uploadData.success)) {
+            onLog('[UPLOAD] ✓ Subido correctamente');
+            return {
+                success: true,
+                message: uploadData.message || 'Código subido exitosamente',
+                family
+            };
+        }
+
+        const err = uploadData.error || `HTTP ${uploadRes.status}`;
+        onLog(`[UPLOAD] ✗ Error: ${err}`);
+        if (uploadData.hint) onLog(`[UPLOAD] 💡 ${uploadData.hint}`);
         return {
             success: false,
-            error: errorMsg
+            error: err,
+            errorCode: uploadData.error_code,
+            hint: uploadData.hint,
+            family,
+            hints: uploadData.hints
         };
+    } catch (e) {
+        const err = e.name === 'AbortError' ? 'Timeout' : e.message;
+        onLog(`[UPLOAD] ✗ Error: ${err}`);
+        return { success: false, error: err, errorCode: 'NETWORK_ERROR' };
     }
+}
+
+/**
+ * Mapea error del Agent a mensaje humano para el usuario
+ */
+function uploadErrorToHumanMessage(result, family) {
+    const code = result.errorCode || '';
+    const err = (result.error || '').toLowerCase();
+    const fam = family || getBoardFamily(currentBoard);
+
+    if (code === 'PORT_NOT_FOUND' || err.includes('port') && err.includes('not found')) {
+        return 'No se detectó puerto';
+    }
+    if (code === 'PERMISSION_DENIED' || err.includes('permission') || err.includes('permiso') ||
+        err.includes('access denied') || err.includes('dialout')) {
+        return 'Drivers faltantes (CH340/CP2102)';
+    }
+    if (fam === 'esp32' && (code === 'TIMEOUT' || err.includes('timeout') || err.includes('boot') || err.includes('bootloader'))) {
+        return 'ESP32: mantén BOOT y presiona EN';
+    }
+    if (result.hint) return result.hint;
+    return result.error ? String(result.error).substring(0, 120) : 'Error al subir';
 }
 
 /**
@@ -717,6 +872,9 @@ document.addEventListener('DOMContentLoaded', function() {
     initBlockly();
     initEventListeners();
     
+    // Board registry: Agent /boards → static → fallback. Pobla selector.
+    loadBoardsRegistry().then(() => populateBoardSelect());
+    
     // Inicializar auto-guardado silencioso (P2.4)
     initAutoSave();
     
@@ -939,12 +1097,16 @@ function addInitialBlocks() {
 // AUTO-SAVE SYSTEM (P2.4 - Guardado automático silencioso)
 // ============================================
 
-const AUTO_SAVE_INTERVAL_MS = 25000; // 25 segundos
-const AUTO_SAVE_INDICATOR_DURATION = 1200; // 1.2s mostrar "Guardado ✓"
+/** Intervalo de auto-guardado (ms). Configurable. */
+const AUTO_SAVE_INTERVAL_MS = 15000; // 15 segundos
+/** Duración del indicador "Guardado ✓" (ms) */
+const AUTO_SAVE_INDICATOR_DURATION = 1000; // 1s
 
 let _autoSaveDirty = false;
 let _autoSaveLastXml = null;
 let _autoSaveInProgress = false;
+let _autoSaveDisabledQuota = false; // Deshabilitado por QuotaExceededError
+let _autoSaveQuotaLogged = false;   // Solo loguear una vez
 
 /**
  * Obtiene la clave de localStorage para el borrador actual
@@ -1027,6 +1189,7 @@ async function autoSaveNow(reason = 'interval') {
     // Guards: no guardar si no aplica
     if (!workspace) return;
     if (isReadOnlyMode()) return;
+    if (_autoSaveDisabledQuota) return;
     if (!_autoSaveDirty) return;
     if (_autoSaveInProgress) return;
     
@@ -1075,7 +1238,7 @@ async function autoSaveNow(reason = 'interval') {
         }
     }
     
-    // Fallback: guardar en localStorage
+    // Backup local: guardar en localStorage (por usuario + actividad + proyecto)
     try {
         const key = getAutoSaveKey();
         const draft = {
@@ -1084,12 +1247,20 @@ async function autoSaveNow(reason = 'interval') {
             savedToServer: savedToServer
         };
         localStorage.setItem(key, JSON.stringify(draft));
-        
         if (window.IDE_DEBUG && !savedToServer) {
             console.debug('[AutoSave] ✓ Guardado en localStorage:', key);
         }
     } catch (e) {
-        if (window.IDE_DEBUG) console.debug('[AutoSave] Error guardando en localStorage:', e.message);
+        const isQuota = e.name === 'QuotaExceededError' || (e.code === 22 && e.name === 'DOMException');
+        if (isQuota) {
+            _autoSaveDisabledQuota = true;
+            if (!_autoSaveQuotaLogged) {
+                _autoSaveQuotaLogged = true;
+                console.warn('[AutoSave] localStorage lleno (quota). Auto-guardado deshabilitado.');
+            }
+        } else if (window.IDE_DEBUG) {
+            console.debug('[AutoSave] Error guardando en localStorage:', e.message);
+        }
     }
     
     // Actualizar estado
@@ -1099,7 +1270,7 @@ async function autoSaveNow(reason = 'interval') {
     
     // Mostrar éxito
     if (reason !== 'beforeunload') {
-        showAutoSaveIndicator('success', '✓ Guardado');
+        showAutoSaveIndicator('success', 'Guardado ✓');
     }
 }
 
@@ -1131,7 +1302,7 @@ function initAutoSave() {
     window.addEventListener('beforeunload', () => {
         try {
             // Sincrónico para beforeunload - usar localStorage directamente
-            if (_autoSaveDirty && workspace && !isReadOnlyMode()) {
+            if (!_autoSaveDisabledQuota && _autoSaveDirty && workspace && !isReadOnlyMode()) {
                 const xmlText = serializeWorkspace();
                 if (xmlText && xmlText !== _autoSaveLastXml) {
                     const key = getAutoSaveKey();
@@ -1226,26 +1397,31 @@ function _captureToastResult(type) {
 
 /**
  * Aplica feedback visual a un botón después de una operación
+ * - success: muestra ✓ por duration ms, luego restaura
+ * - error: rojo suave por duration ms, luego restaura
  * @param {HTMLElement} btn - El botón
  * @param {string} result - 'success' | 'error'
  * @param {number} duration - Duración del flash en ms
  */
 function applyButtonFeedback(btn, result, duration = 1000) {
     if (!btn) return;
-    
-    // Limpiar clases previas
+
+    const savedContent = btn.innerHTML;
     btn.classList.remove('btn-success-flash', 'btn-error-flash', 'btn-loading', 'btn-pulse');
-    
-    // Forzar reflow para reiniciar animación
+    btn.setAttribute('aria-busy', 'false');
+
     void btn.offsetWidth;
-    
-    // Aplicar clase de feedback
-    const feedbackClass = result === 'success' ? 'btn-success-flash' : 'btn-error-flash';
-    btn.classList.add(feedbackClass);
-    
-    // Remover después de la duración
+
+    if (result === 'success') {
+        btn.innerHTML = '<span>✓</span>';
+        btn.classList.add('btn-success-flash');
+    } else {
+        btn.classList.add('btn-error-flash');
+    }
+
     setTimeout(() => {
-        btn.classList.remove(feedbackClass);
+        btn.classList.remove('btn-success-flash', 'btn-error-flash');
+        if (result === 'success') btn.innerHTML = savedContent;
     }, duration);
 }
 
@@ -1258,47 +1434,30 @@ function applyButtonFeedback(btn, result, duration = 1000) {
  */
 async function withButtonFeedback(btn, asyncFn, options = {}) {
     const {
-        successDuration = 1000,
-        errorDuration = 1500
+        successDuration = 1500,
+        errorDuration = 2000
     } = options;
-    
-    // Si no hay botón, ejecutar la función sin wrapper
+
     if (!btn) {
         try { await asyncFn(); } catch(e) { /* silencioso */ }
         return;
     }
-    
-    // Agregar clase de pulse durante la operación
+
     btn.classList.add('btn-pulse');
-    
-    // Reset el tracker de toast antes de la operación
     _lastToastResult = null;
-    
+
     try {
-        // Ejecutar la función original
         await asyncFn();
-        
-        // Determinar resultado basándose en el último toast capturado
-        // Si no hay toast o es success/info = success visual
-        // Si es error/warning = error visual
         const isError = _lastToastResult === 'error';
-        
-        // Pequeño delay para que el botón vuelva a su estado normal primero
         setTimeout(() => {
             btn.classList.remove('btn-pulse');
-            applyButtonFeedback(btn, isError ? 'error' : 'success', 
-                               isError ? errorDuration : successDuration);
+            applyButtonFeedback(btn, isError ? 'error' : 'success',
+                isError ? errorDuration : successDuration);
         }, 100);
-        
     } catch (error) {
-        // Si hay throw explícito, mostrar error
         btn.classList.remove('btn-pulse');
         applyButtonFeedback(btn, 'error', errorDuration);
-        
-        // Debug log solo si está habilitado
-        if (window.IDE_DEBUG) {
-            console.debug('[UI-Feedback] Error capturado:', error.message);
-        }
+        if (window.IDE_DEBUG) console.debug('[UI-Feedback] Error capturado:', error.message);
     }
 }
 
@@ -1314,7 +1473,7 @@ function initEventListeners() {
         btnCompile.addEventListener('click', () => withButtonFeedback(btnCompile, verifyCode));
     }
     if (btnUpload) {
-        btnUpload.addEventListener('click', () => withButtonFeedback(btnUpload, uploadCode, { errorDuration: 2000 }));
+        btnUpload.addEventListener('click', () => withButtonFeedback(btnUpload, uploadCode));
     }
     document.getElementById('btnRefreshPorts').addEventListener('click', refreshPorts);
     document.getElementById('btnAddPort').addEventListener('click', requestSerialPort); // Abre diálogo Web Serial
@@ -1380,16 +1539,12 @@ function initEventListeners() {
     });
     
     document.getElementById('boardSelect').addEventListener('change', function(e) {
-        currentBoard = e.target.value;
-        const boardNames = {
-            'arduino:avr:uno': 'Arduino UNO',
-            'arduino:avr:nano': 'Arduino Nano',
-            'arduino:avr:nano:cpu=atmega328old': 'Arduino Nano (Old Bootloader)',
-            'arduino:avr:mega': 'Arduino Mega',
-            'arduino:avr:leonardo': 'Arduino Leonardo'
-        };
-        document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${boardNames[currentBoard]}</span>`;
-        logToConsole(`Placa seleccionada: ${boardNames[currentBoard]}`, 'info');
+        currentBoard = e.target.value;  // FQBN usado en /compile y /upload
+        const label = getBoardLabel(currentBoard);
+        const boardInfo = document.getElementById('boardInfo');
+        if (boardInfo) boardInfo.innerHTML = `<span>🎯</span><span>${label}</span>`;
+        updateBoardHint(currentBoard);
+        logToConsole(`Placa seleccionada: ${label}`, 'info');
     });
     
     // Monitor Serial
@@ -1613,6 +1768,7 @@ async function verifyCode() {
     }
     
     btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
     btn.innerHTML = '<span class="loading"></span> Verificando...';
     logToConsole('[VERIFY] Compilando código en tu PC...', 'info');
     
@@ -1662,6 +1818,7 @@ async function verifyCode() {
     }
     
     btn.disabled = false;
+    btn.setAttribute('aria-busy', 'false');
     btn.innerHTML = '<span>⚙️</span><span>Verificar</span>';
 }
 
@@ -1685,19 +1842,19 @@ async function uploadCode() {
     
     // Validar puerto seleccionado
     if (!currentPort) {
-        showToast('Selecciona un puerto primero', 'warning');
-        logToConsole('[UPLOAD-AGENT] No hay puerto seleccionado', 'warning');
+        showToast('No se detectó puerto', 'warning');
+        logToConsole('[UPLOAD] No se detectó puerto. Selecciona uno en el menú.', 'warning');
         return;
     }
     
-    // Verificar disponibilidad del Agent
+    // Validar que Agent esté disponible (/health ok)
     if (!AgentConfig.available) {
-        logToConsole('[UPLOAD-AGENT] Agent no disponible, verificando...', 'info');
+        logToConsole('[UPLOAD] Verificando Agent...', 'info');
         const healthCheck = await checkAgentHealth();
         
         if (!healthCheck.available) {
-            showToast('Agent local no disponible. Instala y ejecuta el MAX-IDE Agent.', 'error');
-            logToConsole('[UPLOAD-AGENT] ✗ No se puede subir sin Agent local', 'error');
+            showToast('Agent no disponible', 'error');
+            logToConsole('[UPLOAD] ✗ Agent no disponible', 'error');
             showAgentBanner();
             return;
         }
@@ -1733,7 +1890,7 @@ async function uploadCode() {
             const boardSelect = document.getElementById('boardSelect');
             boardSelect.value = 'arduino:avr:nano:cpu=atmega328old';
             currentBoard = 'arduino:avr:nano:cpu=atmega328old';
-            document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino Nano (Old Bootloader)</span>';
+            document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${getBoardLabel(currentBoard)}</span>`;
             logToConsole('[UPLOAD-AGENT] ✓ Cambiado a Arduino Nano (Old Bootloader)', 'success');
             showToast('Cambiado a Nano Old Bootloader', 'info');
         }
@@ -1747,6 +1904,7 @@ async function uploadCode() {
     }
     
     btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
     btn.innerHTML = '<span class="loading"></span> Subiendo...';
     logToConsole('[UPLOAD-AGENT] Iniciando upload via Agent local...', 'info');
     logToConsole(`[UPLOAD-AGENT] Puerto: ${currentPort}, Placa: ${currentBoard}`, 'info');
@@ -1790,14 +1948,15 @@ async function uploadCode() {
                 if (cambiar) {
                     // Cambiar a Old Bootloader
                     const boardSelect = document.getElementById('boardSelect');
-                    boardSelect.value = 'arduino:avr:nano:cpu=atmega328old';
-                    currentBoard = 'arduino:avr:nano:cpu=atmega328old';
-                    document.getElementById('boardInfo').innerHTML = '<span>🎯</span><span>Arduino Nano (Old Bootloader)</span>';
+            boardSelect.value = 'arduino:avr:nano:cpu=atmega328old';
+            currentBoard = 'arduino:avr:nano:cpu=atmega328old';
+            document.getElementById('boardInfo').innerHTML = `<span>🎯</span><span>${getBoardLabel(currentBoard)}</span>`;
                     logToConsole('[UPLOAD-AGENT] ✓ Cambiado a Arduino Nano (Old Bootloader)', 'success');
                     showToast('Cambiado a Nano Old Bootloader - Reintentando...', 'info');
                     
                     // Reintentar automáticamente después de un breve delay
                     btn.disabled = false;
+                    btn.setAttribute('aria-busy', 'false');
                     btn.innerHTML = '<span>🚀</span><span>Subir</span>';
                     setTimeout(() => uploadCode(), 1000);
                     return;
@@ -1805,23 +1964,39 @@ async function uploadCode() {
                 
                 showToast('Cambia a "Arduino Nano (Old Bootloader)" en el selector de Board', 'warning');
             }
-            // Sugerencias según el tipo de error
-            else if (result.errorCode === 'PORT_BUSY' || errorLower.includes('busy')) {
+            // Mensajes humanos según tipo de error
+            const family = result.family || getBoardFamily(currentBoard);
+            if (result.errorCode === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe')) {
+                showToast('No se detectó puerto', 'error');
+            } else if (result.errorCode === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('permiso') || errorLower.includes('denied') || errorLower.includes('access')) {
+                showToast('Drivers faltantes (CH340/CP2102)', 'error');
+            } else if (family === 'esp32' && (result.errorCode === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader'))) {
+                showToast('ESP32: mantén BOOT y presiona EN', 'error');
+            } else if (result.errorCode === 'PORT_BUSY' || errorLower.includes('busy')) {
                 showToast('Puerto ocupado. Cierra otras aplicaciones que lo usen.', 'error');
-            } else if (result.errorCode === 'PORT_NOT_FOUND' || errorLower.includes('not found')) {
-                showToast('Puerto no encontrado. Verifica la conexión del Arduino.', 'error');
-            } else if (isSyncError) {
+            } else if (isSyncError && family !== 'esp32') {
                 showToast('Error de sincronización. Presiona RESET en el Arduino y reintenta.', 'error');
             } else {
-                showToast(`Error: ${result.error.substring(0, 100)}`, 'error');
+                showToast(result.hint || `Error: ${(result.error || '').substring(0, 80)}`, 'error');
+            }
+            // Hints para ESP32 con errores típicos
+            if (family === 'esp32') {
+                const code = result.errorCode || '';
+                const isDriver = code === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('access') || errorLower.includes('denied');
+                const isBusy = code === 'PORT_BUSY' || errorLower.includes('busy');
+                const isNotFound = code === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe');
+                const isTimeout = code === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader');
+                if (isDriver || isNotFound || isTimeout) logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
+                if (isBusy || isNotFound || isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
             }
         }
     } catch (error) {
-        logToConsole(`[UPLOAD-AGENT] ✗ Error inesperado: ${error.message}`, 'error');
-        showToast('Error de conexión con Agent', 'error');
+        logToConsole(`[UPLOAD] ✗ Error inesperado: ${error.message}`, 'error');
+        showToast('Agent no disponible', 'error');
     }
     
     btn.disabled = false;
+    btn.setAttribute('aria-busy', 'false');
     btn.innerHTML = '<span>🚀</span><span>Subir</span>';
 }
 
