@@ -548,6 +548,16 @@ void loop() {
                                 <div class="step-note" style="margin-top: 8px;">⚠️ Si pide cerrar y volver a abrir, hazlo. Es normal la primera vez.</div>
                             </div>
                         </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Opcional: ESP32 o clones</div>
+                                <div class="step-desc">Si usas <strong>ESP32 DevKit V1</strong>: abre CMD y ejecuta <code>arduino-cli core install esp32:esp32</code>.</div>
+                                <div class="step-desc" style="margin-top: 8px;">Si no detecta el puerto (clones/ESP32): instala el driver <strong>CH340</strong> o <strong>CP2102</strong> según tu placa.</div>
+                                <div class="step-note">Cierra Arduino IDE o el Monitor Serial de MAX-IDE si están usando el puerto.</div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="install-success-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.2)); border: 1px solid #10b981;">
@@ -587,11 +597,13 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">3</div>
                             <div class="step-content">
-                                <div class="step-title">Instala Arduino CLI</div>
+                                <div class="step-title">Instala Arduino CLI (y Python si falta)</div>
                                 <div class="step-desc">En una nueva ventana de Terminal, ejecuta:</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>brew install arduino-cli<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                    <code>brew install arduino-cli python3<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
                                 </div>
+                                <div class="step-note">Para ESP32 DevKit V1: <code>arduino-cli core install esp32:esp32</code></div>
+                                <div class="step-note">Si no detecta el puerto (ESP32/clones): instala driver CP2102 de Silicon Labs. CH340 suele funcionar sin driver en Mac.</div>
                             </div>
                         </div>
                         
@@ -617,6 +629,7 @@ void loop() {
                                 <div class="agent-terminal" style="margin-top: 8px;">
                                     <code>cd ~/Downloads/maxide-agent &amp;&amp; sed -i '' 's/\r$//' start_agent.sh &amp;&amp; sed -i '' 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
                                 </div>
+                                <div class="step-note" style="margin-top: 8px;">Cierra Arduino IDE o el Monitor Serial si están usando el puerto.</div>
                             </div>
                         </div>
                     </div>
@@ -636,12 +649,14 @@ void loop() {
                         <div class="install-step">
                             <div class="step-number">1</div>
                             <div class="step-content">
-                                <div class="step-title">Instala arduino-cli (si no lo tienes)</div>
+                                <div class="step-title">Instala Python 3 y arduino-cli (si no los tienes)</div>
                                 <div class="step-desc">Copia y pega en Terminal (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>):</div>
                                 <div class="agent-terminal" style="margin-top: 10px;">
-                                    <code>curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh<br>sudo mv bin/arduino-cli /usr/local/bin/<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                    <code>sudo apt install python3 python3-pip python3-venv<br>curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh<br>sudo mv bin/arduino-cli /usr/local/bin/<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
                                 </div>
-                                <div class="step-note">⚠️ NO uses snap. La versión snap tiene problemas de permisos con puertos seriales.</div>
+                                <div class="step-note">Ubuntu/Debian: <code>apt</code>. Fedora: <code>sudo dnf install python3 python3-pip</code> (y omite la línea apt).</div>
+                                <div class="step-note">Para ESP32: <code>arduino-cli core install esp32:esp32</code></div>
+                                <div class="step-note">⚠️ NO uses snap para arduino-cli. Tiene problemas de permisos con puertos seriales.</div>
                             </div>
                         </div>
                         
@@ -679,6 +694,7 @@ void loop() {
                                 <div class="agent-terminal" style="margin-top: 8px;">
                                     <code>cd maxide-agent &amp;&amp; sed -i.bak 's/\r$//' start_agent.sh &amp;&amp; sed -i.bak 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
                                 </div>
+                                <div class="step-note" style="margin-top: 8px;">Si no detecta el puerto (ESP32/clones): instala driver CH340 o CP2102. Cierra Arduino IDE o Monitor Serial si usan el puerto.</div>
                             </div>
                         </div>
                     </div>
