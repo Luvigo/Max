@@ -440,7 +440,11 @@ class TutorProfileCreationForm(forms.ModelForm):
     """Formulario para crear TutorProfile con creación automática de User y Membership"""
     username = forms.CharField(max_length=150, help_text="Nombre de usuario para login")
     email = forms.EmailField(help_text="Email del tutor")
-    password = forms.CharField(widget=forms.PasswordInput, help_text="Contraseña inicial")
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        min_length=6,
+        help_text="Mínimo 6 caracteres. Si hay errores de validación, vuelve a ingresarla."
+    )
     first_name = forms.CharField(max_length=150, required=False)
     last_name = forms.CharField(max_length=150, required=False)
     
@@ -459,6 +463,12 @@ class TutorProfileCreationForm(forms.ModelForm):
         if User.objects.filter(email=email).exists():
             raise forms.ValidationError("Ya existe un usuario con este email.")
         return email
+    
+    def clean_password(self):
+        password = self.cleaned_data.get('password', '')
+        if len(password) < 6:
+            raise forms.ValidationError("La contraseña debe tener al menos 6 caracteres.")
+        return password
 
 
 @admin.register(TutorProfile)
@@ -594,7 +604,19 @@ class TutorProfileAdmin(ExportCSVMixin, admin.ModelAdmin):
                 user=obj.user, institution=obj.institution, role='tutor'
             ).update(is_active=obj.status == 'active')
     
-    actions = ['activate_tutors', 'deactivate_tutors', 'suspend_tutors', 'disable_user_accounts', 'export_as_csv']
+    actions = ['activate_tutors', 'deactivate_tutors', 'suspend_tutors', 'disable_user_accounts', 'reset_tutor_password', 'export_as_csv']
+    
+    @admin.action(description='🔑 Resetear contraseña a tutor123')
+    def reset_tutor_password(self, request, queryset):
+        """Resetea la contraseña del tutor para poder iniciar sesión."""
+        for tutor in queryset:
+            tutor.user.set_password('tutor123')
+            tutor.user.save()
+        self.message_user(
+            request,
+            f'Contraseña reseteada para {queryset.count()} tutor(es). Nueva contraseña: tutor123 (indica al tutor que la cambie tras iniciar sesión).',
+            level=25
+        )
     
     @admin.action(description='✅ Activar tutores')
     def activate_tutors(self, request, queryset):
