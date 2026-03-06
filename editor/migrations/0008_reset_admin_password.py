@@ -1,29 +1,26 @@
 # Migración de emergencia: resetea contraseña del admin para recuperar acceso
 # Se ejecuta una sola vez en el próximo deploy.
+# Usamos get_user_model() porque el modelo histórico (apps.get_model) no tiene set_password.
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import migrations
 
 
 def reset_admin_password(apps, schema_editor):
-    app_label, model_name = settings.AUTH_USER_MODEL.split('.')
-    User = apps.get_model(app_label, model_name)
+    User = get_user_model()
     try:
         admin = User.objects.get(username='admin')
         admin.set_password('admin123')
         admin.save()
     except User.DoesNotExist:
-        admin = User(
+        User.objects.create_superuser(
             username='admin',
             email='admin@maxide.com',
+            password='admin123',
             first_name='Admin',
             last_name='MAX-IDE',
-            is_staff=True,
-            is_superuser=True,
-            is_active=True,
         )
-        admin.set_password('admin123')
-        admin.save()
 
 
 def noop(apps, schema_editor):
