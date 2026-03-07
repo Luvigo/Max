@@ -259,27 +259,41 @@ function closeNotifications() {
 }
 
 function loadNotifications() {
-    // Simular carga de notificaciones
-    // En una implementación real, esto haría una llamada AJAX al servidor
-    const notifications = getStoredNotifications();
-    renderNotifications(notifications);
+    fetch('/api/notifications/', {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok && data.notifications) {
+            renderNotifications(data.notifications, data.unread_count);
+        } else {
+            renderNotifications([], 0);
+        }
+    })
+    .catch(() => renderNotifications([], 0));
 }
 
-function getStoredNotifications() {
-    // Obtener notificaciones del localStorage o devolver vacío
-    try {
-        const stored = localStorage.getItem('max_notifications');
-        return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-        return [];
-    }
+function formatNotificationTime(isoDate) {
+    if (!isoDate) return 'Hace un momento';
+    const d = new Date(isoDate);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 60) return `Hace ${diffMins} min`;
+    if (diffHours < 24) return `Hace ${diffHours} h`;
+    if (diffDays < 7) return `Hace ${diffDays} días`;
+    return d.toLocaleDateString('es');
 }
 
-function renderNotifications(notifications) {
+function renderNotifications(notifications, unreadCountFromApi) {
     const list = document.getElementById('notificationsList');
     const badge = document.getElementById('notificationBadge');
     
-    if (notifications.length === 0) {
+    if (!notifications || notifications.length === 0) {
         list.innerHTML = `
             <div class="notification-empty">
                 <i class="fas fa-bell-slash"></i>
@@ -288,7 +302,7 @@ function renderNotifications(notifications) {
         `;
         badge.style.display = 'none';
     } else {
-        const unreadCount = notifications.filter(n => !n.read).length;
+        const unreadCount = unreadCountFromApi !== undefined ? unreadCountFromApi : notifications.filter(n => !n.read).length;
         
         if (unreadCount > 0) {
             badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
@@ -297,19 +311,23 @@ function renderNotifications(notifications) {
             badge.style.display = 'none';
         }
         
-        list.innerHTML = notifications.map(n => `
-            <div class="notification-item ${n.read ? '' : 'unread'}" onclick="markAsRead('${n.id}')">
+        list.innerHTML = notifications.map(n => {
+            const timeStr = formatNotificationTime(n.created_at);
+            const clickHandler = n.link_url ? `window.location.href='${n.link_url.replace(/'/g, "\\'")}'` : '';
+            const markRead = `markAsRead('${n.id}', event)`;
+            return `
+            <div class="notification-item ${n.read ? '' : 'unread'}" onclick="event.preventDefault(); ${markRead}; if ('${(n.link_url || '').replace(/'/g, "\\'")}') window.location.href='${(n.link_url || '').replace(/'/g, "\\'")}'">
                 <div style="display: flex; align-items: flex-start;">
                     <span class="notification-icon ${n.type || 'info'}">
                         <i class="fas fa-${getNotificationIcon(n.type)}"></i>
                     </span>
                     <div class="notification-content">
-                        <div class="notification-title">${n.title}</div>
-                        <div class="notification-time">${n.time || 'Hace un momento'}</div>
+                        <div class="notification-title">${(n.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                        <div class="notification-time">${timeStr}</div>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 }
 
@@ -318,49 +336,56 @@ function getNotificationIcon(type) {
         'success': 'check-circle',
         'info': 'info-circle',
         'warning': 'exclamation-triangle',
-        'error': 'times-circle'
+        'error': 'times-circle',
+        'activity_new': 'clipboard-list',
+        'activity_published': 'paper-plane',
+        'submission_graded': 'star',
+        'group_assigned': 'users'
     };
     return icons[type] || 'bell';
 }
 
+function getCsrfToken() {
+    const name = 'csrftoken';
+    let v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : '';
+}
+
 function markAsRead(id) {
-    let notifications = getStoredNotifications();
-    notifications = notifications.map(n => {
-        if (n.id === id) n.read = true;
-        return n;
-    });
-    localStorage.setItem('max_notifications', JSON.stringify(notifications));
-    renderNotifications(notifications);
+    fetch('/api/notifications/' + id + '/mark-read/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) loadNotifications();
+    })
+    .catch(() => {});
 }
 
 function markAllAsRead() {
-    let notifications = getStoredNotifications();
-    notifications = notifications.map(n => ({ ...n, read: true }));
-    localStorage.setItem('max_notifications', JSON.stringify(notifications));
-    renderNotifications(notifications);
+    fetch('/api/notifications/mark-all-read/', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) loadNotifications();
+    })
+    .catch(() => {});
 }
 
-// Función para agregar una notificación (usar desde otras partes de la app)
+// Función para refrescar notificaciones (las notificaciones se crean en el servidor)
 function addNotification(title, type = 'info') {
-    let notifications = getStoredNotifications();
-    notifications.unshift({
-        id: Date.now().toString(),
-        title: title,
-        type: type,
-        time: 'Ahora',
-        read: false
-    });
-    // Mantener solo las últimas 20 notificaciones
-    notifications = notifications.slice(0, 20);
-    localStorage.setItem('max_notifications', JSON.stringify(notifications));
-    
-    // Actualizar badge
-    const badge = document.getElementById('notificationBadge');
-    const unreadCount = notifications.filter(n => !n.read).length;
-    if (unreadCount > 0) {
-        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-        badge.style.display = 'block';
-    }
+    loadNotifications();
 }
 
 // Cerrar dropdown al hacer clic fuera
@@ -371,15 +396,19 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Cargar badge de notificaciones al iniciar
+// Cargar badge de notificaciones al iniciar (desde API)
 document.addEventListener('DOMContentLoaded', function() {
-    const notifications = getStoredNotifications();
-    const badge = document.getElementById('notificationBadge');
-    const unreadCount = notifications.filter(n => !n.read).length;
-    
-    if (unreadCount > 0) {
-        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
-        badge.style.display = 'block';
-    }
+    fetch('/api/notifications/', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok && data.unread_count > 0) {
+                const badge = document.getElementById('notificationBadge');
+                if (badge) {
+                    badge.textContent = data.unread_count > 9 ? '9+' : data.unread_count;
+                    badge.style.display = 'block';
+                }
+            }
+        })
+        .catch(() => {});
 });
 </script>

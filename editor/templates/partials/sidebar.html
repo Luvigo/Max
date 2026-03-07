@@ -62,6 +62,11 @@
                 <i class="fas fa-user-graduate"></i>
                 <span>Mis Estudiantes</span>
             </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/activities/" class="nav-item {% if request.resolver_match.url_name == 'tutor_my_activities_list' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Mis Actividades</span>
+            </a>
         </div>
         
         <div class="nav-section">

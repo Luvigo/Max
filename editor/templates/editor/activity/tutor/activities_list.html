@@ -1,120 +1,192 @@
 {% extends 'base_dashboard.html' %}
 {% load static %}
 
-{% block title %}Actividades - {{ course.name }}{% endblock %}
+{% block title %}Mis Actividades - {{ institution.name }}{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
-    <div class="page-header-content">
-        <h1><i class="fas fa-tasks"></i> Actividades - {{ course.name }}</h1>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'tutor_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}">Mis Grupos</a></li>
-                <li class="breadcrumb-item active">{{ course.name }}</li>
-            </ol>
-        </nav>
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-clipboard-list"></i>
+            Mis Actividades
+        </h1>
+        <p class="page-subtitle">Todas las actividades que has creado en {{ institution.name }}</p>
     </div>
-    <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}?course={{ course.id }}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Nueva Actividad
-    </a>
-</div>
-
-{% include 'partials/alerts.html' %}
-
-<div class="card">
-    <div class="card-header">
-        <h3>Lista de Actividades - {{ course.name }}</h3>
-    </div>
-    <div class="card-body">
-        {% if activities %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Título</th>
-                        <th>Estado</th>
-                        <th>Fecha Límite</th>
-                        <th>Entregas</th>
-                        <th>Pendientes</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for activity in activities %}
-                    <tr>
-                        <td>
-                            <strong>{{ activity.title }}</strong>
-                            {% if activity.objective %}
-                            <br><small class="text-muted">{{ activity.objective|truncatewords:15 }}</small>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if activity.status == 'draft' %}
-                            <span class="badge badge-secondary">Borrador</span>
-                            {% elif activity.status == 'published' %}
-                            <span class="badge badge-success">Publicada</span>
-                            {% elif activity.status == 'closed' %}
-                            <span class="badge badge-danger">Cerrada</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if activity.deadline %}
-                            {{ activity.deadline|date:"d/m/Y H:i" }}
-                            {% if activity.is_deadline_passed %}
-                            <br><small class="text-danger"><i class="fas fa-exclamation-triangle"></i> Vencida</small>
-                            {% endif %}
-                            {% else %}
-                            <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        <td><span class="badge badge-info">{{ activity.submissions_count }}</span></td>
-                        <td>
-                            {% if activity.pending_count > 0 %}
-                            <span class="badge badge-warning">{{ activity.pending_count }}</span>
-                            {% else %}
-                            <span class="badge badge-success">0</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <a href="{% url 'editor:tutor_activity_submissions' institution_slug=institution.slug activity_id=activity.id %}" 
-                                   class="btn btn-sm btn-primary" title="Ver entregas">
-                                    <i class="fas fa-eye"></i> Entregas
-                                </a>
-                                <a href="{% url 'editor:tutor_activity_ide_sandbox' institution_slug=institution.slug activity_id=activity.id %}" 
-                                   class="btn btn-sm btn-info" title="Abrir Sandbox">
-                                    <i class="fas fa-flask"></i> Sandbox
-                                </a>
-                                <a href="{% url 'editor:tutor_activity_edit' institution_slug=institution.slug activity_id=activity.id %}" 
-                                   class="btn btn-sm btn-secondary" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                                {% if activity.status == 'draft' %}
-                                <form method="post" action="{% url 'editor:tutor_activity_publish' institution_slug=institution.slug activity_id=activity.id %}" style="display: inline;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-success" title="Publicar">
-                                        <i class="fas fa-paper-plane"></i>
-                                    </button>
-                                </form>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <i class="fas fa-tasks fa-3x text-muted"></i>
-            <h3>No hay actividades</h3>
-            <p class="text-muted">Comienza creando tu primera actividad.</p>
-            <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}?course={{ course.id }}" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Crear Actividad
-            </a>
-        </div>
-        {% endif %}
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nueva Actividad
+        </a>
     </div>
 </div>
+
+<div class="content-body">
+    <!-- Filtros -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <form method="get" class="filters-form">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Estado</label>
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Borrador</option>
+                            <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Publicada</option>
+                            <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Cerrada</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Actividades -->
+    <div class="activities-grid">
+        {% for activity in activities %}
+        <div class="card animate-in activity-card" style="animation-delay: {{ forloop.counter0|divisibleby:10 }}s;">
+            <div class="card-header">
+                <h3 class="card-title">{{ activity.title }}</h3>
+                <span class="badge {% if activity.status == 'published' %}badge-success{% elif activity.status == 'draft' %}badge-warning{% else %}badge-secondary{% endif %}">
+                    {{ activity.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="activity-group-badge">
+                    <i class="fas fa-users"></i>
+                    <a href="{% url 'editor:tutor_group_detail' institution_slug=institution.slug group_id=activity.group.id %}">{{ activity.group.name }}</a>
+                </div>
+                {% if activity.objective %}
+                <p class="activity-objective">{{ activity.objective|truncatewords:20 }}</p>
+                {% endif %}
+                
+                <div class="activity-meta">
+                    {% if activity.deadline %}
+                    <div class="meta-item {% if activity.is_deadline_passed %}text-danger{% endif %}">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>{{ activity.deadline|date:"d/m/Y H:i" }}</span>
+                        {% if activity.is_deadline_passed %}
+                        <span class="badge badge-danger">Vencida</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="meta-item">
+                        <i class="fas fa-inbox"></i>
+                        <span>{{ activity.submissions_count }}/{{ activity.group.get_students_count }} entregas</span>
+                    </div>
+                    
+                    {% if activity.pending_count > 0 %}
+                    <div class="meta-item">
+                        <span class="badge badge-warning">{{ activity.pending_count }} pendientes</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" 
+                   class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye"></i> Ver Entregas
+                </a>
+                <a href="{% url 'editor:tutor_group_activity_edit' institution_slug=institution.slug group_id=activity.group.id activity_id=activity.id %}" 
+                   class="btn btn-sm btn-ghost">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card animate-in">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>No hay actividades</h3>
+                    <p>Crea tu primera actividad para uno de tus grupos.</p>
+                    <a href="{% url 'editor:tutor_activity_create' institution_slug=institution.slug %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Crear Actividad
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .activities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+    .activity-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    .activity-group-badge {
+        margin-bottom: 12px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+    .activity-group-badge a {
+        color: var(--accent-color, #58a6ff);
+        text-decoration: none;
+    }
+    .activity-group-badge a:hover {
+        text-decoration: underline;
+    }
+    .activity-objective {
+        color: var(--color-text-muted);
+        font-size: 14px;
+        margin: 0 0 16px 0;
+    }
+    .activity-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+    .meta-item i {
+        width: 16px;
+    }
+    .card-footer {
+        padding: 12px 16px;
+        border-top: 1px solid var(--color-border);
+        display: flex;
+        gap: 8px;
+    }
+    .filters-form .filter-row {
+        display: flex;
+        gap: 16px;
+    }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-item label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .filter-item select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
 {% endblock %}

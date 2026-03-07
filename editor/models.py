@@ -1498,6 +1498,54 @@ class AuditLog(models.Model):
         return f"{actor_name} - {self.get_action_display()} - {self.entity}"
 
 
+class Notification(models.Model):
+    """
+    Notificaciones para usuarios (tutor/estudiante).
+    Se crean cuando ocurren eventos relevantes: nueva actividad, calificación, etc.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', verbose_name="Usuario")
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='notifications', null=True, blank=True, verbose_name="Institución")
+    
+    TYPE_CHOICES = [
+        ('activity_new', 'Nueva actividad'),
+        ('activity_published', 'Actividad publicada'),
+        ('submission_graded', 'Entrega calificada'),
+        ('group_assigned', 'Asignado a grupo'),
+        ('info', 'Información'),
+    ]
+    notification_type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='info', verbose_name="Tipo")
+    title = models.CharField(max_length=255, verbose_name="Título")
+    message = models.TextField(blank=True, verbose_name="Mensaje")
+    
+    # Enlace opcional (URL o referencia)
+    link_url = models.CharField(max_length=500, blank=True, verbose_name="Enlace")
+    
+    # Estado
+    read = models.BooleanField(default=False, verbose_name="Leída")
+    read_at = models.DateTimeField(null=True, blank=True, verbose_name="Leída en")
+    
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Creada", db_index=True)
+    
+    class Meta:
+        verbose_name = "Notificación"
+        verbose_name_plural = "Notificaciones"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['user', 'read', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username}: {self.title}"
+    
+    def mark_as_read(self):
+        if not self.read:
+            self.read = True
+            self.read_at = timezone.now()
+            self.save(update_fields=['read', 'read_at'])
+
+
 class ErrorEvent(models.Model):
     """Eventos de error del sistema para observabilidad"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

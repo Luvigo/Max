@@ -27,11 +27,43 @@ from .models import (
     Feedback, IDEProject, ActivityWorkspace
 )
 from .mixins import tutor_required, student_required
+from .notification_views import notify_students_of_new_activity
 
 
 # ============================================
 # VISTAS DE TUTOR: ACTIVIDADES POR GRUPO
 # ============================================
+
+@login_required
+@tutor_required
+def tutor_activities_list(request, institution_slug):
+    """
+    Lista todas las actividades creadas por el tutor (de todos sus grupos).
+    """
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    
+    activities = Activity.objects.filter(
+        group__institution=institution,
+        group__tutor=request.user,
+        group__status='active'
+    ).select_related('group').annotate(
+        submissions_count=Count('submissions', filter=Q(submissions__status__in=['submitted', 'graded'])),
+        pending_count=Count('submissions', filter=Q(submissions__status='submitted'))
+    ).order_by('-created_at')
+    
+    # Filtros
+    status_filter = request.GET.get('status', '')
+    if status_filter:
+        activities = activities.filter(status=status_filter)
+    
+    context = {
+        'institution': institution,
+        'user_role': 'tutor',
+        'activities': activities,
+        'status_filter': status_filter,
+    }
+    return render(request, 'editor/activity/tutor/activities_list.html', context)
+
 
 @login_required
 @tutor_required
@@ -122,7 +154,7 @@ def tutor_activity_create_select_group(request, institution_slug):
                             deadline = timezone.datetime.fromisoformat(deadline_str.replace('T', ' '))
                             deadline = timezone.make_aware(deadline) if timezone.is_naive(deadline) else deadline
                         
-                        Activity.objects.create(
+                        activity = Activity.objects.create(
                             group=group,
                             created_by=request.user,
                             title=title,
@@ -135,6 +167,8 @@ def tutor_activity_create_select_group(request, institution_slug):
                             max_score=max_score,
                             published_at=timezone.now() if status == 'published' else None
                         )
+                        if status == 'published':
+                            notify_students_of_new_activity(activity, institution, 'activity_published')
                         
                         messages.success(request, f'Actividad "{title}" creada exitosamente para {group.name}.')
                         return redirect('editor:tutor_group_activities_list',
@@ -205,6 +239,8 @@ def tutor_group_activity_create(request, institution_slug, group_id):
                     max_score=max_score,
                     published_at=timezone.now() if status == 'published' else None
                 )
+                if status == 'published':
+                    notify_students_of_new_activity(activity, institution, 'activity_published')
                 
                 messages.success(request, f'Actividad "{title}" creada exitosamente.')
                 return redirect('editor:tutor_group_activities_list', 
@@ -247,7 +283,8 @@ def tutor_group_activity_edit(request, institution_slug, group_id, activity_id):
             activity.deadline = None
         
         new_status = request.POST.get('status', 'draft')
-        if new_status == 'published' and activity.status == 'draft':
+        was_draft = activity.status == 'draft'
+        if new_status == 'published' and was_draft:
             activity.published_at = timezone.now()
         activity.status = new_status
         
@@ -257,6 +294,8 @@ def tutor_group_activity_edit(request, institution_slug, group_id, activity_id):
         
         try:
             activity.save()
+            if new_status == 'published' and was_draft:
+                notify_students_of_new_activity(activity, institution, 'activity_published')
             messages.success(request, f'Actividad "{activity.title}" actualizada.')
             return redirect('editor:tutor_group_activities_list',
                            institution_slug=institution_slug, group_id=group_id)

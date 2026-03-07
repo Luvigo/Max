@@ -136,6 +136,7 @@ urlpatterns = [
     # ============================================
     # ✅ TUTOR - Actividades por Grupo
     # ============================================
+    path('tutor/activities/', activity_group_views.tutor_activities_list, name='tutor_my_activities_list'),
     path('tutor/groups/<uuid:group_id>/activities/', activity_group_views.tutor_group_activities_list, name='tutor_group_activities_list'),
     path('tutor/groups/<uuid:group_id>/activities/new/', activity_group_views.tutor_group_activity_create, name='tutor_group_activity_create'),
     path('tutor/groups/<uuid:group_id>/activities/<uuid:activity_id>/edit/', activity_group_views.tutor_group_activity_edit, name='tutor_group_activity_edit'),

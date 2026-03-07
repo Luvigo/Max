@@ -27,7 +27,7 @@ from .models import (
     Activity, Submission, Rubric, Feedback,
     IDEProject, ProjectSnapshot, ActivityWorkspace,
     AgentInstance,
-    AuditLog, ErrorEvent
+    AuditLog, ErrorEvent, Notification
 )
 from .forms import StudentGroupAdminForm
 
@@ -1445,6 +1445,22 @@ class ErrorEventAdmin(ExportCSVMixin, admin.ModelAdmin):
     def mark_as_unresolved(self, request, queryset):
         queryset.update(resolved=False, resolved_at=None, resolved_by=None)
         self.message_user(request, f'{queryset.count()} error(es) marcado(s) como pendiente(s).')
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['title', 'user', 'notification_type', 'read_badge', 'institution', 'created_at']
+    list_filter = ['notification_type', 'read', 'institution']
+    search_fields = ['title', 'message', 'user__username']
+    readonly_fields = ['created_at', 'read_at']
+    raw_id_fields = ['user', 'institution']
+    date_hierarchy = 'created_at'
+    
+    def read_badge(self, obj):
+        if obj.read:
+            return mark_safe('<span style="color:#2ea043;">✓ Leída</span>')
+        return mark_safe('<span style="color:#f85149;">● No leída</span>')
+    read_badge.short_description = 'Estado'
 
 
 # ============================================

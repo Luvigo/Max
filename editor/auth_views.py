@@ -84,6 +84,15 @@ def user_login(request):
     # Si ya está autenticado, mostrar login con opción de ir al panel (no redirigir)
     if request.user.is_authenticated:
         user = request.user
+        # Si vino con ?editor=true, ir directo al IDE (evita pantalla "Ya estás conectado")
+        if request.GET.get('editor') == 'true':
+            membership = Membership.objects.filter(
+                user=user,
+                is_active=True,
+                role__in=['tutor', 'student']
+            ).select_related('institution').first()
+            if membership:
+                return redirect(f'/i/{membership.institution.slug}/?editor=true')
         redirect_url, role = get_post_login_redirect(user)
         
         if role == 'institution_deprecated':

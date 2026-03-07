@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -5,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ activity.title }} - MAX-IDE</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    <script src="https://unpkg.com/blockly@9.3.3/blockly.min.js"></script>
     <style>
         :root {
             --color-bg: #0d1117;
@@ -533,21 +534,76 @@
             readOnly: isReadOnly
         });
         
-        // Cargar XML previo si existe
-        const savedXml = `{{ project_xml|escapejs }}`;
-        if (savedXml) {
-            try {
-                const xml = Blockly.utils.xml.textToDom(savedXml);
-                Blockly.Xml.domToWorkspace(xml, workspace);
-            } catch (e) {
-                console.error('Error loading XML:', e);
+        // Cargar bloques tras un frame para que el contenedor tenga dimensiones (evita parpadeo)
+        function loadBlocksIntoWorkspace() {
+            const savedXml = `{{ project_xml|escapejs }}`;
+            let loadedFromSave = false;
+            if (savedXml && savedXml.trim() !== '' && savedXml !== 'None') {
+                try {
+                    const xml = Blockly.utils.xml.textToDom(savedXml);
+                    Blockly.Xml.domToWorkspace(xml, workspace);
+                    loadedFromSave = true;
+                } catch (e) {
+                    console.error('Error loading XML:', e);
+                }
+            }
+            if (!loadedFromSave) {
+                const initialXml = `<xml>
+                    <block type="arduino_setup" x="50" y="50">
+                        <statement name="SETUP_CODE"></statement>
+                    </block>
+                    <block type="arduino_loop" x="50" y="220">
+                        <statement name="LOOP_CODE"></statement>
+                    </block>
+                </xml>`;
+                try {
+                    const dom = Blockly.utils.xml.textToDom(initialXml);
+                    Blockly.Xml.domToWorkspace(dom, workspace);
+                } catch (e) {
+                    console.error('Error adding initial blocks:', e);
+                }
+            }
+            resizeBlockly();
+        }
+        
+        // Forzar redimensionado del SVG para que los bloques se muestren correctamente
+        // (evita que aparezcan y desaparezcan por problemas de layout inicial)
+        function resizeBlockly() {
+            if (typeof Blockly !== 'undefined' && Blockly.svgResize) {
+                Blockly.svgResize(workspace);
+            } else if (workspace.resize) {
+                workspace.resize();
             }
         }
+        resizeBlockly();
+        window.addEventListener('resize', resizeBlockly);
+        // Redimensionar tras el layout (el contenedor puede tener 0 altura al inicio)
+        setTimeout(resizeBlockly, 100);
+        setTimeout(resizeBlockly, 400);
+        // Cargar bloques tras el primer frame (cuando el contenedor ya tiene dimensiones)
+        requestAnimationFrame(function() {
+            loadBlocksIntoWorkspace();
+            updateCode();
+        });
+        // ResizeObserver: redimensionar cuando blocklyDiv obtenga dimensiones reales
+        if (typeof ResizeObserver !== 'undefined') {
+            const blocklyDiv = document.getElementById('blocklyDiv');
+            const ro = new ResizeObserver(function() {
+                resizeBlockly();
+            });
+            if (blocklyDiv) ro.observe(blocklyDiv);
+        }
+        
+        // Cargar bloques (diferido un frame para que el layout esté listo)
+        requestAnimationFrame(function() {
+            loadBlocksIntoWorkspace();
+            updateCode();
+        });
         
         // Generar código cuando cambie el workspace
         function updateCode() {
             try {
-                const code = Blockly.Arduino ? Blockly.Arduino.workspaceToCode(workspace) : '// Generador no disponible';
+                const code = (typeof arduinoGenerator !== 'undefined') ? arduinoGenerator.workspaceToCode(workspace) : '// Generador no disponible';
                 document.getElementById('arduinoCode').value = code;
             } catch (e) {
                 document.getElementById('arduinoCode').value = '// Error generando código';
