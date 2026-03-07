@@ -422,33 +422,34 @@ class TutorProfile(models.Model):
         """Obtener email del usuario"""
         return self.user.email
     
-    def get_courses_count(self):
-        """Obtener número de cursos asignados activos"""
-        return TeachingAssignment.objects.filter(
+    def get_groups_count(self):
+        """Obtener número de grupos del tutor"""
+        return StudentGroup.objects.filter(
             tutor=self.user,
-            course__institution=self.institution,
+            institution=self.institution,
             status='active'
         ).count()
     
+    def get_courses_count(self):
+        """Alias de get_groups_count para compatibilidad con admin"""
+        return self.get_groups_count()
+    
     def get_students_count(self):
-        """Obtener número total de estudiantes en sus cursos"""
-        assignments = TeachingAssignment.objects.filter(
+        """Obtener número total de estudiantes en sus grupos"""
+        groups = StudentGroup.objects.filter(
             tutor=self.user,
-            course__institution=self.institution,
+            institution=self.institution,
             status='active'
         )
-        total = 0
-        for assignment in assignments:
-            total += assignment.course.get_students_count()
-        return total
+        return sum(g.get_students_count() for g in groups)
     
-    def get_courses(self):
-        """Obtener cursos asignados"""
-        return Course.objects.filter(
-            teaching_assignments__tutor=self.user,
-            teaching_assignments__status='active',
-            institution=self.institution
-        ).distinct()
+    def get_groups(self):
+        """Obtener grupos del tutor"""
+        return StudentGroup.objects.filter(
+            tutor=self.user,
+            institution=self.institution,
+            status='active'
+        ).order_by('-academic_year', 'name')
     
     def can_login(self):
         """Verificar si el tutor puede hacer login"""

@@ -7,7 +7,7 @@
     <div class="breadcrumb">
         <a href="{% url 'tutor_dashboard' slug=institution.slug %}">Dashboard</a>
         <span class="separator">/</span>
-        <a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a>
+        <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}">Mis Grupos</a>
         <span class="separator">/</span>
         <span>Crear Estudiante</span>
     </div>
@@ -91,7 +91,7 @@
             {% if not courses %}
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i>
-                No tienes cursos creados. <a href="{% url 'editor:tutor_course_create' institution_slug=institution.slug %}">Crear un curso primero</a>.
+                No tienes grupos creados. <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}">Crear un grupo primero</a>.
             </div>
             {% endif %}
             

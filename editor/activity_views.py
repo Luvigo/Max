@@ -33,7 +33,7 @@ def tutor_activities_list(request, institution_slug, course_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para ver este curso.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     activities = Activity.objects.filter(
         course=course
@@ -58,7 +58,7 @@ def tutor_activity_create(request, institution_slug):
     # Verificar permisos
     if not UserRoleHelper.user_has_role(request.user, ['admin', 'institution', 'tutor'], institution):
         messages.error(request, 'No tienes permisos para crear actividades.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Obtener curso si viene en query string
     course_id = request.GET.get('course')
@@ -72,7 +72,7 @@ def tutor_activity_create(request, institution_slug):
             status='active'
         ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
             messages.error(request, 'No tienes permisos para crear actividades en este curso.')
-            return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+            return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     if request.method == 'POST':
         form = ActivityForm(request.POST)
@@ -127,7 +127,7 @@ def tutor_activity_edit(request, institution_slug, activity_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para editar esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -136,7 +136,7 @@ def tutor_activity_edit(request, institution_slug, activity_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para editar esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     if request.method == 'POST':
         form = ActivityForm(request.POST, instance=activity)
@@ -172,7 +172,7 @@ def tutor_activity_publish(request, institution_slug, activity_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para publicar esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -181,7 +181,7 @@ def tutor_activity_publish(request, institution_slug, activity_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para publicar esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     if activity.status == 'draft':
         activity.status = 'published'
@@ -204,7 +204,7 @@ def tutor_activity_submissions(request, institution_slug, activity_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para ver esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -213,7 +213,7 @@ def tutor_activity_submissions(request, institution_slug, activity_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para ver las entregas de esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     submissions = Submission.objects.filter(
         activity=activity
@@ -237,7 +237,7 @@ def tutor_submission_grade(request, institution_slug, submission_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para calificar esta entrega.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -246,7 +246,7 @@ def tutor_submission_grade(request, institution_slug, submission_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para calificar esta entrega.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Obtener feedback existente o crear uno nuevo
     feedback = submission.get_latest_feedback()

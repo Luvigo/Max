@@ -10,7 +10,7 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{% url 'tutor_dashboard' slug=institution.slug %}">{{ institution.name }}</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_courses_list' institution_slug=institution.slug %}">Mis Cursos</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}">Mis Grupos</a></li>
                 <li class="breadcrumb-item active">{{ course.name }}</li>
             </ol>
         </nav>

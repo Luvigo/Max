@@ -141,15 +141,15 @@ class InstitutionAdmin(ExportCSVMixin, admin.ModelAdmin):
     """
     list_display = [
         'name', 'code', 'city', 'status', 'status_badge', 
-        'get_tutors_count', 'get_students_count', 'get_courses_count', 
-        'get_groups_count', 'get_activities_count', 'created_at'
+        'get_tutors_count', 'get_students_count', 'get_groups_count',
+        'get_activities_count', 'created_at'
     ]
     list_filter = ['status', 'country', 'city', 'created_at', 'is_active']
     search_fields = ['name', 'code', 'slug', 'email', 'city', 'address', 'phone']
     readonly_fields = [
         'created_at', 'updated_at', 
         'get_members_count', 'get_tutors_count', 'get_students_count', 
-        'get_courses_count', 'get_groups_count', 'get_activities_count',
+        'get_groups_count', 'get_activities_count',
         'agent_token'
     ]
     prepopulated_fields = {'slug': ('name',)}
@@ -179,7 +179,7 @@ class InstitutionAdmin(ExportCSVMixin, admin.ModelAdmin):
         ('Estadísticas', {
             'fields': (
                 'get_members_count', 'get_tutors_count', 'get_students_count', 
-                'get_courses_count', 'get_groups_count', 'get_activities_count'
+                'get_groups_count', 'get_activities_count'
             ),
             'classes': ('collapse',)
         }),
@@ -215,10 +215,6 @@ class InstitutionAdmin(ExportCSVMixin, admin.ModelAdmin):
     def get_students_count(self, obj):
         return obj.get_students_count()
     get_students_count.short_description = 'Estudiantes'
-    
-    def get_courses_count(self, obj):
-        return obj.get_courses_count()
-    get_courses_count.short_description = 'Cursos'
     
     def get_groups_count(self, obj):
         return obj.student_groups.count()

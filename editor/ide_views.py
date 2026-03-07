@@ -117,7 +117,7 @@ def tutor_activity_ide_sandbox(request, institution_slug, activity_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para ver esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -126,7 +126,7 @@ def tutor_activity_ide_sandbox(request, institution_slug, activity_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para abrir el sandbox de esta actividad.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Crear proyecto sandbox para el tutor
     sandbox_project, created = IDEProject.objects.get_or_create(
@@ -159,7 +159,7 @@ def tutor_submission_ide_readonly(request, institution_slug, submission_id):
     # Verificar que pertenece a la institución
     if activity.institution != institution:
         messages.error(request, 'No tienes permisos para ver esta entrega.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Verificar permisos
     if not TeachingAssignment.objects.filter(
@@ -168,7 +168,7 @@ def tutor_submission_ide_readonly(request, institution_slug, submission_id):
         status='active'
     ).exists() and not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, 'No tienes permisos para ver esta entrega.')
-        return redirect('editor:tutor_courses_list', institution_slug=institution_slug)
+        return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
     
     # Obtener proyecto de la entrega
     artifact_ref = submission.artifact_ref or {}

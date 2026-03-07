@@ -34,6 +34,16 @@ def deprecated_redirect(request, *args, **kwargs):
     return redirect('dashboard')
 
 
+def redirect_tutor_courses_to_groups(request, institution_slug, **kwargs):
+    """Redirige rutas de cursos (legacy) a grupos"""
+    return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
+
+
+def redirect_tutor_activity_new_to_groups(request, institution_slug):
+    """Redirige Nueva Actividad a lista de grupos (las actividades se crean por grupo)"""
+    return redirect('editor:tutor_groups_list', institution_slug=institution_slug)
+
+
 urlpatterns = [
     # ============================================
     # Vista principal - IDE
@@ -98,12 +108,12 @@ urlpatterns = [
     path('api/tutor/status/', tutor_views.check_tutor_status, name='api_tutor_status'),
     
     # ============================================
-    # ✅ TUTOR - Cursos
+    # ❌ TUTOR - Cursos (redirige a Grupos)
     # ============================================
-    path('tutor/courses/', academic_views.tutor_courses_list, name='tutor_courses_list'),
-    path('tutor/courses/new/', academic_views.tutor_course_create, name='tutor_course_create'),
-    path('tutor/courses/<int:course_id>/roster/', academic_views.tutor_course_roster, name='tutor_course_roster'),
-    path('tutor/courses/<int:course_id>/enroll/', academic_views.tutor_enroll_student, name='tutor_enroll_student'),
+    path('tutor/courses/', redirect_tutor_courses_to_groups, name='tutor_courses_list'),
+    path('tutor/courses/new/', redirect_tutor_courses_to_groups, name='tutor_course_create'),
+    path('tutor/courses/<int:course_id>/roster/', redirect_tutor_courses_to_groups, name='tutor_course_roster'),
+    path('tutor/courses/<int:course_id>/enroll/', redirect_tutor_courses_to_groups, name='tutor_enroll_student'),
     
     # ============================================
     # ✅ TUTOR - Grupos
@@ -136,8 +146,8 @@ urlpatterns = [
     # ============================================
     # ✅ TUTOR - Actividades por Curso (legacy)
     # ============================================
-    path('tutor/courses/<int:course_id>/activities/', activity_views.tutor_activities_list, name='tutor_activities_list'),
-    path('tutor/activities/new/', activity_views.tutor_activity_create, name='tutor_activity_create'),
+    path('tutor/courses/<int:course_id>/activities/', redirect_tutor_courses_to_groups, name='tutor_activities_list'),
+    path('tutor/activities/new/', redirect_tutor_activity_new_to_groups, name='tutor_activity_create'),
     path('tutor/activities/<str:activity_id>/edit/', activity_views.tutor_activity_edit, name='tutor_activity_edit'),
     path('tutor/activities/<str:activity_id>/publish/', activity_views.tutor_activity_publish, name='tutor_activity_publish'),
     path('tutor/activities/<str:activity_id>/submissions/', activity_views.tutor_activity_submissions, name='tutor_activity_submissions'),

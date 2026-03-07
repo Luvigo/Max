@@ -52,11 +52,11 @@
     <div class="stats-grid" style="margin-top: 20px;">
         <div class="stat-card animate-in" style="animation-delay: 0.1s;">
             <div class="stat-icon" style="background: var(--color-primary-glow);">
-                <i class="fas fa-book" style="color: var(--color-primary);"></i>
+                <i class="fas fa-users" style="color: var(--color-primary);"></i>
             </div>
             <div class="stat-content">
-                <div class="stat-value">{{ stats.courses_count }}</div>
-                <div class="stat-label">Cursos</div>
+                <div class="stat-value">{{ stats.groups_count }}</div>
+                <div class="stat-label">Grupos</div>
             </div>
         </div>
         
@@ -135,32 +135,32 @@
     </div>
     {% endif %}
     
-    <!-- Mis Cursos (Tutor) -->
-    {% if my_courses %}
+    <!-- Mis Grupos (Tutor) -->
+    {% if my_groups %}
     <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.6s;">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="fas fa-chalkboard" style="color: var(--color-primary);"></i>
-                Mis Cursos (como Tutor)
+                <i class="fas fa-users" style="color: var(--color-primary);"></i>
+                Mis Grupos (como Tutor)
             </h3>
         </div>
         <div class="card-body" style="padding: 0;">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Curso</th>
+                        <th>Grupo</th>
                         <th>Código</th>
                         <th>Año</th>
                         <th>Estudiantes</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for assignment in my_courses %}
+                    {% for group in my_groups %}
                     <tr>
-                        <td>{{ assignment.course.name }}</td>
-                        <td><span class="badge badge-secondary">{{ assignment.course.code }}</span></td>
-                        <td>{{ assignment.course.academic_year }}</td>
-                        <td>{{ assignment.course.get_students_count }}</td>
+                        <td>{{ group.name }}</td>
+                        <td><span class="badge badge-secondary">{{ group.code }}</span></td>
+                        <td>{{ group.academic_year }}</td>
+                        <td>{{ group.get_students_count }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -169,38 +169,30 @@
     </div>
     {% endif %}
     
-    <!-- Mis Cursos (Estudiante) -->
-    {% if my_enrollments %}
+    <!-- Mi Grupo (Estudiante) -->
+    {% if my_group %}
     <div class="card animate-in" style="margin-top: 20px; animation-delay: 0.6s;">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="fas fa-graduation-cap" style="color: var(--color-warning);"></i>
-                Mis Cursos
+                <i class="fas fa-users" style="color: var(--color-warning);"></i>
+                Mi Grupo
             </h3>
         </div>
         <div class="card-body" style="padding: 0;">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Curso</th>
+                        <th>Grupo</th>
                         <th>Código</th>
                         <th>Año</th>
-                        <th>Estado</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for enrollment in my_enrollments %}
                     <tr>
-                        <td>{{ enrollment.course.name }}</td>
-                        <td><span class="badge badge-secondary">{{ enrollment.course.code }}</span></td>
-                        <td>{{ enrollment.course.academic_year }}</td>
-                        <td>
-                            <span class="badge {% if enrollment.status == 'active' %}badge-success{% else %}badge-secondary{% endif %}">
-                                {{ enrollment.get_status_display }}
-                            </span>
-                        </td>
+                        <td>{{ my_group.name }}</td>
+                        <td><span class="badge badge-secondary">{{ my_group.code }}</span></td>
+                        <td>{{ my_group.academic_year }}</td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
         </div>

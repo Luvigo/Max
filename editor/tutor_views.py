@@ -9,7 +9,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from .models import Institution, Membership, TutorProfile, TeachingAssignment, Course
+from .models import Institution, Membership, TutorProfile, StudentGroup
 from .mixins import tutor_required
 
 
@@ -42,27 +42,24 @@ def tutor_profile(request, institution_slug):
         institution=institution
     ).first()
     
-    # Obtener cursos asignados
-    teaching_assignments = TeachingAssignment.objects.filter(
-        tutor=request.user,
-        course__institution=institution,
-        status='active'
-    ).select_related('course')
+    # Obtener grupos del tutor
+    my_groups = StudentGroup.objects.filter(
+        institution=institution,
+        tutor=request.user
+    ).order_by('-academic_year', 'name')
     
     # Calcular estadísticas
-    total_courses = teaching_assignments.count()
-    total_students = 0
-    for assignment in teaching_assignments:
-        total_students += assignment.course.get_students_count()
+    total_groups = my_groups.count()
+    total_students = sum(g.get_students_count() for g in my_groups)
     
     context = {
         'institution': institution,
         'user_role': 'tutor',
         'tutor_profile': tutor_profile,
         'membership': membership,
-        'teaching_assignments': teaching_assignments,
+        'my_groups': my_groups,
         'stats': {
-            'courses_count': total_courses,
+            'groups_count': total_groups,
             'students_count': total_students,
         }
     }

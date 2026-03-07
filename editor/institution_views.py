@@ -9,7 +9,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from .models import Institution, Membership, Course, Enrollment, TeachingAssignment
+from django.db.models import Q
+from .models import Institution, Membership, StudentGroup, Student
 from .mixins import tutor_required, student_required
 
 
@@ -46,26 +47,26 @@ def my_institution(request, institution_slug):
     
     # Estadísticas generales (visible para todos)
     context['stats'] = {
-        'courses_count': institution.get_courses_count(),
+        'groups_count': StudentGroup.objects.filter(institution=institution, status='active').count(),
         'tutors_count': institution.get_tutors_count(),
         'students_count': institution.get_students_count(),
     }
     
-    # Si es tutor, mostrar sus cursos
+    # Si es tutor, mostrar sus grupos
     if user_role == 'tutor' or user_role in ['admin', 'institution']:
-        context['my_courses'] = TeachingAssignment.objects.filter(
-            tutor=request.user,
-            course__institution=institution,
-            status='active'
-        ).select_related('course')
+        context['my_groups'] = StudentGroup.objects.filter(
+            institution=institution,
+            tutor=request.user
+        ).order_by('-academic_year', 'name')
     
-    # Si es estudiante, mostrar sus cursos
+    # Si es estudiante, mostrar su grupo
     if user_role == 'student':
-        context['my_enrollments'] = Enrollment.objects.filter(
-            student=request.user,
-            course__institution=institution,
-            status='active'
-        ).select_related('course')
+        student_profile = Student.objects.filter(
+            user=request.user,
+            institution=institution,
+            is_active=True
+        ).select_related('group').first()
+        context['my_group'] = student_profile.group if student_profile else None
     
     return render(request, 'editor/institution/my_institution.html', context)
 
@@ -90,24 +91,21 @@ def tutor_my_institution(request, institution_slug):
         messages.error(request, 'No tienes acceso como tutor a esta institución.')
         return redirect('dashboard')
     
-    # Cursos del tutor
-    my_courses = TeachingAssignment.objects.filter(
-        tutor=request.user,
-        course__institution=institution,
-        status='active'
-    ).select_related('course')
+    # Grupos del tutor
+    my_groups = StudentGroup.objects.filter(
+        institution=institution,
+        tutor=request.user
+    ).order_by('-academic_year', 'name')
     
-    # Calcular total de estudiantes en los cursos del tutor
-    total_students = 0
-    for assignment in my_courses:
-        total_students += assignment.course.get_students_count()
+    # Calcular total de estudiantes en los grupos del tutor
+    total_students = sum(g.get_students_count() for g in my_groups)
     
     context = {
         'institution': institution,
         'user_role': 'tutor',
-        'my_courses': my_courses,
+        'my_groups': my_groups,
         'stats': {
-            'courses_count': my_courses.count(),
+            'groups_count': my_groups.count(),
             'students_count': total_students,
             'tutors_count': institution.get_tutors_count(),
             'total_students': institution.get_students_count(),
@@ -136,27 +134,24 @@ def student_my_institution(request, institution_slug):
         messages.error(request, 'No tienes acceso a esta institución.')
         return redirect('dashboard')
     
-    # Cursos del estudiante
-    my_enrollments = Enrollment.objects.filter(
-        student=request.user,
-        course__institution=institution,
-        status='active'
-    ).select_related('course')
+    # Grupo del estudiante
+    student_profile = Student.objects.filter(
+        user=request.user,
+        institution=institution,
+        is_active=True
+    ).select_related('group', 'tutor').first()
     
-    # Tutores de mis cursos
-    my_tutors = set()
-    for enrollment in my_enrollments:
-        for tutor in enrollment.course.get_assigned_tutors():
-            my_tutors.add(tutor)
+    my_group = student_profile.group if student_profile else None
+    my_tutor = student_profile.tutor if student_profile else None
     
     context = {
         'institution': institution,
         'user_role': 'student',
-        'my_enrollments': my_enrollments,
-        'my_tutors': list(my_tutors),
+        'my_group': my_group,
+        'my_tutor': my_tutor,
         'stats': {
-            'courses_count': my_enrollments.count(),
-            'tutors_count': len(my_tutors),
+            'groups_count': 1 if my_group else 0,
+            'tutors_count': 1 if my_tutor else 0,
         }
     }
     

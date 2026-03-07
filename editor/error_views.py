@@ -14,7 +14,7 @@ from django.utils import timezone
 from datetime import timedelta
 import json
 
-from .models import Institution, ErrorEvent, AuditLog, Course, Activity, UserRoleHelper
+from .models import Institution, ErrorEvent, AuditLog, StudentGroup, Activity, UserRoleHelper
 from .mixins import InstitutionScopedMixin, RoleRequiredMixin
 
 
@@ -99,17 +99,14 @@ def api_error_list(request):
     # Institución: ve solo su institución
     elif UserRoleHelper.user_has_role(user, 'institution', institution):
         errors = errors.filter(institution=institution)
-    # Tutor: ve errores de sus cursos/actividades
+    # Tutor: ve errores de sus grupos/actividades
     elif UserRoleHelper.user_has_role(user, 'tutor', institution):
-        # Obtener cursos donde es tutor
-        courses = Course.objects.filter(tutor=user, institution=institution)
-        # Obtener actividades de esos cursos
-        activity_ids = Activity.objects.filter(course__in=courses).values_list('id', flat=True)
-        # Filtrar errores relacionados con esas actividades
-        # Por ahora, filtramos por institución y usuario
+        # Obtener grupos donde es tutor
+        groups = StudentGroup.objects.filter(tutor=user, institution=institution)
+        activity_ids = Activity.objects.filter(group__in=groups).values_list('id', flat=True)
         errors = errors.filter(
             Q(institution=institution) &
-            (Q(user=user) | Q(context__course_id__in=[str(c.id) for c in courses]))
+            (Q(user=user) | Q(context__activity_id__in=[str(aid) for aid in activity_ids]))
         )
     # Estudiante: solo diagnóstico propio
     elif UserRoleHelper.user_has_role(user, 'student', institution):
@@ -333,16 +330,15 @@ def tutor_errors_list(request, institution_slug):
         messages.error(request, "Acceso denegado")
         return redirect('editor:dashboard_redirect')
     
-    # Obtener cursos donde es tutor
-    courses = Course.objects.filter(tutor=request.user, institution=institution)
-    activity_ids = Activity.objects.filter(course__in=courses).values_list('id', flat=True)
+    # Obtener grupos donde es tutor
+    groups = StudentGroup.objects.filter(tutor=request.user, institution=institution)
+    activity_ids = Activity.objects.filter(group__in=groups).values_list('id', flat=True)
     
     # Filtrar errores relacionados
     errors = ErrorEvent.objects.filter(
         Q(institution=institution) &
         (
             Q(user=request.user) |
-            Q(context__course_id__in=[str(c.id) for c in courses]) |
             Q(context__activity_id__in=[str(aid) for aid in activity_ids])
         )
     ).order_by('-ts')
@@ -376,7 +372,7 @@ def tutor_errors_list(request, institution_slug):
         'code_filter': code_filter,
         'severity_filter': severity_filter,
         'institution': institution,
-        'courses': courses,
+        'groups': groups,
     }
     
     return render(request, 'editor/error/tutor/errors_list.html', context)
