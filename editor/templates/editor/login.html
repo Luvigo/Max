@@ -183,6 +183,45 @@
         .divider::after {
             right: 0;
         }
+        
+        .logged-in-banner {
+            text-align: center;
+            padding: 20px 0;
+        }
+        .logged-in-banner p {
+            margin-bottom: 16px;
+            color: #e6edf3;
+        }
+        .logged-in-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .logged-in-actions a {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .logged-in-actions .btn-login {
+            background: #238636;
+            color: white;
+        }
+        .logged-in-actions .btn-login:hover {
+            background: #2ea043;
+        }
+        .btn-logout {
+            background: transparent !important;
+            color: #8b949e !important;
+            border: 1px solid #30363d;
+        }
+        .btn-logout:hover {
+            background: #21262d !important;
+            color: #e6edf3 !important;
+        }
     </style>
 </head>
 <body>
@@ -201,6 +240,17 @@
             </div>
         {% endif %}
         
+        {% if already_logged_in %}
+        <div class="logged-in-banner">
+            <p>Ya estás conectado como <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>.</p>
+            <div class="logged-in-actions">
+                {% if panel_url %}
+                <a href="{{ panel_url }}" class="btn-login">{{ panel_label }}</a>
+                {% endif %}
+                <a href="{% url 'logout' %}" class="btn-logout">Cerrar sesión</a>
+            </div>
+        </div>
+        {% else %}
         <form method="post">
             {% csrf_token %}
             <div class="form-group">

@@ -20,6 +20,8 @@ from django.shortcuts import redirect
 from editor import dashboard_views
 from editor import auth_views
 
+# "Ver sitio" en el admin debe llevar siempre al login principal
+admin.site.site_url = '/login/'
 
 # Vista helper para redirigir rutas obsoletas
 def redirect_to_admin(request, *args, **kwargs):

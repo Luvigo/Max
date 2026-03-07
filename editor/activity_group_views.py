@@ -69,8 +69,93 @@ def tutor_group_activities_list(request, institution_slug, group_id):
 
 @login_required
 @tutor_required
+def tutor_activity_create_select_group(request, institution_slug):
+    """
+    Crear nueva actividad con selector de grupo.
+    Muestra el formulario completo y permite elegir para qué grupo es la actividad.
+    """
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    
+    # Grupos del tutor
+    groups = StudentGroup.objects.filter(
+        institution=institution,
+        tutor=request.user,
+        status='active'
+    ).order_by('-academic_year', 'name')
+    
+    if not groups.exists():
+        messages.warning(request, 'Necesitas crear al menos un grupo antes de crear actividades.')
+        return redirect('editor:tutor_group_create', institution_slug=institution_slug)
+    
+    if request.method == 'POST':
+        group_id = request.POST.get('group', '').strip()
+        title = request.POST.get('title', '').strip()
+        objective = request.POST.get('objective', '').strip()
+        instructions = request.POST.get('instructions', '').strip()
+        deadline_str = request.POST.get('deadline', '').strip()
+        status = request.POST.get('status', 'draft')
+        allow_resubmit = request.POST.get('allow_resubmit') == 'on'
+        allow_late_submit = request.POST.get('allow_late_submit') == 'on'
+        max_score = request.POST.get('max_score', '100')
+        
+        # Validar grupo
+        if not group_id:
+            messages.error(request, 'Debes seleccionar un grupo para la actividad.')
+        else:
+            group = groups.filter(id=group_id).first()
+            if not group:
+                messages.error(request, 'El grupo seleccionado no es válido.')
+            else:
+                errors = []
+                if not title:
+                    errors.append('El título es requerido.')
+                if not instructions:
+                    errors.append('Las instrucciones son requeridas.')
+                
+                if errors:
+                    for error in errors:
+                        messages.error(request, error)
+                else:
+                    try:
+                        deadline = None
+                        if deadline_str:
+                            deadline = timezone.datetime.fromisoformat(deadline_str.replace('T', ' '))
+                            deadline = timezone.make_aware(deadline) if timezone.is_naive(deadline) else deadline
+                        
+                        Activity.objects.create(
+                            group=group,
+                            created_by=request.user,
+                            title=title,
+                            objective=objective,
+                            instructions=instructions,
+                            deadline=deadline,
+                            status=status,
+                            allow_resubmit=allow_resubmit,
+                            allow_late_submit=allow_late_submit,
+                            max_score=max_score,
+                            published_at=timezone.now() if status == 'published' else None
+                        )
+                        
+                        messages.success(request, f'Actividad "{title}" creada exitosamente para {group.name}.')
+                        return redirect('editor:tutor_group_activities_list',
+                                       institution_slug=institution_slug, group_id=group.id)
+                    except Exception as e:
+                        messages.error(request, f'Error al crear la actividad: {str(e)}')
+    
+    context = {
+        'institution': institution,
+        'user_role': 'tutor',
+        'groups': groups,
+        'group': None,
+        'select_group_mode': True,
+    }
+    return render(request, 'editor/activity/tutor/group_activity_form_select.html', context)
+
+
+@login_required
+@tutor_required
 def tutor_group_activity_create(request, institution_slug, group_id):
-    """Crear nueva actividad para un grupo"""
+    """Crear nueva actividad para un grupo (cuando ya se conoce el grupo)"""
     institution = get_object_or_404(Institution, slug=institution_slug, status='active')
     group = get_object_or_404(
         StudentGroup,

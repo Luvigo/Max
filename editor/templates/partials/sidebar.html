@@ -67,9 +67,9 @@
         <div class="nav-section">
             <div class="nav-section-title">Crear</div>
             
-            <a href="/i/{{ institution.slug }}/tutor/groups/" class="nav-item">
+            <a href="/i/{{ institution.slug }}/tutor/activities/new/" class="nav-item {% if request.resolver_match.url_name == 'tutor_activity_create' %}active{% endif %}">
                 <i class="fas fa-clipboard-list"></i>
-                <span>Actividades por Grupo</span>
+                <span>Nueva Actividad</span>
             </a>
         </div>
         

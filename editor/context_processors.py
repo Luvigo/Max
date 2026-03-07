@@ -24,6 +24,9 @@ def global_context(request):
         
         # Alias para templates
         'institution': getattr(request, 'current_institution', None),
+        
+        # "Ver sitio" en el admin debe llevar siempre al login principal
+        'site_url': '/login/',
     }
     
     return context

@@ -18,8 +18,13 @@ def deprecated_redirect(request, *args, **kwargs):
     return redirect('dashboard')
 
 
+def root_redirect(request):
+    """La raíz siempre lleva al login principal (nunca redirige a admin/dashboard)."""
+    return redirect('login')
+
+
 urlpatterns = [
-    path('', views.index, name='index'),
+    path('', root_redirect, name='index'),
     path('api/ports/', views.list_ports, name='list_ports'),
     path('api/compile/', views.compile_code, name='compile'),
     path('api/compile-download/', views.compile_and_download, name='compile_download'),

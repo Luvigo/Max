@@ -73,21 +73,17 @@ def user_login(request):
     """
     Página de login principal para Tutores y Estudiantes.
     
-    FLUJO:
-    - Admin/Staff -> Redirigir a /admin/login/
+    La URL raíz siempre redirige aquí. Si el usuario ya está autenticado,
+    se muestra el login con opción de ir a su panel (no redirección automática).
+    
+    FLUJO POST-LOGIN:
+    - Admin/Staff -> /admin/
     - Tutor -> /i/<slug>/dashboard/tutor/
     - Estudiante -> /i/<slug>/dashboard/student/
-    
-    ❌ Rol "institution" DEPRECADO
     """
-    # Si ya está autenticado, redirigir según rol
+    # Si ya está autenticado, mostrar login con opción de ir al panel (no redirigir)
     if request.user.is_authenticated:
         user = request.user
-        
-        # Admin va al admin
-        if user.is_superuser or user.is_staff:
-            return redirect('/admin/')
-        
         redirect_url, role = get_post_login_redirect(user)
         
         if role == 'institution_deprecated':
@@ -95,12 +91,23 @@ def user_login(request):
             logout(request)
             return render(request, 'editor/login.html')
         
-        if redirect_url:
+        # Determinar URL del panel para el botón "Ir a mi panel"
+        panel_url = None
+        panel_label = 'Ir a mi panel'
+        if user.is_superuser or user.is_staff:
+            panel_url = '/admin/'
+            panel_label = 'Ir al panel de administración'
+        elif redirect_url:
             if redirect_url == 'select_institution':
-                return redirect('select_institution')
-            return redirect(redirect_url)
+                panel_url = '/select-institution/'
+            else:
+                panel_url = redirect_url
         
-        return redirect('editor:index')  # Fallback al IDE
+        return render(request, 'editor/login.html', {
+            'already_logged_in': True,
+            'panel_url': panel_url,
+            'panel_label': panel_label,
+        })
     
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()

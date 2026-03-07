@@ -147,7 +147,7 @@ urlpatterns = [
     # ✅ TUTOR - Actividades por Curso (legacy)
     # ============================================
     path('tutor/courses/<int:course_id>/activities/', redirect_tutor_courses_to_groups, name='tutor_activities_list'),
-    path('tutor/activities/new/', redirect_tutor_activity_new_to_groups, name='tutor_activity_create'),
+    path('tutor/activities/new/', activity_group_views.tutor_activity_create_select_group, name='tutor_activity_create'),
     path('tutor/activities/<str:activity_id>/edit/', activity_views.tutor_activity_edit, name='tutor_activity_edit'),
     path('tutor/activities/<str:activity_id>/publish/', activity_views.tutor_activity_publish, name='tutor_activity_publish'),
     path('tutor/activities/<str:activity_id>/submissions/', activity_views.tutor_activity_submissions, name='tutor_activity_submissions'),
