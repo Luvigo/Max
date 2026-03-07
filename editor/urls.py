@@ -118,7 +118,7 @@ urlpatterns = [
     # ✅ TUTOR - Estudiantes
     # ============================================
     path('tutor/students/', group_views.tutor_students_list, name='tutor_students_list'),
-    path('tutor/students/new/', group_views.tutor_student_create, name='tutor_student_create_new'),
+    path('tutor/students/create/', group_views.tutor_student_create, name='tutor_student_create'),
     path('tutor/students/<int:student_id>/', group_views.tutor_student_detail, name='tutor_student_detail'),
     path('tutor/students/<int:student_id>/edit/', group_views.tutor_student_edit, name='tutor_student_edit'),
     path('api/tutor/assign-group/', group_views.tutor_assign_student_to_group, name='tutor_assign_student_to_group'),

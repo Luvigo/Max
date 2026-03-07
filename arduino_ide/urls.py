@@ -77,9 +77,10 @@ urlpatterns = [
     path('i/<slug:institution_slug>/', include('editor.urls')),
     
     # ============================================
-    # Editor app - Rutas globales (IDE, APIs)
+    # Editor app - Rutas globales (IDE, APIs) - SIN tutor/student
+    # para evitar conflicto de namespace con editor:tutor_student_create
     # ============================================
-    path('', include('editor.urls')),
+    path('', include('editor.urls_global')),
 ]
 
 # Servir archivos estáticos en desarrollo

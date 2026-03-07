@@ -371,10 +371,24 @@ def tutor_student_create(request, institution_slug):
             except Exception as e:
                 messages.error(request, f'Error al crear el estudiante: {str(e)}')
     
+    # Grupo preseleccionado desde ?group=<id> (validar que pertenece al tutor)
+    preselected_group_id = None
+    group_param = request.GET.get('group', '').strip()
+    if group_param:
+        valid_group = StudentGroup.objects.filter(
+            id=group_param,
+            institution=institution,
+            tutor=request.user,
+            status='active'
+        ).first()
+        if valid_group:
+            preselected_group_id = str(valid_group.id)
+    
     context = {
         'institution': institution,
         'user_role': 'tutor',
         'groups': groups,
+        'preselected_group_id': preselected_group_id,
     }
     
     return render(request, 'editor/tutor/student_create.html', context)
