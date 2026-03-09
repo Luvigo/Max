@@ -96,7 +96,8 @@
                     {% for submission in submissions %}
                     <tr>
                         <td>
-                            <strong>{{ submission.student.get_full_name|default:submission.student.username }}</strong>
+                            <strong>{{ submission.student_name }}</strong>
+                            <div class="student-username" style="font-size: 0.85rem; color: var(--color-text-muted); margin-top: 2px;">{{ submission.student.username }}</div>
                             {% if submission.is_late %}
                             <span class="badge badge-warning" title="Entrega tardía">Tardía</span>
                             {% endif %}

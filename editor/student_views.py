@@ -19,7 +19,7 @@ def student_dashboard(request):
         student = request.user.student_profile
     except Student.DoesNotExist:
         messages.error(request, 'No tienes un perfil de estudiante. Contacta al administrador.')
-        return redirect('editor:index')
+        return redirect('dashboard')
     
     projects = student.projects.filter(is_active=True).order_by('-updated_at')[:10]
     projects_count = student.projects.filter(is_active=True).count()
@@ -39,7 +39,7 @@ def student_projects(request):
         student = request.user.student_profile
     except Student.DoesNotExist:
         messages.error(request, 'No tienes un perfil de estudiante.')
-        return redirect('editor:index')
+        return redirect('dashboard')
     
     projects = student.projects.filter(is_active=True).order_by('-updated_at')
     return render(request, 'editor/student/projects_list.html', {
@@ -55,7 +55,7 @@ def project_detail(request, project_id):
         student = request.user.student_profile
     except Student.DoesNotExist:
         messages.error(request, 'No tienes un perfil de estudiante.')
-        return redirect('editor:index')
+        return redirect('dashboard')
     
     project = get_object_or_404(Project, id=project_id, student=student, is_active=True)
     

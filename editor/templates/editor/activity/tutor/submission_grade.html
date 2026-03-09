@@ -79,7 +79,11 @@
             <div class="info-grid">
                 <div class="info-item">
                     <span class="info-label">Estudiante</span>
-                    <span class="info-value">{{ submission.student_name }}</span>
+                    <span class="info-value"><strong>{{ submission.student_name }}</strong></span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Usuario</span>
+                    <span class="info-value">{{ submission.student.username }}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">Email</span>

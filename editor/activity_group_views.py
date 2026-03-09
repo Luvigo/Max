@@ -594,6 +594,26 @@ def student_activity_ide(request, institution_slug, activity_id):
 # API: SUBMIT ACTIVITY
 # ============================================
 
+def _parse_request_body(request):
+    """
+    Parsea el body del request de forma robusta.
+    - Si Content-Type indica JSON (application/json o application/json; charset=...), usa json.loads
+    - Si no, usa request.POST (form-urlencoded / multipart)
+    - Maneja body vacío o JSON inválido devolviendo {}
+    - Devuelve objeto con .get() (dict o QueryDict) para compatibilidad
+    """
+    content_type = (request.content_type or '').split(';')[0].strip().lower()
+    if content_type == 'application/json':
+        try:
+            body = request.body
+            if not body:
+                return {}
+            return json.loads(body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return {}
+    return request.POST
+
+
 @login_required
 @require_POST
 def api_submit_activity(request, institution_slug, activity_id):
@@ -610,8 +630,8 @@ def api_submit_activity(request, institution_slug, activity_id):
                 'error': reason
             }, status=400)
         
-        # Obtener datos
-        data = json.loads(request.body) if request.content_type == 'application/json' else request.POST
+        # Obtener datos (acepta JSON y form-urlencoded)
+        data = _parse_request_body(request)
         xml_content = data.get('xml_content', '')
         arduino_code = data.get('arduino_code', '')
         notes = data.get('notes', '')
@@ -667,8 +687,8 @@ def api_save_activity_progress(request, institution_slug, activity_id):
         institution = get_object_or_404(Institution, slug=institution_slug, status='active')
         activity = get_object_or_404(Activity, id=activity_id)
         
-        # Obtener datos
-        data = json.loads(request.body) if request.content_type == 'application/json' else request.POST
+        # Obtener datos (acepta JSON y form-urlencoded)
+        data = _parse_request_body(request)
         xml_content = data.get('xml_content', '')
         arduino_code = data.get('arduino_code', '')
         

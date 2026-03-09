@@ -2,7 +2,8 @@
 URLs globales de Editor - Rutas que NO requieren institution_slug.
 
 Incluidas en la raíz (path '') para IDE, APIs, etc.
-Evita conflicto de namespace con editor.urls (tenant) que tiene tutor/student.
+SIN app_name: evita urls.W005 (namespace 'editor' duplicado).
+El namespace 'editor' pertenece solo a editor.urls (tenant bajo i/<slug>/).
 """
 from django.urls import path
 from django.shortcuts import redirect
@@ -12,7 +13,8 @@ from . import agent_views
 from . import error_views
 from . import notification_views
 
-app_name = 'editor'
+# Sin app_name: estas URLs quedan sin namespace en la raíz.
+# reverse('index'), reverse('compile'), etc. apuntan aquí.
 
 
 def deprecated_redirect(request, *args, **kwargs):

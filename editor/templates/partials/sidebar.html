@@ -53,7 +53,7 @@
         <div class="nav-section">
             <div class="nav-section-title">Gestionar</div>
             
-            <a href="/i/{{ institution.slug }}/tutor/groups/" class="nav-item {% if 'group' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="nav-item {% if 'group' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="fas fa-users"></i>
                 <span>Mis Grupos</span>
             </a>

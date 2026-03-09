@@ -55,7 +55,7 @@
                 <i class="fas fa-users" style="color: var(--color-warning);"></i>
                 Mis Grupos
             </h3>
-            <a href="/i/{{ institution.slug }}/tutor/groups/" class="btn btn-ghost">Ver todos</a>
+            <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="btn btn-ghost">Ver todos</a>
         </div>
         <div class="card-body" style="padding: 0;">
             {% if my_groups %}
@@ -81,10 +81,10 @@
                             </span>
                         </td>
                         <td>
-                            <a href="/i/{{ institution.slug }}/tutor/groups/{{ group.id }}/" class="btn btn-sm btn-secondary">
+                            <a href="{% url 'editor:tutor_group_detail' institution_slug=institution.slug group_id=group.id %}" class="btn btn-sm btn-secondary">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <a href="/i/{{ institution.slug }}/tutor/groups/{{ group.id }}/activities/" class="btn btn-sm btn-primary">
+                            <a href="{% url 'editor:tutor_group_activities_list' institution_slug=institution.slug group_id=group.id %}" class="btn btn-sm btn-primary">
                                 <i class="fas fa-tasks"></i>
                             </a>
                         </td>
@@ -96,7 +96,7 @@
             <div class="empty-state">
                 <i class="fas fa-layer-group"></i>
                 <p>No tienes grupos creados</p>
-                <a href="/i/{{ institution.slug }}/tutor/groups/new/" class="btn btn-primary">
+                <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> Crear Grupo
                 </a>
             </div>
@@ -207,13 +207,13 @@
             <a href="/?editor=true" class="btn btn-primary">
                 <i class="fas fa-code"></i> Abrir IDE
             </a>
-            <a href="/i/{{ institution.slug }}/tutor/groups/new/" class="btn btn-secondary">
+            <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-secondary">
                 <i class="fas fa-layer-group"></i> Nuevo Grupo
             </a>
-            <a href="/i/{{ institution.slug }}/tutor/students/create/" class="btn btn-secondary">
+            <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-secondary">
                 <i class="fas fa-user-plus"></i> Nuevo Estudiante
             </a>
-            <a href="/i/{{ institution.slug }}/tutor/groups/" class="btn btn-secondary">
+            <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="btn btn-secondary">
                 <i class="fas fa-clipboard-list"></i> Ver Grupos y Actividades
             </a>
         </div>
