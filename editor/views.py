@@ -409,8 +409,8 @@ def reset_arduino_dtr(port, log_func=None):
         return False, str(e)
 
 
-def index(request):
-    """Vista principal del IDE."""
+def index(request, institution_slug=None):
+    """Vista principal del IDE. institution_slug viene del path padre /i/<slug>/."""
     # IMPORTANTE: Requiere autenticación
     # Si no está autenticado, redirigir al login
     if not request.user.is_authenticated:

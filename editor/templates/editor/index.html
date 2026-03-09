@@ -217,7 +217,8 @@
             </div>
             
             <div class="header-controls">
-                <!-- Mis Proyectos Dropdown -->
+                <!-- Mis Proyectos Dropdown (oculto en modo actividad) -->
+                {% if not activity_mode %}
                 <div class="control-group projects-dropdown">
                     <button class="btn btn-ghost" id="btnProjectsMenu" title="Mis Proyectos">
                         <span>📁</span>
@@ -239,6 +240,7 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
                 
                 <!-- Activity Status Badge (solo visible si hay actividad) -->
                 <div id="activityStatusContainer" class="activity-status-container" style="display: none;">
@@ -316,7 +318,11 @@
                         <button class="btn btn-sm btn-ghost" id="btnNew" title="Nuevo proyecto">
                             📄 Nuevo
                         </button>
-                        {% if user.is_authenticated %}
+                        {% if activity_mode %}
+                        <button class="btn btn-sm btn-ghost" id="btnSaveActivityProgress" title="Guardar progreso">
+                            💾 Guardar progreso
+                        </button>
+                        {% elif user.is_authenticated %}
                         <button class="btn btn-sm btn-ghost" id="btnSaveProject" title="Guardar Proyecto">
                             💾 Guardar Proyecto
                         </button>
@@ -1078,6 +1084,29 @@ void loop() {
     </xml>
     
     <!-- Scripts (timestamp = cache bust) -->
+    {% if activity_mode %}
+    <script>
+        // Configuración para modo actividad (debe cargarse ANTES de app.js)
+        window.IDE_CONFIG = {
+            activityId: '{{ activity.id }}',
+            institutionSlug: '{{ institution.slug }}',
+            canSubmit: {{ can_submit|yesno:"true,false" }},
+            isReadOnly: {{ is_read_only|yesno:"true,false" }},
+            isFrozen: {{ is_read_only|yesno:"true,false" }},
+            submissionStatus: '{{ submission_status }}',
+            allowResubmit: {{ allow_resubmit|yesno:"true,false" }},
+            csrfToken: '{{ csrf_token }}',
+            submitUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/submit/',
+            saveUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/save/',
+            autosaveEnabled: true
+        };
+    </script>
+    {% else %}
+    <script>
+        window.IDE_CONFIG = window.IDE_CONFIG || {};
+    </script>
+    {% endif %}
+    
     <script src="{% static 'editor/js/arduino_blocks.js' %}?v=2026012601"></script>
     <script src="{% static 'editor/js/arduino_generator.js' %}?v=2026012601"></script>
     <script src="{% static 'editor/js/app.js' %}?v=2026012601"></script>
@@ -1429,10 +1458,10 @@ void loop() {
     
     {% if project_xml %}
     <script>
-        // Cargar proyecto desde template
+        // Cargar contenido desde template (proyecto o actividad)
         setTimeout(function() {
             if (typeof loadProjectFromTemplate === 'function') {
-                loadProjectFromTemplate('{{ project_xml|escapejs }}', {{ project.id|default:"null" }});
+                loadProjectFromTemplate('{{ project_xml|escapejs }}', {% if project %}{{ project.id }}{% else %}null{% endif %});
             }
         }, 1000);
     </script>
@@ -1489,6 +1518,48 @@ void loop() {
             
             // Actualizar badge según estado actual
             updateBadgeFromConfig();
+            
+            // Botón Guardar progreso
+            const btnSaveProgress = document.getElementById('btnSaveActivityProgress');
+            if (btnSaveProgress) {
+                btnSaveProgress.addEventListener('click', async function() {
+                    if (typeof workspace === 'undefined' || typeof arduinoGenerator === 'undefined') return;
+                    btnSaveProgress.disabled = true;
+                    btnSaveProgress.innerHTML = '<span class="mini-spinner"></span> Guardando...';
+                    try {
+                        const xml = Blockly.Xml.workspaceToDom(workspace);
+                        const xml_content = Blockly.Xml.domToText(xml);
+                        const arduino_code = arduinoGenerator.workspaceToCode(workspace);
+                        const res = await fetch(IDE_CONFIG.saveUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': IDE_CONFIG.csrfToken || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
+                            },
+                            body: JSON.stringify({ xml_content: xml_content, arduino_code: arduino_code })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (res.ok && data.ok) {
+                            if (typeof showToast === 'function') {
+                                showToast('Progreso guardado ✓', 'success');
+                            } else {
+                                alert('Progreso guardado.');
+                            }
+                        } else {
+                            throw new Error(data.error || 'Error al guardar');
+                        }
+                    } catch (e) {
+                        if (typeof showToast === 'function') {
+                            showToast('Error: ' + (e.message || 'No se pudo guardar'), 'error');
+                        } else {
+                            alert('Error: ' + (e.message || 'No se pudo guardar'));
+                        }
+                    } finally {
+                        btnSaveProgress.disabled = false;
+                        btnSaveProgress.innerHTML = '💾 Guardar progreso';
+                    }
+                });
+            }
             
             // Event listeners del modal
             document.getElementById('btnCancelSubmit')?.addEventListener('click', closeSubmitModal);
@@ -1556,52 +1627,56 @@ void loop() {
             if (statusMsg) statusMsg.className = 'submit-status-message';
             
             try {
-                // Obtener URL de submit
                 const submitUrl = IDE_CONFIG.submitUrl || 
-                    `/i/${IDE_CONFIG.institutionSlug}/student/activities/${IDE_CONFIG.activityId}/submit/`;
+                    `/i/${IDE_CONFIG.institutionSlug}/api/activity/${IDE_CONFIG.activityId}/submit/`;
                 
-                // Crear FormData
-                const formData = new FormData();
-                formData.append('project_id', IDE_CONFIG.projectId || currentProjectId || '');
+                // Obtener XML y código del workspace
+                let xml_content = '';
+                let arduino_code = '';
+                if (typeof workspace !== 'undefined') {
+                    const xml = Blockly.Xml.workspaceToDom(workspace);
+                    xml_content = Blockly.Xml.domToText(xml);
+                }
+                if (typeof arduinoGenerator !== 'undefined') {
+                    arduino_code = arduinoGenerator.workspaceToCode(workspace);
+                }
+                
+                const body = JSON.stringify({
+                    xml_content: xml_content,
+                    arduino_code: arduino_code,
+                    notes: ''
+                });
                 
                 const response = await fetch(submitUrl, {
                     method: 'POST',
                     headers: {
+                        'Content-Type': 'application/json',
                         'X-CSRFToken': IDE_CONFIG.csrfToken || getCsrfToken()
                     },
-                    body: formData
+                    body: body
                 });
                 
-                if (response.redirected || response.ok) {
-                    // Éxito
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.ok) {
                     if (statusMsg) {
                         statusMsg.className = 'submit-status-message show success';
                         statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
                     }
                     if (confirmText) confirmText.textContent = '✓ Entregado';
                     
-                    // Actualizar badge
                     const badge = document.getElementById('submissionStatusBadge');
                     if (badge) {
                         badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
                     }
                     
-                    // Ocultar botón de entregar si no permite re-entrega
                     if (!IDE_CONFIG.allowResubmit) {
                         const submitBtn = document.getElementById('btnSubmitActivity');
                         if (submitBtn) submitBtn.style.display = 'none';
                     }
                     
-                    // Recargar después de un momento
-                    setTimeout(() => {
-                        if (response.redirected) {
-                            window.location.href = response.url;
-                        } else {
-                            window.location.reload();
-                        }
-                    }, 1500);
+                    setTimeout(() => window.location.reload(), 1500);
                 } else {
-                    throw new Error('Error en la respuesta del servidor');
+                    throw new Error(data.error || 'Error en la respuesta del servidor');
                 }
             } catch (error) {
                 if (statusMsg) {

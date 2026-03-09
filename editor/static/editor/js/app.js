@@ -975,10 +975,12 @@ function showAgentBanner() {
 function initBlockly() {
     const toolbox = document.getElementById('toolbox');
     const blocklyDiv = document.getElementById('blocklyDiv');
+    const readOnly = typeof isReadOnlyMode === 'function' && isReadOnlyMode();
     
     workspace = Blockly.inject(blocklyDiv, {
         toolbox: toolbox,
         theme: darkTheme,
+        readOnly: readOnly,
         grid: {
             spacing: 25,
             length: 3,
@@ -1213,20 +1215,34 @@ async function autoSaveNow(reason = 'interval') {
     
     let savedToServer = false;
     
-    // Intentar guardar al servidor si hay proyecto y API disponible
-    if (currentProjectId && typeof IDE_CONFIG !== 'undefined' && IDE_CONFIG.autosaveEnabled !== false) {
+    // Modo actividad: guardar en API de actividad
+    const isActivityMode = typeof IDE_CONFIG !== 'undefined' && IDE_CONFIG.activityId && IDE_CONFIG.saveUrl;
+    const canSaveToServer = (currentProjectId || isActivityMode) && typeof IDE_CONFIG !== 'undefined' && IDE_CONFIG.autosaveEnabled !== false;
+    
+    if (canSaveToServer) {
         try {
-            const response = await fetch('/api/ide/autosave/', {
+            let url, body;
+            if (isActivityMode) {
+                url = IDE_CONFIG.saveUrl;
+                body = JSON.stringify({
+                    xml_content: xmlText,
+                    arduino_code: arduinoGenerator.workspaceToCode(workspace)
+                });
+            } else {
+                url = '/api/ide/autosave/';
+                body = JSON.stringify({
+                    project_id: currentProjectId,
+                    xml_content: xmlText,
+                    arduino_code: arduinoGenerator.workspaceToCode(workspace)
+                });
+            }
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCsrfToken()
                 },
-                body: JSON.stringify({
-                    project_id: currentProjectId,
-                    xml_content: xmlText,
-                    arduino_code: arduinoGenerator.workspaceToCode(workspace)
-                })
+                body: body
             });
             
             if (response.ok) {

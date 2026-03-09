@@ -544,6 +544,7 @@ def student_activity_ide(request, institution_slug, activity_id):
     # Cargar contenido previo si existe
     project_xml = submission.xml_content or ''
     
+    # Usar el mismo IDE que el principal (index.html) con modo actividad
     context = {
         'institution': institution,
         'user_role': 'student',
@@ -554,8 +555,11 @@ def student_activity_ide(request, institution_slug, activity_id):
         'submit_reason': reason,
         'is_read_only': is_read_only,
         'project_xml': project_xml,
+        'activity_mode': True,
+        'allow_resubmit': getattr(activity, 'allow_resubmit', True),
+        'submission_status': submission.status,
     }
-    return render(request, 'editor/activity/student/activity_ide.html', context)
+    return render(request, 'editor/index.html', context)
 
 
 # ============================================
