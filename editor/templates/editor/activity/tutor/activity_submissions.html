@@ -120,6 +120,12 @@
                                class="btn btn-sm btn-ghost" title="Ver Detalle">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            {% if submission.status == 'submitted' or submission.status == 'graded' %}
+                            <a href="{% url 'editor:tutor_submission_ide_readonly_groups' institution_slug=institution.slug submission_id=submission.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver bloques">
+                                <i class="fas fa-cubes"></i>
+                            </a>
+                            {% endif %}
                             {% if submission.status == 'submitted' %}
                             <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" 
                                class="btn btn-sm btn-primary" title="Calificar">

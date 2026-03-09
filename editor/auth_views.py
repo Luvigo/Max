@@ -81,42 +81,11 @@ def user_login(request):
     - Tutor -> /i/<slug>/dashboard/tutor/
     - Estudiante -> /i/<slug>/dashboard/student/
     """
-    # Si ya está autenticado, mostrar login con opción de ir al panel (no redirigir)
+    # SEGURIDAD: Si ya está autenticado al visitar /login/, cerrar sesión y pedir login de nuevo.
+    # Evita que alguien con acceso al PC pueda entrar con una sesión anterior.
     if request.user.is_authenticated:
-        user = request.user
-        # Si vino con ?editor=true, ir directo al IDE (evita pantalla "Ya estás conectado")
-        if request.GET.get('editor') == 'true':
-            membership = Membership.objects.filter(
-                user=user,
-                is_active=True,
-                role__in=['tutor', 'student']
-            ).select_related('institution').first()
-            if membership:
-                return redirect(f'/i/{membership.institution.slug}/?editor=true')
-        redirect_url, role = get_post_login_redirect(user)
-        
-        if role == 'institution_deprecated':
-            messages.warning(request, 'Tu rol de "institución" ha sido deprecado. Contacta al administrador.')
-            logout(request)
-            return render(request, 'editor/login.html')
-        
-        # Determinar URL del panel para el botón "Ir a mi panel"
-        panel_url = None
-        panel_label = 'Ir a mi panel'
-        if user.is_superuser or user.is_staff:
-            panel_url = '/admin/'
-            panel_label = 'Ir al panel de administración'
-        elif redirect_url:
-            if redirect_url == 'select_institution':
-                panel_url = '/select-institution/'
-            else:
-                panel_url = redirect_url
-        
-        return render(request, 'editor/login.html', {
-            'already_logged_in': True,
-            'panel_url': panel_url,
-            'panel_label': panel_label,
-        })
+        logout(request)
+        messages.info(request, 'Por seguridad, debes iniciar sesión de nuevo.')
     
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()

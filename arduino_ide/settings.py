@@ -184,6 +184,9 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
 
+# Session security: expire when browser is closed (no persistent login across visits)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 # Build ID for static file versioning
 BUILD_ID = BUILD_ID
 

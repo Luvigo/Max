@@ -412,6 +412,34 @@ def tutor_submission_grade(request, institution_slug, submission_id):
     return render(request, 'editor/activity/tutor/submission_grade.html', context)
 
 
+@login_required
+@tutor_required
+def tutor_submission_ide_readonly(request, institution_slug, submission_id):
+    """Ver bloques Blockly de una entrega en modo solo lectura (tutor)"""
+    institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+    submission = get_object_or_404(Submission, id=submission_id)
+    
+    # Verificar permisos
+    if submission.activity.group and submission.activity.group.tutor != request.user:
+        messages.error(request, 'No tienes permisos para ver esta entrega.')
+        return redirect('dashboard')
+    
+    if submission.status not in ('submitted', 'graded'):
+        messages.error(request, 'Esta entrega aún no ha sido entregada.')
+        return redirect('editor:tutor_submission_detail',
+                       institution_slug=institution_slug, submission_id=submission.id)
+    
+    context = {
+        'institution': institution,
+        'submission': submission,
+        'activity': submission.activity,
+        'tutor_submission_mode': True,
+        'project_xml': submission.xml_content or '',
+        'is_read_only': True,
+    }
+    return render(request, 'editor/index.html', context)
+
+
 # ============================================
 # VISTAS DE ESTUDIANTE: ACTIVIDADES
 # ============================================

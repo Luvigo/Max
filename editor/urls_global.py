@@ -11,7 +11,6 @@ from . import ide_views
 from . import agent_views
 from . import error_views
 from . import notification_views
-from .models import Membership
 
 app_name = 'editor'
 
@@ -22,25 +21,9 @@ def deprecated_redirect(request, *args, **kwargs):
 
 def root_redirect(request):
     """
-    La raíz redirige según el contexto:
-    - Si ?editor=true y usuario autenticado -> IDE directamente (evita pantalla "Ya estás conectado")
-    - Si no autenticado -> login
+    La raíz siempre redirige a login.
+    SEGURIDAD: Siempre pedir credenciales al entrar al sitio (ver auth_views.user_login).
     """
-    want_ide = request.GET.get('editor') == 'true'
-
-    if want_ide and request.user.is_authenticated:
-        # Usuario ya logueado quiere el IDE: ir directo, sin pasar por login
-        if request.user.is_superuser or request.user.is_staff:
-            return redirect('dashboard')  # Admin no tiene IDE en /i/<slug>/
-        membership = Membership.objects.filter(
-            user=request.user,
-            is_active=True,
-            role__in=['tutor', 'student']
-        ).select_related('institution').first()
-        if membership:
-            return redirect(f'/i/{membership.institution.slug}/?editor=true')
-        return redirect('login')
-
     return redirect('login')
 
 

@@ -208,6 +208,31 @@
 </head>
 <body>
     <div class="app-container">
+        {% if tutor_submission_mode %}
+        <!-- Banner: Tutor viendo entrega de estudiante -->
+        <div class="tutor-submission-banner" style="background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); border-bottom: 1px solid #4a5568; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 18px;">👁️</span>
+                <div>
+                    <span style="font-weight: 600; color: #e2e8f0;">Vista de entrega</span>
+                    <span style="color: #a0aec0; margin-left: 8px;">— {{ submission.student_name }} · {{ activity.title }}</span>
+                </div>
+                <span style="background: rgba(248, 81, 73, 0.2); color: #fc8181; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;">Solo lectura</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-sm btn-ghost" style="color: #a0aec0;">
+                    ← Volver a entregas
+                </a>
+                <a href="{% url 'editor:tutor_submission_detail' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-sm btn-secondary">
+                    Ver detalle
+                </a>
+                <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-sm btn-primary">
+                    ✏️ Calificar
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- Header -->
         <header class="header">
             <div class="logo">
@@ -217,8 +242,8 @@
             </div>
             
             <div class="header-controls">
-                <!-- Mis Proyectos Dropdown (oculto en modo actividad) -->
-                {% if not activity_mode %}
+                <!-- Mis Proyectos Dropdown (oculto en modo actividad o tutor viendo entrega) -->
+                {% if not activity_mode and not tutor_submission_mode %}
                 <div class="control-group projects-dropdown">
                     <button class="btn btn-ghost" id="btnProjectsMenu" title="Mis Proyectos">
                         <span>📁</span>
@@ -315,14 +340,16 @@
                         </button>
                     </div>
                     <div class="workspace-actions">
+                        {% if not tutor_submission_mode %}
                         <button class="btn btn-sm btn-ghost" id="btnNew" title="Nuevo proyecto">
                             📄 Nuevo
                         </button>
+                        {% endif %}
                         {% if activity_mode %}
                         <button class="btn btn-sm btn-ghost" id="btnSaveActivityProgress" title="Guardar progreso">
                             💾 Guardar progreso
                         </button>
-                        {% elif user.is_authenticated %}
+                        {% elif not tutor_submission_mode and user.is_authenticated %}
                         <button class="btn btn-sm btn-ghost" id="btnSaveProject" title="Guardar Proyecto">
                             💾 Guardar Proyecto
                         </button>
@@ -330,12 +357,14 @@
                             📂 Mis Proyectos
                         </button>
                         {% endif %}
+                        {% if not tutor_submission_mode %}
                         <button class="btn btn-sm btn-ghost" id="btnSave" title="Guardar archivo local">
                             💾 Guardar Local
                         </button>
                         <button class="btn btn-sm btn-ghost" id="btnLoad" title="Cargar archivo local">
                             📂 Cargar Local
                         </button>
+                        {% endif %}
                     </div>
                 </div>
                 
@@ -1099,6 +1128,16 @@ void loop() {
             submitUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/submit/',
             saveUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/save/',
             autosaveEnabled: true
+        };
+    </script>
+    {% elif tutor_submission_mode %}
+    <script>
+        // Configuración para tutor viendo entrega (solo lectura)
+        window.IDE_CONFIG = {
+            institutionSlug: '{{ institution.slug }}',
+            isReadOnly: true,
+            isFrozen: true,
+            autosaveEnabled: false
         };
     </script>
     {% else %}

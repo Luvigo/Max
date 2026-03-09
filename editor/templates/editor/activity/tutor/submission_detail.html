@@ -16,6 +16,11 @@
         <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-ghost">
             <i class="fas fa-arrow-left"></i> Volver
         </a>
+        {% if submission.status == 'submitted' or submission.status == 'graded' %}
+        <a href="{% url 'editor:tutor_submission_ide_readonly_groups' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-secondary">
+            <i class="fas fa-cubes"></i> Ver bloques
+        </a>
+        {% endif %}
         {% if submission.status == 'submitted' %}
         <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-primary">
             <i class="fas fa-star"></i> Calificar

@@ -52,10 +52,13 @@
         
         <!-- Vista Previa del Código -->
         <div class="card animate-in" style="animation-delay: 0.1s;">
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3 class="card-title">
                     <i class="fas fa-code"></i> Código del Estudiante
                 </h3>
+                <a href="{% url 'editor:tutor_submission_ide_readonly_groups' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-cubes"></i> Ver bloques
+                </a>
             </div>
             <div class="card-body">
                 {% if submission.arduino_code %}

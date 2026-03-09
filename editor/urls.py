@@ -143,6 +143,7 @@ urlpatterns = [
     path('tutor/activities/<uuid:activity_id>/submissions/', activity_group_views.tutor_activity_submissions, name='tutor_activity_submissions_list'),
     path('tutor/submissions/<uuid:submission_id>/', activity_group_views.tutor_submission_detail, name='tutor_submission_detail'),
     path('tutor/submissions/<uuid:submission_id>/grade/', activity_group_views.tutor_submission_grade, name='tutor_submission_grade_form'),
+    path('tutor/submissions/<uuid:submission_id>/ver-bloques/', activity_group_views.tutor_submission_ide_readonly, name='tutor_submission_ide_readonly_groups'),
     
     # ============================================
     # ✅ TUTOR - Actividades por Curso (legacy)
