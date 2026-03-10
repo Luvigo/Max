@@ -23,13 +23,11 @@ def deprecated_redirect(request, *args, **kwargs):
 
 def root_redirect(request):
     """
-    Raíz: si no autenticado -> login. Si autenticado -> dashboard.
-    El login solo se pide una vez al entrar al sitio (primera visita).
-    Los botones "Abrir IDE" apuntan a /i/<slug>/?editor=true (no a /) para evitar ciclos.
+    La URL principal (/) SIEMPRE redirige a login.
+    El usuario debe iniciar sesión al entrar al sitio.
+    Los botones "Abrir IDE" apuntan a /i/<slug>/?editor=true para ir al IDE sin pasar por /.
     """
-    if not request.user.is_authenticated:
-        return redirect('login')
-    return redirect('dashboard')
+    return redirect('login')
 
 
 urlpatterns = [
