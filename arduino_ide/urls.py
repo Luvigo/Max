@@ -19,6 +19,7 @@ from django.shortcuts import redirect
 
 from editor import dashboard_views
 from editor import auth_views
+from editor import error_views
 
 # "Ver sitio" en el admin debe llevar siempre al login principal
 admin.site.site_url = '/login/'
@@ -39,6 +40,10 @@ urlpatterns = [
     # Django Admin - ÚNICO lugar para Administrador
     # ============================================
     path('admin/', admin.site.urls),
+    
+    # Errores reportados (solo superuser, visible desde /admin/)
+    path('admin-errores/', error_views.admin_errors_list, name='admin_errors_list'),
+    path('admin-errores/<uuid:error_id>/', error_views.admin_error_detail, name='admin_error_detail'),
     
     # ============================================
     # Autenticación

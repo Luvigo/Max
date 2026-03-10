@@ -126,6 +126,21 @@
         </div>
         {% endif %}
         
+        {% elif user.is_superuser %}
+        <!-- ============================================ -->
+        <!-- ✅ ADMIN (sin institución en contexto) -->
+        <!-- ============================================ -->
+        <div class="nav-section">
+            <div class="nav-section-title">Administración</div>
+            <a href="/admin/" class="nav-item">
+                <i class="fas fa-cog"></i>
+                <span>Django Admin</span>
+            </a>
+            <a href="{% url 'admin_errors_list' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_errors_list' or request.resolver_match.url_name == 'admin_error_detail' %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Errores Reportados</span>
+            </a>
+        </div>
         {% endif %}
         
         <!-- Ayuda -->
@@ -416,10 +431,44 @@ function submitProblemReport() {
         return;
     }
     
-    // Aquí se podría enviar el reporte al servidor
-    // Por ahora mostramos un mensaje de confirmación
-    alert('✅ Reporte enviado correctamente.\n\nGracias por ayudarnos a mejorar MAX-IDE.');
-    closeReportProblemModal();
+    const typeToCode = {
+        'bug': 'GenericError',
+        'ide': 'WorkspaceCorrupt',
+        'agent': 'AgentMissing',
+        'compile': 'CompilationError',
+        'upload': 'UploadFailed',
+        'other': 'GenericError'
+    };
+    const code = typeToCode[problemType] || 'GenericError';
+    const message = problemDescription + (problemSteps ? '\n\nPasos: ' + problemSteps : '');
+    
+    fetch('/api/errors/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': (typeof getCsrfToken === 'function' ? getCsrfToken() : null) || 
+                document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''
+        },
+        body: JSON.stringify({
+            code: code,
+            severity: 'medium',
+            message: message,
+            context: { type: problemType, source: 'reportar_problema' }
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            alert('✅ Reporte enviado correctamente.\n\nGracias por ayudarnos a mejorar MAX-IDE. El administrador lo revisará.');
+        } else {
+            alert('Error al enviar: ' + (data.error || 'Intenta de nuevo'));
+        }
+        closeReportProblemModal();
+    })
+    .catch(() => {
+        alert('Error de conexión. Intenta de nuevo.');
+    });
 }
 
 // Cerrar modales con Escape

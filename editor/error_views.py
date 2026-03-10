@@ -172,7 +172,7 @@ def admin_errors_list(request):
     """
     if not request.user.is_superuser:
         messages.error(request, "Acceso denegado")
-        return redirect('editor:dashboard_redirect')
+        return redirect('dashboard')
     
     errors = ErrorEvent.objects.all().order_by('-ts')
     
@@ -226,7 +226,7 @@ def admin_error_detail(request, error_id):
     """
     if not request.user.is_superuser:
         messages.error(request, "Acceso denegado")
-        return redirect('editor:dashboard_redirect')
+        return redirect('dashboard')
     
     error = get_object_or_404(ErrorEvent, id=error_id)
     
@@ -262,7 +262,7 @@ def institution_errors_list(request, institution_slug):
     # Verificar permisos
     if not UserRoleHelper.user_has_role(request.user, ['admin', 'institution'], institution):
         messages.error(request, "Acceso denegado")
-        return redirect('editor:dashboard_redirect')
+        return redirect('dashboard')
     
     # Filtrar por institución
     errors = ErrorEvent.objects.filter(institution=institution).order_by('-ts')
@@ -328,7 +328,7 @@ def tutor_errors_list(request, institution_slug):
     # Verificar permisos
     if not UserRoleHelper.user_has_role(request.user, ['admin', 'tutor'], institution):
         messages.error(request, "Acceso denegado")
-        return redirect('editor:dashboard_redirect')
+        return redirect('dashboard')
     
     # Obtener grupos donde es tutor
     groups = StudentGroup.objects.filter(tutor=request.user, institution=institution)

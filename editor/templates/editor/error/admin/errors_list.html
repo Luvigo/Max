@@ -6,8 +6,8 @@
 {% block content %}
 <div class="page-header">
     <div class="page-header-content">
-        <h1><i class="fas fa-exclamation-triangle"></i> Eventos de Error</h1>
-        <p class="text-muted">Monitoreo global de errores del sistema</p>
+        <h1><i class="fas fa-exclamation-triangle"></i> Errores Reportados</h1>
+        <p class="text-muted">Problemas reportados por usuarios desde el IDE y la plataforma</p>
     </div>
 </div>
 
@@ -141,7 +141,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{% url 'editor:admin_error_detail' error_id=error.id %}" class="btn btn-sm btn-outline-primary">
+                            <a href="{% url 'admin_error_detail' error_id=error.id %}" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-eye"></i> Ver
                             </a>
                         </td>

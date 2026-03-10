@@ -1598,8 +1598,8 @@ class ErrorEvent(models.Model):
     resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_errors', verbose_name="Resuelto por")
     
     class Meta:
-        verbose_name = "Evento de Error"
-        verbose_name_plural = "Eventos de Error"
+        verbose_name = "Error Reportado"
+        verbose_name_plural = "Errores Reportados"
         ordering = ['-ts']
         indexes = [
             models.Index(fields=['-ts']),
