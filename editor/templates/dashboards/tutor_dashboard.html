@@ -204,7 +204,7 @@
     </div>
     <div class="card-body">
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="/?editor=true" class="btn btn-primary">
+            <a href="/i/{{ institution.slug }}/?editor=true" class="btn btn-primary">
                 <i class="fas fa-code"></i> Abrir IDE
             </a>
             <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-secondary">

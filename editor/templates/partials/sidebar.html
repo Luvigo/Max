@@ -34,7 +34,7 @@
                 <span>Dashboard</span>
             </a>
             
-            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+            <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}/dashboard/{% endif %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
                 <i class="fas fa-code"></i>
                 <span>Editor IDE</span>
             </a>
@@ -100,7 +100,7 @@
                 <span>Dashboard</span>
             </a>
             
-            <a href="/?editor=true" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+            <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}/dashboard/{% endif %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
                 <i class="fas fa-code"></i>
                 <span>Editor IDE</span>
             </a>

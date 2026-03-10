@@ -233,7 +233,7 @@
                     <a href="/admin/students/">Estudiantes</a>
                 {% else %}
                     <a href="{% url 'dashboard' %}">Mi Panel</a>
-                    <a href="/?editor=true">Editor</a>
+                    <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}">Editor</a>
                 {% endif %}
                 <a href="{% url 'logout' %}">Cerrar Sesión</a>
             {% else %}
