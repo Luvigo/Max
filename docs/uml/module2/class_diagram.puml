@@ -1,0 +1,104 @@
+@startuml
+title Módulo 2: Diagrama de Clases - Institución
+
+package "Modelos de Institución" {
+    class Institution {
+        +id: UUID
+        +name: str
+        +slug: str
+        +code: str
+        +description: str
+        +logo: URL
+        --
+        **Contacto**
+        +email: str
+        +phone: str
+        +website: URL
+        --
+        **Dirección**
+        +address: str
+        +city: str
+        +state: str
+        +country: str
+        +postal_code: str
+        --
+        +status: str ['active', 'inactive', 'suspended']
+        +agent_token: str
+        +created_at: datetime
+        +updated_at: datetime
+        --
+        +get_members_count(): int
+        +get_tutors_count(): int
+        +get_students_count(): int
+        +get_courses_count(): int
+        +get_tutors(): QuerySet<User>
+        +get_students(): QuerySet<User>
+        +get_full_address(): str
+    }
+    
+    class Membership {
+        +id: UUID
+        +user: FK(User)
+        +institution: FK(Institution)
+        +role: str
+        +is_active: bool
+    }
+}
+
+package "Django Admin" {
+    class InstitutionAdmin <<ModelAdmin>> {
+        +list_display: list
+        +list_filter: list
+        +search_fields: list
+        +fieldsets: tuple
+        --
+        +get_tutors_count(obj)
+        +get_students_count(obj)
+        +activate_institutions(queryset)
+        +deactivate_institutions(queryset)
+    }
+}
+
+package "Vistas Read-Only" {
+    class "institution_views.py" <<module>> {
+        +my_institution(request, slug)
+        +tutor_my_institution(request, slug)
+        +student_my_institution(request, slug)
+    }
+}
+
+package "Templates" {
+    class "my_institution.html" <<template>> {
+        Vista genérica read-only
+    }
+    class "tutor_institution.html" <<template>> {
+        Vista de tutor con sus cursos
+    }
+    class "student_institution.html" <<template>> {
+        Vista de estudiante con sus cursos/tutores
+    }
+}
+
+Institution "1" -- "*" Membership
+InstitutionAdmin --> Institution : "CRUD en /admin/"
+"institution_views.py" --> Institution : "Read-Only"
+"tutor_institution.html" --> "institution_views.py"
+"student_institution.html" --> "institution_views.py"
+
+note bottom of InstitutionAdmin
+  **Campos del Admin:**
+  - list_display: name, code, city, status, tutors, students, courses
+  - list_filter: status, country, city, created_at
+  - search_fields: name, code, slug, email, city
+  - actions: activate/deactivate
+end note
+
+note right of "institution_views.py"
+  **Decoradores:**
+  - @login_required
+  - @tutor_required (para tutor)
+  - @student_required (para student)
+  
+  **NO permite edición**
+end note
+@enduml

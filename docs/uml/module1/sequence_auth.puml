@@ -1,0 +1,65 @@
+@startuml
+title Módulo 1: Flujo de Autenticación por Rol
+
+actor Usuario
+participant "Login View" as Login
+participant "Django Auth" as Auth
+database "Membership" as DB
+participant "Redirect Logic" as Redirect
+
+== Flujo de Login ==
+
+Usuario -> Login: POST /login/ (username, password)
+Login -> Auth: authenticate(username, password)
+
+alt Credenciales inválidas
+    Auth --> Login: None
+    Login --> Usuario: Error: "Credenciales incorrectas"
+end
+
+Auth --> Login: User object
+Login -> Login: Verificar is_superuser/is_staff
+
+alt Es Admin/Staff
+    Login --> Usuario: redirect("/admin/login/")
+    note right: Admin usa Django Admin exclusivamente
+end
+
+Login -> Auth: login(user)
+Login -> DB: get_user_role(user)
+Login -> DB: get_user_institutions(user)
+
+alt Sin instituciones asignadas
+    Login --> Usuario: redirect al IDE básico
+    note right: Usuario sin rol/institución
+end
+
+alt Una institución
+    DB --> Redirect: role, institution
+    
+    alt role == 'institution'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/")
+    else role == 'tutor'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/tutor/")
+    else role == 'student'
+        Redirect --> Usuario: redirect("/i/<slug>/dashboard/student/")
+    end
+end
+
+alt Múltiples instituciones
+    Redirect --> Usuario: redirect("select_institution")
+end
+
+== Verificación de Acceso (Decorators) ==
+
+Usuario -> Login: GET /i/<slug>/tutor/some-view/
+Login -> Auth: @tutor_required decorator
+Auth -> DB: Check user_role in ['admin', 'institution', 'tutor']
+
+alt Rol permitido
+    Auth --> Usuario: Render vista
+else Rol no permitido
+    Auth --> Usuario: redirect("dashboard") + Error 403
+end
+
+@enduml

@@ -1,0 +1,182 @@
+@startuml
+title Módulo 6: Clases de Admin
+
+package "Mixins y Helpers" {
+  class ExportCSVMixin {
+    +export_as_csv(request, queryset): HttpResponse
+  }
+  
+  class AuditMixin {
+    +save_model(request, obj, form, change)
+  }
+  
+  class IsActiveListFilter {
+    +title: str
+    +parameter_name: str
+    +lookups(): tuple
+    +queryset(): QuerySet
+  }
+  
+  class HasSubmissionsFilter {
+    +title: str
+    +parameter_name: str
+    +lookups(): tuple
+    +queryset(): QuerySet
+  }
+  
+  class DeadlineStatusFilter {
+    +title: str
+    +parameter_name: str
+    +lookups(): tuple
+    +queryset(): QuerySet
+  }
+}
+
+package "Admin Classes" {
+  class InstitutionAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    --
+    +status_badge(obj)
+    +get_groups_count(obj)
+    +get_activities_count(obj)
+    +activate_institutions()
+    +deactivate_institutions()
+    +suspend_institutions()
+  }
+  
+  class TutorProfileAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    +add_fieldsets: tuple
+    --
+    +status_badge(obj)
+    +get_groups_count(obj)
+    +get_activities_count(obj)
+    +activate_tutors()
+    +deactivate_tutors()
+    +suspend_tutors()
+    +disable_user_accounts()
+  }
+  
+  class StudentAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    --
+    +is_active_badge(obj)
+    +get_submissions_count(obj)
+    +activate_students()
+    +deactivate_students()
+    +disable_user_accounts()
+  }
+  
+  class StudentGroupAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    --
+    +status_badge(obj)
+    +get_activities_count(obj)
+    +activate_groups()
+    +deactivate_groups()
+    +archive_groups()
+  }
+  
+  class ActivityAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    --
+    +status_badge(obj)
+    +deadline_badge(obj)
+    +get_pending_count(obj)
+    +publish_activities()
+    +close_activities()
+    +draft_activities()
+  }
+  
+  class SubmissionAdmin {
+    +list_display: list
+    +list_filter: list
+    +search_fields: list
+    +actions: list
+    --
+    +status_badge(obj)
+    +score_display(obj)
+    +is_late_badge(obj)
+    +mark_as_graded()
+    +mark_as_submitted()
+    +mark_as_reviewed()
+    +reset_to_in_progress()
+  }
+  
+  class CustomUserAdmin {
+    +inlines: tuple
+    +list_display: tuple
+    +actions: list
+    --
+    +is_active_badge(obj)
+    +get_roles(obj)
+    +activate_users()
+    +deactivate_users()
+  }
+  
+  class AuditLogAdmin {
+    +list_display: list
+    +readonly_fields: list
+    --
+    +action_badge(obj)
+    +has_add_permission()
+    +has_change_permission()
+  }
+  
+  class ErrorEventAdmin {
+    +list_display: list
+    +actions: list
+    --
+    +severity_badge(obj)
+    +resolved_badge(obj)
+    +mark_as_resolved()
+    +mark_as_unresolved()
+  }
+}
+
+' Herencias
+InstitutionAdmin --|> ExportCSVMixin
+TutorProfileAdmin --|> ExportCSVMixin
+StudentAdmin --|> ExportCSVMixin
+StudentAdmin --|> AuditMixin
+StudentGroupAdmin --|> ExportCSVMixin
+StudentGroupAdmin --|> AuditMixin
+ActivityAdmin --|> ExportCSVMixin
+ActivityAdmin --|> AuditMixin
+SubmissionAdmin --|> ExportCSVMixin
+ErrorEventAdmin --|> ExportCSVMixin
+
+' Uso de filtros
+TutorProfileAdmin ..> IsActiveListFilter
+StudentAdmin ..> IsActiveListFilter
+ActivityAdmin ..> HasSubmissionsFilter
+ActivityAdmin ..> DeadlineStatusFilter
+
+note bottom of ExportCSVMixin
+  **Exportación CSV**
+  Genera archivo CSV con
+  todos los campos del modelo
+end note
+
+note right of AuditMixin
+  **Auditoría**
+  Guarda automáticamente
+  created_by en modelos
+  con ese campo
+end note
+@enduml

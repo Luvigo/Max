@@ -1,0 +1,117 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ agent.hostname }} - Agent Detail{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-content">
+        <h1><i class="fas fa-server"></i> {{ agent.hostname }}</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'editor:admin_agents_list' %}">Agents</a></li>
+                <li class="breadcrumb-item active">{{ agent.hostname }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+{% include 'partials/alerts.html' %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3>Información del Agent</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Hostname:</dt>
+                    <dd class="col-sm-9"><strong>{{ agent.hostname }}</strong></dd>
+                    
+                    <dt class="col-sm-3">Institución:</dt>
+                    <dd class="col-sm-9">{{ agent.institution.name }}</dd>
+                    
+                    <dt class="col-sm-3">Sistema Operativo:</dt>
+                    <dd class="col-sm-9">{{ agent.os }}</dd>
+                    
+                    <dt class="col-sm-3">Versión Agent:</dt>
+                    <dd class="col-sm-9"><code>{{ agent.agent_version }}</code></dd>
+                    
+                    <dt class="col-sm-3">Versión IDE Compatible:</dt>
+                    <dd class="col-sm-9">{{ agent.ide_version_compatible|default:"-" }}</dd>
+                    
+                    <dt class="col-sm-3">Estado:</dt>
+                    <dd class="col-sm-9">
+                        {% if agent.status == 'online' and is_online %}
+                        <span class="badge badge-success">Online</span>
+                        {% elif agent.status == 'offline' %}
+                        <span class="badge badge-warning">Offline</span>
+                        {% elif agent.status == 'error' %}
+                        <span class="badge badge-danger">Error</span>
+                        {% else %}
+                        <span class="badge badge-secondary">{{ agent.get_status_display }}</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-3">Última Conexión:</dt>
+                    <dd class="col-sm-9">
+                        {% if agent.last_seen %}
+                        {{ agent.last_seen|date:"d/m/Y H:i:s" }}
+                        <br><small class="text-muted">{{ agent.last_seen|timesince }} atrás</small>
+                        {% else %}
+                        <span class="text-muted">Nunca</span>
+                        {% endif %}
+                    </dd>
+                    
+                    <dt class="col-sm-3">Fecha de Registro:</dt>
+                    <dd class="col-sm-9">{{ agent.created_at|date:"d/m/Y H:i:s" }}</dd>
+                </dl>
+            </div>
+        </div>
+        
+        {% if agent.meta %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3>Metadata</h3>
+            </div>
+            <div class="card-body">
+                <pre class="bg-dark p-3 rounded">{{ agent.meta|pprint }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h3>Estado Actual</h3>
+            </div>
+            <div class="card-body">
+                {% if is_online %}
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle"></i> <strong>Agent Online</strong>
+                    <br><small>Última conexión: {{ agent.last_seen|timesince }} atrás</small>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> <strong>Agent Offline</strong>
+                    <br><small>No se ha recibido heartbeat recientemente</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h3>Acciones</h3>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'editor:admin_agents_list' %}" class="btn btn-secondary btn-block">
+                    ← Volver a Lista
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,90 @@
+@startuml
+title Modulo 5: Actividades y Entregas (Tutor/Student UI; Admin via Django Admin)
+left to right direction
+
+actor Admin
+actor Tutor
+actor Estudiante
+
+rectangle "Modulo 5: Actividades y Entregas por Grupo" {
+  ' Tutor Use Cases
+  usecase "Crear actividad para grupo" as UC_CreateAct
+  usecase "Editar actividad" as UC_EditAct
+  usecase "Publicar/Cerrar actividad" as UC_PublishAct
+  usecase "Ver entregas" as UC_ViewSubmissions
+  usecase "Ver detalle de entrega" as UC_ViewSubmission
+  usecase "Calificar entrega" as UC_Grade
+  
+  ' Student Use Cases
+  usecase "Ver actividades de mi grupo" as UC_ViewActs
+  usecase "Ver detalle de actividad" as UC_ViewActDetail
+  usecase "Abrir IDE por actividad" as UC_OpenIDE
+  usecase "Guardar progreso" as UC_SaveProgress
+  usecase "Entregar actividad" as UC_Submit
+  usecase "Ver feedback" as UC_ViewFeedback
+  
+  ' Admin Use Cases
+  usecase "Supervisar actividades\n(Django Admin)" as UC_AdminActs
+  usecase "Supervisar entregas\n(Django Admin)" as UC_AdminSubs
+  
+  ' Errors
+  usecase "ERROR: No pertenece al grupo" as E_NotInGroup
+  usecase "ERROR: Fuera de fecha" as E_Late
+  usecase "ERROR: Re-entrega no permitida" as E_NoResubmit
+  usecase "ERROR: Actividad cerrada" as E_Closed
+}
+
+' Tutor connections
+Tutor --> UC_CreateAct
+Tutor --> UC_EditAct
+Tutor --> UC_PublishAct
+Tutor --> UC_ViewSubmissions
+Tutor --> UC_ViewSubmission
+Tutor --> UC_Grade
+
+' Student connections
+Estudiante --> UC_ViewActs
+Estudiante --> UC_ViewActDetail
+Estudiante --> UC_OpenIDE
+Estudiante --> UC_SaveProgress
+Estudiante --> UC_Submit
+Estudiante --> UC_ViewFeedback
+
+' Admin connections
+Admin --> UC_AdminActs : "Solo /admin/"
+Admin --> UC_AdminSubs : "Solo /admin/"
+
+' Error extensions
+UC_Submit ..> E_NotInGroup : <<extend>>
+UC_Submit ..> E_Late : <<extend>>
+UC_Submit ..> E_NoResubmit : <<extend>>
+UC_Submit ..> E_Closed : <<extend>>
+UC_OpenIDE ..> E_NotInGroup : <<extend>>
+
+note right of Tutor
+  **Rutas del Tutor:**
+  /i/slug/tutor/groups/id/activities/
+  /i/slug/tutor/groups/id/activities/new/
+  /i/slug/tutor/activities/id/submissions/
+  /i/slug/tutor/submissions/id/grade/
+end note
+
+note right of Estudiante
+  **Rutas del Estudiante:**
+  /i/slug/student/activities/
+  /i/slug/student/activities/id/
+  /i/slug/student/activities/id/ide/
+  
+  **Boton Entregar en IDE:**
+  Crea Submission y pasa a read-only
+end note
+
+note bottom of Admin
+  **Admin supervisa en Django Admin:**
+  /admin/editor/activity/
+  /admin/editor/submission/
+  
+  NO hay templates de admin
+  para actividades/entregas.
+end note
+@enduml

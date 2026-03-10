@@ -1,0 +1,1732 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAX-IDE | Arduino Block Editor</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Blockly -->
+    <script src="https://unpkg.com/blockly/blockly.min.js"></script>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}">
+    
+    <!-- Estilos de Proyectos -->
+    <style>
+        /* Dropdown de Proyectos */
+        .projects-dropdown {
+            position: relative;
+        }
+        
+        .projects-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 1000;
+            min-width: 320px;
+            background: var(--color-bg-card, #161b22);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            margin-top: 8px;
+        }
+        
+        .projects-menu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border, #30363d);
+            font-weight: 600;
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .projects-menu-header .btn-close {
+            background: none;
+            border: none;
+            color: var(--color-text-muted, #8b949e);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        
+        .projects-menu-header .btn-close:hover {
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .projects-menu-actions {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--color-border, #30363d);
+        }
+        
+        .projects-menu-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .projects-loading, .projects-empty {
+            padding: 24px 16px;
+            text-align: center;
+            color: var(--color-text-muted, #8b949e);
+        }
+        
+        .project-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+            border-bottom: 1px solid var(--color-border-muted, #21262d);
+        }
+        
+        .project-item:hover {
+            background: var(--color-bg-hover, #1c2128);
+        }
+        
+        .project-item:last-child {
+            border-bottom: none;
+        }
+        
+        .project-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .project-item-name {
+            font-weight: 500;
+            color: var(--color-text, #e6edf3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .project-item-date {
+            font-size: 11px;
+            color: var(--color-text-muted, #8b949e);
+            margin-top: 2px;
+        }
+        
+        .project-item-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        
+        .project-item:hover .project-item-actions {
+            opacity: 1;
+        }
+        
+        .project-item-actions button {
+            padding: 4px 8px;
+            font-size: 12px;
+            background: var(--color-bg, #0d1117);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 4px;
+            color: var(--color-text-muted, #8b949e);
+            cursor: pointer;
+        }
+        
+        .project-item-actions button:hover {
+            background: var(--color-bg-hover, #1c2128);
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .project-item-actions button.btn-delete:hover {
+            color: var(--color-danger, #f85149);
+            border-color: var(--color-danger, #f85149);
+        }
+        
+        /* Modal de Guardar Proyecto */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: var(--color-bg-card, #161b22);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 12px;
+            padding: 24px;
+            min-width: 400px;
+            max-width: 90%;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--color-text, #e6edf3);
+        }
+        
+        .modal-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--color-bg, #0d1117);
+            border: 1px solid var(--color-border, #30363d);
+            border-radius: 6px;
+            color: var(--color-text, #e6edf3);
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--color-accent, #58a6ff);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        #currentProjectName {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        {% if tutor_submission_mode %}
+        <!-- Banner: Tutor viendo entrega de estudiante -->
+        <div class="tutor-submission-banner" style="background: linear-gradient(135deg, #1a365d 0%, #2d3748 100%); border-bottom: 1px solid #4a5568; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <span style="font-size: 18px;">👁️</span>
+                <div>
+                    <span style="font-weight: 600; color: #e2e8f0;">Vista de entrega</span>
+                    <span style="color: #a0aec0; margin-left: 8px;">— {{ submission.student_name }} · {{ activity.title }}</span>
+                </div>
+                <span style="background: rgba(248, 81, 73, 0.2); color: #fc8181; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;">Solo lectura</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" class="btn btn-sm btn-ghost" style="color: #a0aec0;">
+                    ← Volver a entregas
+                </a>
+                <a href="{% url 'editor:tutor_submission_detail' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-sm btn-secondary">
+                    Ver detalle
+                </a>
+                <a href="{% url 'editor:tutor_submission_grade_form' institution_slug=institution.slug submission_id=submission.id %}" class="btn btn-sm btn-primary">
+                    ✏️ Calificar
+                </a>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">MAX-IDE</div>
+                <span class="logo-badge">ARDUINO</span>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Mis Proyectos Dropdown (oculto en modo actividad o tutor viendo entrega) -->
+                {% if not activity_mode and not tutor_submission_mode %}
+                <div class="control-group projects-dropdown">
+                    <button class="btn btn-ghost" id="btnProjectsMenu" title="Mis Proyectos">
+                        <span>📁</span>
+                        <span id="currentProjectName">Nuevo Proyecto</span>
+                        <span style="font-size: 10px;">▼</span>
+                    </button>
+                    <div class="projects-menu" id="projectsMenu" style="display: none;">
+                        <div class="projects-menu-header">
+                            <span>📁 Mis Proyectos</span>
+                            <button class="btn-close" id="btnCloseProjectsMenu">×</button>
+                        </div>
+                        <div class="projects-menu-actions">
+                            <button class="btn btn-sm btn-primary" id="btnNewProject">➕ Nuevo</button>
+                            <button class="btn btn-sm btn-secondary" id="btnSaveProject">💾 Guardar</button>
+                            <button class="btn btn-sm btn-secondary" id="btnSaveAsProject">📝 Guardar como...</button>
+                        </div>
+                        <div class="projects-menu-list" id="projectsList">
+                            <div class="projects-loading">Cargando proyectos...</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Activity Status Badge (solo visible si hay actividad) -->
+                <div id="activityStatusContainer" class="activity-status-container" style="display: none;">
+                    <span class="activity-badge" id="submissionStatusBadge">
+                        <span class="badge-inprogress">🟡 En progreso</span>
+                    </span>
+                    <button class="btn btn-success btn-sm" id="btnSubmitActivity" style="display: none;">
+                        📤 Entregar
+                    </button>
+                </div>
+                
+                <!-- Board Selector -->
+                <div class="control-group">
+                    <label>
+                        <span>🎯</span>
+                        Board
+                    </label>
+                    <select id="boardSelect">
+                        <option value="arduino:avr:uno">Arduino UNO</option>
+                        <option value="arduino:avr:nano">Arduino Nano</option>
+                        <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
+                        <option value="arduino:avr:mega">Arduino Mega</option>
+                        <option value="arduino:avr:leonardo">Arduino Leonardo</option>
+                        <option value="esp32:esp32:esp32">ESP32 Dev Module</option>
+                    </select>
+                </div>
+                
+                <!-- Port Selector -->
+                <div class="control-group">
+                    <label>
+                        <span>🔌</span>
+                        Puerto
+                    </label>
+                    <select id="portSelect">
+                        <option value="">Seleccionar...</option>
+                    </select>
+                    <button class="btn btn-icon-only btn-ghost" id="btnAddPort" title="Agregar nuevo puerto">
+                        ➕
+                    </button>
+                    <button class="btn btn-icon-only btn-ghost" id="btnRefreshPorts" title="Actualizar puertos">
+                        🔄
+                    </button>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-ghost" id="btnSerialMonitor" title="Monitor Serial">
+                        <span>📟</span>
+                        <span>Serial</span>
+                    </button>
+                    <button class="btn btn-warning" id="btnCompile" data-action="verify">
+                        <span>⚙️</span>
+                        <span>Verificar</span>
+                    </button>
+                    <button class="btn btn-success" id="btnUpload" data-action="upload">
+                        <span>🚀</span>
+                        <span>Subir</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Workspace de Blockly -->
+            <div class="workspace-container">
+                <div class="workspace-header">
+                    <div class="workspace-tabs">
+                        <button class="workspace-tab active">
+                            <span>📦</span>
+                            Bloques
+                        </button>
+                    </div>
+                    <div class="workspace-actions">
+                        {% if not tutor_submission_mode %}
+                        <button class="btn btn-sm btn-ghost" id="btnNew" title="Nuevo proyecto">
+                            📄 Nuevo
+                        </button>
+                        {% endif %}
+                        {% if activity_mode %}
+                        <button class="btn btn-sm btn-ghost" id="btnSaveActivityProgress" title="Guardar progreso">
+                            💾 Guardar progreso
+                        </button>
+                        {% elif not tutor_submission_mode and user.is_authenticated %}
+                        <button class="btn btn-sm btn-ghost" id="btnSaveProject" title="Guardar Proyecto">
+                            💾 Guardar Proyecto
+                        </button>
+                        <button class="btn btn-sm btn-ghost" id="btnLoadProject" title="Cargar Proyecto">
+                            📂 Mis Proyectos
+                        </button>
+                        {% endif %}
+                        {% if not tutor_submission_mode %}
+                        <button class="btn btn-sm btn-ghost" id="btnSave" title="Guardar archivo local">
+                            💾 Guardar Local
+                        </button>
+                        <button class="btn btn-sm btn-ghost" id="btnLoad" title="Cargar archivo local">
+                            📂 Cargar Local
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div id="blocklyDiv"></div>
+            </div>
+            
+            <!-- Panel de código -->
+            <div class="code-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <span class="icon">&lt;/&gt;</span>
+                        Código Arduino
+                    </h3>
+                    <button class="btn btn-sm btn-ghost" id="btnCopyCode" title="Copiar código">
+                        📋 Copiar
+                    </button>
+                </div>
+                <div class="code-content">
+                    <pre><code id="codeOutput">// El código aparecerá aquí
+// Arrastra bloques para empezar
+
+void setup() {
+  
+}
+
+void loop() {
+  
+}</code></pre>
+                </div>
+                
+                <!-- Console -->
+                <div class="console-panel">
+                    <div class="console-header">
+                        <h4>
+                            <span>📟</span>
+                            Consola
+                        </h4>
+                        <button class="btn btn-sm btn-ghost" id="btnClearConsole">Limpiar</button>
+                    </div>
+                    <div class="console-content" id="consoleOutput">
+                        <div class="console-line info">
+                            <span class="console-time">[00:00]</span>
+                            <span>MAX-IDE listo. ¡Arrastra bloques para empezar!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Agent Install Banner -->
+        <div class="agent-banner" id="agentBanner" style="display: none;">
+            <div class="agent-banner-content">
+                <div class="agent-banner-icon">🔧</div>
+                <div class="agent-banner-text">
+                    <strong>Agent local requerido para subir código</strong>
+                    <span>Instala el MAX-IDE Agent en tu PC para poder subir código al Arduino</span>
+                </div>
+                <div class="agent-banner-actions">
+                    <button class="btn btn-sm btn-ghost" id="btnCheckAgent">
+                        🔄 Verificar conexión
+                    </button>
+                    <button class="btn btn-sm btn-primary" id="btnInstallAgent">
+                        📥 Instrucciones de instalación
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span class="status-dot disconnected" id="statusDot"></span>
+                    <span id="statusText">Sin conexión</span>
+                </div>
+                <div class="status-item">
+                    <span>📦</span>
+                    <span id="blockCount">0 bloques</span>
+                </div>
+            </div>
+            <div class="status-right">
+                <div class="status-item" id="agentStatus">
+                    <span class="status-dot disconnected" id="agentStatusDot"></span>
+                    <span id="agentStatusText">Agent: Verificando...</span>
+                </div>
+                <div class="status-item" id="boardInfo">
+                    <span>🎯</span>
+                    <span>Arduino UNO</span>
+                </div>
+                <div class="status-item">
+                    MAX-IDE v1.0
+                </div>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Modal Monitor Serial -->
+    <div class="modal-overlay" id="serialModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="icon">📟</span>
+                    Monitor Serial
+                </h2>
+                <button class="modal-close" id="btnCloseSerial">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="serial-controls">
+                    <div class="control-group">
+                        <label>Puerto (Web Serial API)</label>
+                        <select id="serialPortSelect" disabled>
+                            <option value="">Usa "Conectar" para seleccionar puerto</option>
+                        </select>
+                        <small style="color: #888; font-size: 11px;">El puerto se selecciona al hacer clic en "Conectar"</small>
+                    </div>
+                    <div class="control-group">
+                        <label>Baudrate</label>
+                        <select id="serialBaudrate">
+                            <option value="9600">9600</option>
+                            <option value="115200">115200</option>
+                            <option value="57600">57600</option>
+                            <option value="38400">38400</option>
+                            <option value="19200">19200</option>
+                            <option value="4800">4800</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btnSerialConnect">
+                        <span>🔗</span>
+                        Conectar
+                    </button>
+                    <button class="btn btn-danger hidden" id="btnSerialDisconnect">
+                        <span>⛔</span>
+                        Desconectar
+                    </button>
+                    <div class="connection-status disconnected" id="serialStatus">
+                        <span class="status-dot disconnected"></span>
+                        <span>Desconectado</span>
+                    </div>
+                    <div class="flex-1"></div>
+                    <button class="btn btn-sm btn-ghost" id="btnClearSerial">
+                        🗑️ Limpiar
+                    </button>
+                </div>
+                <div class="serial-output" id="serialOutput">
+                    <div class="line system">Esperando conexión...</div>
+                </div>
+                <div class="serial-input-container">
+                    <input type="text" class="serial-input" id="serialInput" placeholder="Escribe un mensaje y presiona Enter..." disabled>
+                    <button class="btn btn-primary" id="btnSerialSend" disabled>
+                        Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+    
+    <!-- Modal Instalar Agent -->
+    <div class="modal-overlay" id="agentInstallModal" style="display: none;">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="icon">🔧</span>
+                    Instalar MAX-IDE Agent
+                </h2>
+                <button class="modal-close" id="btnCloseAgentModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="agent-install-intro">
+                    <div style="text-align: center; padding: 10px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">🔌</div>
+                        <p style="font-size: 1.1rem; margin: 0;">El <strong style="color: var(--accent-cyan);">MAX-IDE Agent</strong> conecta tu Arduino con el navegador.</p>
+                        <p style="color: var(--text-muted); margin-top: 8px;">¡Solo necesitas instalarlo una vez!</p>
+                    </div>
+                </div>
+                
+                <div class="agent-install-tabs">
+                    <button class="agent-tab active" data-os="windows">🪟 Windows</button>
+                    <button class="agent-tab" data-os="mac">🍎 macOS</button>
+                    <button class="agent-tab" data-os="linux">🐧 Linux</button>
+                </div>
+                
+                <!-- Windows Instructions - SIMPLIFICADO con winget -->
+                <div class="agent-instructions" id="instructions-windows">
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <div class="step-desc">Haz clic en el botón para descargar:</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 10px; padding: 12px 24px; font-size: 1rem;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                                <div class="step-note">📦 Archivo pequeño (~50 KB)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Extrae y ejecuta</div>
+                                <div class="step-desc">Clic derecho en el ZIP → <strong>"Extraer todo"</strong>, luego abre la carpeta y haz <strong>doble clic</strong> en:</div>
+                                <div class="step-file" style="font-size: 1.1rem; padding: 10px 16px; margin: 10px 0;">▶️ start_agent.bat</div>
+                                <div class="step-note">💡 Se abrirá una ventana negra - ¡no la cierres!</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">¡Espera la instalación automática!</div>
+                                <div class="step-desc">La primera vez instalará <strong>Python</strong> y <strong>Arduino CLI</strong> automáticamente.</div>
+                                <div class="step-note">⏱️ La instalación toma menos de un minuto.</div>
+                                <div class="step-note" style="margin-top: 8px;">⚠️ Si pide cerrar y volver a abrir, hazlo. Es normal la primera vez.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Opcional: ESP32 o clones</div>
+                                <div class="step-desc">Si usas <strong>ESP32 Dev Module</strong>: abre CMD y ejecuta <code>arduino-cli core install esp32:esp32</code>.</div>
+                                <div class="step-desc" style="margin-top: 8px;">Si no detecta el puerto (clones/ESP32): instala el driver <strong>CH340</strong> o <strong>CP2102</strong> según tu placa.</div>
+                                <div class="step-note">Cierra Arduino IDE o el Monitor Serial de MAX-IDE si están usando el puerto.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="install-success-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.2)); border: 1px solid #10b981;">
+                        <div style="font-size: 28px;">🎉</div>
+                        <div>
+                            <strong style="font-size: 1.05rem;">¡Solo descarga, extrae y doble clic!</strong><br>
+                            <span style="opacity: 0.9;">El instalador configura todo automáticamente.</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- macOS Instructions -->
+                <div class="agent-instructions" id="instructions-mac" style="display: none;">
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Instala Homebrew (si no lo tienes)</div>
+                                <div class="step-desc">Abre Terminal (<kbd>Cmd</kbd> + <kbd>Espacio</kbd> → escribe "Terminal") y ejecuta:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</code>
+                                </div>
+                                <div class="step-note">💡 Sigue las instrucciones en pantalla. Te pedirá tu contraseña.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Agrega Homebrew al PATH</div>
+                                <div class="step-desc">Cuando termine la instalación, Homebrew te mostrará una sección <strong>"Next steps"</strong> con comandos personalizados para tu Mac. <strong>Copia y ejecuta esos comandos</strong> (son 2-3 líneas que empiezan con <code>echo</code> y <code>eval</code>).</div>
+                                <div class="step-note">⚠️ Importante: Cierra y vuelve a abrir Terminal después de ejecutar los comandos.</div>
+                                <div class="step-note">💡 Verifica que funcionó ejecutando: <code>brew --version</code></div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Instala Arduino CLI (y Python si falta)</div>
+                                <div class="step-desc">En una nueva ventana de Terminal, ejecuta:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>brew install arduino-cli python3<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                                <div class="step-note">Para ESP32 Dev Module: <code>arduino-cli core install esp32:esp32</code></div>
+                                <div class="step-note">Si no detecta el puerto (ESP32/clones): instala driver CP2102 de Silicon Labs. CH340 suele funcionar sin driver en Mac.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">5</div>
+                            <div class="step-content">
+                                <div class="step-title">Descomprime y ejecuta</div>
+                                <div class="step-desc">Descomprime el ZIP (doble clic), luego en Terminal:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>cd ~/Downloads/maxide-agent<br>bash start_agent.sh</code>
+                                </div>
+                                <div class="step-note" style="margin-top: 12px;">⚠️ Si ves <strong>«command not found»</strong> o <strong>«syntax error near unexpected token 'elif'»</strong>, ejecuta primero este comando (repara el script) y después <code>bash start_agent.sh</code>:</div>
+                                <div class="agent-terminal" style="margin-top: 8px;">
+                                    <code>cd ~/Downloads/maxide-agent &amp;&amp; sed -i '' 's/\r$//' start_agent.sh &amp;&amp; sed -i '' 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
+                                </div>
+                                <div class="step-note" style="margin-top: 8px;">Cierra Arduino IDE o el Monitor Serial si están usando el puerto.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="install-success-box">
+                        <div style="font-size: 24px;">✅</div>
+                        <div>
+                            <strong>¡Listo!</strong> Cuando veas "Listening on http://localhost:8765", 
+                            haz clic en "Verificar conexión" abajo.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Linux Instructions -->
+                <div class="agent-instructions" id="instructions-linux" style="display: none;">
+                    <div class="install-steps">
+                        <div class="install-step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Instala Python 3 y arduino-cli (si no los tienes)</div>
+                                <div class="step-desc">Copia y pega en Terminal (<kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd>):</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>sudo apt install python3 python3-pip python3-venv<br>curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh<br>sudo mv bin/arduino-cli /usr/local/bin/<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
+                                </div>
+                                <div class="step-note">Ubuntu/Debian: <code>apt</code>. Fedora: <code>sudo dnf install python3 python3-pip</code> (y omite la línea apt).</div>
+                                <div class="step-note">Para ESP32: <code>arduino-cli core install esp32:esp32</code></div>
+                                <div class="step-note">⚠️ NO uses snap para arduino-cli. Tiene problemas de permisos con puertos seriales.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Permisos para puertos serial</div>
+                                <div class="step-desc">Ejecuta esto y luego <strong>cierra sesión y vuelve a entrar</strong>:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>sudo usermod -a -G dialout $USER</code>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Descarga el Agent</div>
+                                <a href="/static/agent/maxide-agent.zip" download class="btn btn-primary" style="margin-top: 8px;">
+                                    📥 Descargar MAX-IDE Agent
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="install-step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Ejecuta el Agent</div>
+                                <div class="step-desc">Abre la terminal en la carpeta donde descargaste el ZIP (p. ej. Descargas o Downloads). Luego:</div>
+                                <div class="agent-terminal" style="margin-top: 10px;">
+                                    <code>unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>
+                                </div>
+                                <div class="step-note">Si prefieres usar la ruta completa: <strong>Descargas</strong> (español) → <code>cd ~/Descargas && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>. <strong>Downloads</strong> (inglés) → <code>cd ~/Downloads && unzip -o maxide-agent.zip && cd maxide-agent && bash start_agent.sh</code>.</div>
+                                <div class="step-note" style="margin-top: 12px;">⚠️ Si ves <strong>«orden no encontrada»</strong> (<code>$'\r'</code>) o <strong>«syntax error near unexpected token 'elif'»</strong>, ejecuta primero (en la carpeta maxide-agent) y después <code>bash start_agent.sh</code>:</div>
+                                <div class="agent-terminal" style="margin-top: 8px;">
+                                    <code>cd maxide-agent &amp;&amp; sed -i.bak 's/\r$//' start_agent.sh &amp;&amp; sed -i.bak 's/&amp;&gt; \/dev\/null/&gt; \/dev\/null 2&gt;\&amp;1/g' start_agent.sh &amp;&amp; bash start_agent.sh</code>
+                                </div>
+                                <div class="step-note" style="margin-top: 8px;">Si no detecta el puerto (ESP32/clones): instala driver CH340 o CP2102. Cierra Arduino IDE o Monitor Serial si usan el puerto.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="install-success-box">
+                        <div style="font-size: 24px;">✅</div>
+                        <div>
+                            <strong>¡Listo!</strong> Cuando veas "Listening on http://localhost:8765", 
+                            haz clic en "Verificar conexión" abajo.
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="agent-install-footer">
+                    <button class="btn btn-primary btn-lg" id="btnVerifyAgentInstall" style="padding: 14px 28px; font-size: 1rem;">
+                        🔄 Verificar conexión del Agent
+                    </button>
+                    <span class="agent-verify-status" id="agentVerifyStatus"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hidden file input -->
+    <input type="file" id="fileInput" accept=".xml,.maxide" style="display: none;">
+    
+    <!-- Modal Proyectos -->
+    {% if user.is_authenticated %}
+    <div class="modal-overlay" id="projectsModal" style="display: none;">
+        <div class="modal" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 class="modal-title">📦 Mis Proyectos</h2>
+                <button class="modal-close" id="btnCloseProjects">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-primary" id="btnCreateNewProject">➕ Crear Nuevo Proyecto</button>
+                </div>
+                <div id="projectsList" style="max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; padding: 20px; color: #8b949e;">Cargando proyectos...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Crear Proyecto -->
+    <div class="modal-overlay" id="createProjectModal" style="display: none;">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2 class="modal-title">➕ Crear Nuevo Proyecto</h2>
+                <button class="modal-close" id="btnCloseCreateProject">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre del Proyecto *</label>
+                    <input type="text" id="projectName" placeholder="Mi Proyecto Arduino" style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3;">
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="projectDescription" placeholder="Descripción del proyecto..." style="width: 100%; padding: 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; min-height: 80px;"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn" id="btnCancelCreateProject">Cancelar</button>
+                    <button class="btn btn-primary" id="btnConfirmCreateProject">Crear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Toolbox XML para Blockly -->
+    <xml id="toolbox" style="display: none;">
+        <category name="⚙️ Estructura" colour="60">
+            <block type="arduino_setup"></block>
+            <block type="arduino_loop"></block>
+        </category>
+        
+        <category name="📌 Digital" colour="230">
+            <block type="arduino_pin_mode">
+                <field name="PIN">13</field>
+                <field name="MODE">OUTPUT</field>
+            </block>
+            <block type="arduino_digital_write">
+                <field name="PIN">13</field>
+                <field name="VALUE">HIGH</field>
+            </block>
+            <block type="arduino_digital_read">
+                <field name="PIN">2</field>
+            </block>
+        </category>
+        
+        <category name="📊 Analógico" colour="180">
+            <block type="arduino_analog_read">
+                <field name="PIN">0</field>
+            </block>
+            <block type="arduino_analog_write">
+                <field name="PIN">9</field>
+                <value name="VALUE">
+                    <block type="arduino_number">
+                        <field name="NUM">128</field>
+                    </block>
+                </value>
+            </block>
+        </category>
+        
+        <category name="⏱️ Tiempo" colour="330">
+            <block type="arduino_delay">
+                <value name="TIME">
+                    <block type="arduino_number">
+                        <field name="NUM">1000</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_delay_microseconds">
+                <value name="TIME">
+                    <block type="arduino_number">
+                        <field name="NUM">100</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_millis"></block>
+            <block type="arduino_micros"></block>
+        </category>
+        
+        <category name="📡 Serial" colour="20">
+            <block type="arduino_serial_begin">
+                <field name="BAUD">9600</field>
+            </block>
+            <block type="arduino_serial_print"></block>
+            <block type="arduino_serial_println"></block>
+            <block type="arduino_serial_available"></block>
+            <block type="arduino_serial_read"></block>
+        </category>
+        
+        <category name="🔀 Control" colour="210">
+            <label text="── Condicionales ──"></label>
+            <block type="arduino_if"></block>
+            <block type="arduino_if_else"></block>
+            <block type="arduino_if_elseif"></block>
+            <block type="arduino_if_elseif_else"></block>
+            <block type="arduino_if_elseif2_else"></block>
+            <label text="── Ciclos ──"></label>
+            <block type="arduino_for">
+                <field name="VAR">i</field>
+                <field name="FROM">0</field>
+                <field name="TO">10</field>
+            </block>
+            <block type="arduino_while"></block>
+        </category>
+        
+        <category name="⚖️ Lógica" colour="210">
+            <block type="arduino_compare"></block>
+            <block type="arduino_and"></block>
+            <block type="arduino_or"></block>
+            <block type="arduino_and3"></block>
+            <block type="arduino_or3"></block>
+            <block type="arduino_and_or"></block>
+            <block type="arduino_or_and"></block>
+            <block type="arduino_logic"></block>
+            <block type="arduino_not"></block>
+            <block type="arduino_true"></block>
+            <block type="arduino_false"></block>
+        </category>
+        
+        <category name="🔢 Matemáticas" colour="200">
+            <block type="arduino_number">
+                <field name="NUM">0</field>
+            </block>
+            <block type="arduino_math"></block>
+            <block type="arduino_map"></block>
+            <block type="arduino_constrain"></block>
+            <block type="arduino_random"></block>
+        </category>
+        
+        <category name="📝 Variables" colour="290">
+            <block type="arduino_variable_int"></block>
+            <block type="arduino_variable_float"></block>
+            <block type="arduino_variable_string"></block>
+            <block type="arduino_variable_boolean"></block>
+            <block type="arduino_get_variable"></block>
+            <block type="arduino_set_variable"></block>
+        </category>
+        
+        <category name="📝 Texto" colour="160">
+            <block type="arduino_string">
+                <field name="TEXT">Hola</field>
+            </block>
+        </category>
+        
+        <category name="🔧 Componentes" colour="40">
+            <block type="arduino_led_builtin">
+                <field name="STATE">HIGH</field>
+            </block>
+            <block type="arduino_tone"></block>
+            <block type="arduino_no_tone"></block>
+        </category>
+        
+        <category name="🦾 Servos" colour="270">
+            <block type="arduino_servo_attach">
+                <field name="NAME">miServo</field>
+                <field name="PIN">9</field>
+            </block>
+            <block type="arduino_servo_attach_limits">
+                <field name="NAME">miServo</field>
+                <field name="PIN">9</field>
+                <field name="MIN">544</field>
+                <field name="MAX">2400</field>
+            </block>
+            <block type="arduino_servo_write">
+                <field name="NAME">miServo</field>
+                <value name="ANGLE">
+                    <block type="arduino_number">
+                        <field name="NUM">90</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_servo_write_simple">
+                <field name="NAME">miServo</field>
+                <field name="ANGLE">90</field>
+            </block>
+            <block type="arduino_servo_write_microseconds">
+                <field name="NAME">miServo</field>
+                <value name="US">
+                    <block type="arduino_number">
+                        <field name="NUM">1500</field>
+                    </block>
+                </value>
+            </block>
+            <block type="arduino_servo_read">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_attached">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_detach">
+                <field name="NAME">miServo</field>
+            </block>
+            <block type="arduino_servo_sweep">
+                <field name="NAME">miServo</field>
+                <field name="FROM">0</field>
+                <field name="TO">180</field>
+                <value name="DELAY">
+                    <block type="arduino_number">
+                        <field name="NUM">15</field>
+                    </block>
+                </value>
+            </block>
+        </category>
+        
+        <!-- ============================================ -->
+        <!-- 🚗 CARRITO MAX - Bloques especiales -->
+        <!-- ============================================ -->
+        
+        <category name="🚗 Carrito MAX" colour="190" expanded="false">
+            <category name="⚙️ Inicialización" colour="190">
+                <block type="max_init_motores">
+                    <field name="PIN_IZQ">9</field>
+                    <field name="PIN_DER">10</field>
+                </block>
+                <block type="max_init_distancia">
+                    <field name="PIN_TRIG">6</field>
+                    <field name="PIN_ECHO">7</field>
+                </block>
+                <block type="max_init_lineas">
+                    <field name="PIN_IZQ">0</field>
+                    <field name="PIN_CENT">1</field>
+                    <field name="PIN_DER">2</field>
+                </block>
+                <block type="max_init_buzzer">
+                    <field name="PIN">3</field>
+                </block>
+                <block type="max_init_garra">
+                    <field name="PIN">11</field>
+                    <field name="CERRADA">0</field>
+                    <field name="ABIERTA">90</field>
+                </block>
+            </category>
+            
+            <category name="🏎️ Movimiento" colour="120">
+                <block type="max_adelante">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_atras">
+                    <field name="VEL">30</field>
+                </block>
+                <block type="max_izquierda">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_derecha">
+                    <field name="VEL">25</field>
+                </block>
+                <block type="max_detener"></block>
+                <block type="max_adelante_var"></block>
+                <block type="max_atras_var"></block>
+                <block type="max_izquierda_var"></block>
+                <block type="max_derecha_var"></block>
+                <block type="max_avanzar_tiempo">
+                    <field name="VEL">30</field>
+                    <field name="TIEMPO">1000</field>
+                </block>
+                <block type="max_retroceder_tiempo">
+                    <field name="VEL">30</field>
+                    <field name="TIEMPO">1000</field>
+                </block>
+                <block type="max_girar_tiempo">
+                    <field name="DIR">izquierda</field>
+                    <field name="VEL">25</field>
+                    <field name="TIEMPO">500</field>
+                </block>
+            </category>
+            
+            <category name="📡 Sensor Distancia" colour="230">
+                <block type="max_medir_distancia"></block>
+                <block type="max_distancia_menor_que">
+                    <field name="CM">20</field>
+                </block>
+                <block type="max_distancia_mayor_que">
+                    <field name="CM">30</field>
+                </block>
+                <block type="max_evitar_obstaculo">
+                    <field name="DISTANCIA">20</field>
+                </block>
+            </category>
+            
+            <category name="➖ Sensor Líneas" colour="60">
+                <block type="max_leer_linea_izq"></block>
+                <block type="max_leer_linea_centro"></block>
+                <block type="max_leer_linea_der"></block>
+                <block type="max_linea_detectada">
+                    <field name="SENSOR">CENT</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
+                    <field name="UMBRAL">500</field>
+                </block>
+                <block type="max_linea_valor_comparar">
+                    <field name="SENSOR">CENT</field>
+                    <field name="OP"><</field>
+                </block>
+            </category>
+            
+            <category name="🎵 Buzzer/Sonido" colour="300">
+                <block type="max_tocar_nota">
+                    <field name="NOTA">262</field>
+                    <field name="DURACION">300</field>
+                </block>
+                <block type="max_tocar_frecuencia">
+                    <value name="FREQ">
+                        <block type="arduino_number">
+                            <field name="NUM">440</field>
+                        </block>
+                    </value>
+                    <value name="DURACION">
+                        <block type="arduino_number">
+                            <field name="NUM">300</field>
+                        </block>
+                    </value>
+                </block>
+                <block type="max_beep"></block>
+                <block type="max_detener_sonido"></block>
+            </category>
+            
+            <category name="🦾 Garra" colour="45">
+                <block type="max_abrir_garra"></block>
+                <block type="max_cerrar_garra"></block>
+                <block type="max_mover_garra">
+                    <field name="ANGULO">45</field>
+                </block>
+            </category>
+        </category>
+        
+        <category name="⚡ Avanzado" colour="0">
+            <block type="arduino_include">
+                <field name="LIBRARY">Servo.h</field>
+            </block>
+            <block type="arduino_custom_code"></block>
+            <block type="arduino_comment"></block>
+        </category>
+    </xml>
+    
+    <!-- Scripts (timestamp = cache bust) -->
+    {% if activity_mode %}
+    <script>
+        // Configuración para modo actividad (debe cargarse ANTES de app.js)
+        window.IDE_CONFIG = {
+            activityId: '{{ activity.id }}',
+            institutionSlug: '{{ institution.slug }}',
+            canSubmit: {{ can_submit|yesno:"true,false" }},
+            isReadOnly: {{ is_read_only|yesno:"true,false" }},
+            isFrozen: {{ is_read_only|yesno:"true,false" }},
+            submissionStatus: '{{ submission_status }}',
+            allowResubmit: {{ allow_resubmit|yesno:"true,false" }},
+            csrfToken: '{{ csrf_token }}',
+            submitUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/submit/',
+            saveUrl: '/i/{{ institution.slug }}/api/activity/{{ activity.id }}/save/',
+            autosaveEnabled: true
+        };
+    </script>
+    {% elif tutor_submission_mode %}
+    <script>
+        // Configuración para tutor viendo entrega (solo lectura)
+        window.IDE_CONFIG = {
+            institutionSlug: '{{ institution.slug }}',
+            isReadOnly: true,
+            isFrozen: true,
+            autosaveEnabled: false
+        };
+    </script>
+    {% else %}
+    <script>
+        window.IDE_CONFIG = window.IDE_CONFIG || {};
+    </script>
+    {% endif %}
+    
+    <script src="{% static 'editor/js/arduino_blocks.js' %}?v=2026012601"></script>
+    <script src="{% static 'editor/js/arduino_generator.js' %}?v=2026012601"></script>
+    <script src="{% static 'editor/js/app.js' %}?v=2026012601"></script>
+    
+    <!-- Sistema de Mis Proyectos -->
+    <script>
+    (function() {
+        // Variables de estado
+        let currentProjectId = null;
+        let currentProjectName = 'Nuevo Proyecto';
+        let projectsMenuOpen = false;
+        
+        // Elementos del DOM
+        const btnProjectsMenu = document.getElementById('btnProjectsMenu');
+        const projectsMenu = document.getElementById('projectsMenu');
+        const btnCloseProjectsMenu = document.getElementById('btnCloseProjectsMenu');
+        const projectsList = document.getElementById('projectsList');
+        const currentProjectNameEl = document.getElementById('currentProjectName');
+        const btnNewProject = document.getElementById('btnNewProject');
+        const btnSaveProject = document.getElementById('btnSaveProject');
+        const btnSaveAsProject = document.getElementById('btnSaveAsProject');
+        
+        // Toggle menú de proyectos
+        if (btnProjectsMenu) {
+            btnProjectsMenu.addEventListener('click', function(e) {
+                e.stopPropagation();
+                projectsMenuOpen = !projectsMenuOpen;
+                projectsMenu.style.display = projectsMenuOpen ? 'block' : 'none';
+                if (projectsMenuOpen) {
+                    loadProjectsList();
+                }
+            });
+        }
+        
+        // Cerrar menú
+        if (btnCloseProjectsMenu) {
+            btnCloseProjectsMenu.addEventListener('click', function() {
+                projectsMenu.style.display = 'none';
+                projectsMenuOpen = false;
+            });
+        }
+        
+        // Cerrar al hacer click fuera
+        document.addEventListener('click', function(e) {
+            if (projectsMenuOpen && !projectsMenu.contains(e.target) && !btnProjectsMenu.contains(e.target)) {
+                projectsMenu.style.display = 'none';
+                projectsMenuOpen = false;
+            }
+        });
+        
+        // Cargar lista de proyectos
+        function loadProjectsList() {
+            projectsList.innerHTML = '<div class="projects-loading">Cargando proyectos...</div>';
+            
+            fetch('/api/ide/projects/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok && data.projects.length > 0) {
+                        projectsList.innerHTML = data.projects.map(p => `
+                            <div class="project-item" data-id="${p.id}">
+                                <div class="project-item-info" onclick="loadProject('${p.id}')">
+                                    <div class="project-item-name">${escapeHtml(p.name)}</div>
+                                    <div class="project-item-date">${p.updated_at}</div>
+                                </div>
+                                <div class="project-item-actions">
+                                    <button onclick="renameProject('${p.id}', '${escapeHtml(p.name)}')" title="Renombrar">✏️</button>
+                                    <button class="btn-delete" onclick="deleteProject('${p.id}', '${escapeHtml(p.name)}')" title="Eliminar">🗑️</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        projectsList.innerHTML = '<div class="projects-empty">No tienes proyectos guardados.<br>¡Crea uno nuevo!</div>';
+                    }
+                })
+                .catch(err => {
+                    projectsList.innerHTML = '<div class="projects-empty">Error al cargar proyectos</div>';
+                    console.error('Error cargando proyectos:', err);
+                });
+        }
+        
+        // Nuevo proyecto
+        if (btnNewProject) {
+            btnNewProject.addEventListener('click', function() {
+                if (confirm('¿Crear un nuevo proyecto? Se perderán los cambios no guardados.')) {
+                    if (typeof workspace !== 'undefined') {
+                        workspace.clear();
+                    }
+                    currentProjectId = null;
+                    currentProjectName = 'Nuevo Proyecto';
+                    currentProjectNameEl.textContent = currentProjectName;
+                    projectsMenu.style.display = 'none';
+                    projectsMenuOpen = false;
+                }
+            });
+        }
+        
+        // Guardar proyecto actual
+        if (btnSaveProject) {
+            btnSaveProject.addEventListener('click', function() {
+                if (currentProjectId) {
+                    // Autosave al proyecto actual
+                    saveCurrentProject();
+                } else {
+                    // Si no hay proyecto, mostrar "Guardar como..."
+                    showSaveAsModal();
+                }
+            });
+        }
+        
+        // Guardar como...
+        if (btnSaveAsProject) {
+            btnSaveAsProject.addEventListener('click', showSaveAsModal);
+        }
+        
+        // Modal de guardar como
+        function showSaveAsModal(defaultName) {
+            const name = defaultName || currentProjectName;
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.id = 'saveAsModal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-title">💾 Guardar Proyecto</div>
+                    <input type="text" class="modal-input" id="projectNameInput" value="${escapeHtml(name)}" placeholder="Nombre del proyecto">
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" onclick="closeSaveAsModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="confirmSaveAs()">Guardar</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            document.getElementById('projectNameInput').focus();
+            document.getElementById('projectNameInput').select();
+        }
+        
+        // Cerrar modal
+        window.closeSaveAsModal = function() {
+            const modal = document.getElementById('saveAsModal');
+            if (modal) modal.remove();
+        };
+        
+        // Confirmar guardar como
+        window.confirmSaveAs = function() {
+            const nameInput = document.getElementById('projectNameInput');
+            const name = nameInput.value.trim();
+            
+            if (!name) {
+                alert('El nombre no puede estar vacío');
+                return;
+            }
+            
+            // Obtener XML y código actual
+            let blocklyXml = '';
+            let arduinoCode = '';
+            
+            if (typeof workspace !== 'undefined') {
+                const xml = Blockly.Xml.workspaceToDom(workspace);
+                blocklyXml = Blockly.Xml.domToText(xml);
+            }
+            if (typeof arduinoGenerator !== 'undefined') {
+                arduinoCode = arduinoGenerator.workspaceToCode(workspace);
+            }
+            
+            fetch('/api/ide/projects/save-as/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({
+                    name: name,
+                    blockly_xml: blocklyXml,
+                    arduino_code: arduinoCode,
+                    source_project_id: currentProjectId || ''
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    currentProjectId = data.project.id;
+                    currentProjectName = data.project.name;
+                    currentProjectNameEl.textContent = currentProjectName;
+                    closeSaveAsModal();
+                    projectsMenu.style.display = 'none';
+                    projectsMenuOpen = false;
+                    showNotification('✅ Proyecto guardado: ' + currentProjectName);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error('Error guardando:', err);
+                alert('Error al guardar el proyecto');
+            });
+        };
+        
+        // Guardar proyecto actual
+        function saveCurrentProject() {
+            if (!currentProjectId) return;
+            
+            let blocklyXml = '';
+            let arduinoCode = '';
+            
+            if (typeof workspace !== 'undefined') {
+                const xml = Blockly.Xml.workspaceToDom(workspace);
+                blocklyXml = Blockly.Xml.domToText(xml);
+            }
+            if (typeof arduinoGenerator !== 'undefined') {
+                arduinoCode = arduinoGenerator.workspaceToCode(workspace);
+            }
+            
+            fetch('/api/ide/autosave/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({
+                    project_id: currentProjectId,
+                    blockly_xml: blocklyXml,
+                    arduino_code: arduinoCode
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    showNotification('💾 Proyecto guardado');
+                }
+            });
+        }
+        
+        // Cargar proyecto
+        window.loadProject = function(projectId) {
+            fetch('/api/ide/project/' + projectId + '/')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        currentProjectId = data.project.id;
+                        currentProjectName = data.project.name;
+                        currentProjectNameEl.textContent = currentProjectName;
+                        
+                        // Cargar en workspace
+                        if (typeof workspace !== 'undefined' && data.project.blockly_xml) {
+                            workspace.clear();
+                            const xml = Blockly.utils.xml.textToDom(data.project.blockly_xml);
+                            Blockly.Xml.domToWorkspace(xml, workspace);
+                        }
+                        
+                        projectsMenu.style.display = 'none';
+                        projectsMenuOpen = false;
+                        showNotification('📂 Proyecto cargado: ' + currentProjectName);
+                    }
+                })
+                .catch(err => {
+                    console.error('Error cargando proyecto:', err);
+                    alert('Error al cargar el proyecto');
+                });
+        };
+        
+        // Renombrar proyecto
+        window.renameProject = function(projectId, currentName) {
+            const newName = prompt('Nuevo nombre del proyecto:', currentName);
+            if (newName && newName.trim() !== currentName) {
+                fetch('/api/ide/projects/' + projectId + '/rename/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({ name: newName.trim() })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        loadProjectsList();
+                        if (currentProjectId === projectId) {
+                            currentProjectName = data.name;
+                            currentProjectNameEl.textContent = currentProjectName;
+                        }
+                        showNotification('✏️ Proyecto renombrado');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        };
+        
+        // Eliminar proyecto
+        window.deleteProject = function(projectId, projectName) {
+            if (confirm('¿Eliminar el proyecto "' + projectName + '"?\nEsta acción no se puede deshacer.')) {
+                fetch('/api/ide/projects/' + projectId + '/delete/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        loadProjectsList();
+                        if (currentProjectId === projectId) {
+                            currentProjectId = null;
+                            currentProjectName = 'Nuevo Proyecto';
+                            currentProjectNameEl.textContent = currentProjectName;
+                        }
+                        showNotification('🗑️ Proyecto eliminado');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
+                });
+            }
+        };
+        
+        // Helpers
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function getCSRFToken() {
+            const cookie = document.cookie.split(';').find(c => c.trim().startsWith('csrftoken='));
+            return cookie ? cookie.split('=')[1] : '';
+        }
+        
+        function showNotification(message) {
+            // Crear notificación temporal
+            const notification = document.createElement('div');
+            notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#238636;color:white;padding:12px 20px;border-radius:8px;z-index:9999;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+        
+        // Exponer funciones globalmente para app.js
+        window.setCurrentProject = function(id, name) {
+            currentProjectId = id;
+            currentProjectName = name || 'Proyecto';
+            if (currentProjectNameEl) {
+                currentProjectNameEl.textContent = currentProjectName;
+            }
+        };
+        
+        window.getCurrentProjectId = function() {
+            return currentProjectId;
+        };
+    })();
+    </script>
+    
+    {% if project_xml %}
+    <script>
+        // Cargar contenido desde template (proyecto o actividad)
+        setTimeout(function() {
+            if (typeof loadProjectFromTemplate === 'function') {
+                loadProjectFromTemplate('{{ project_xml|escapejs }}', {% if project %}{{ project.id }}{% else %}null{% endif %});
+            }
+        }, 1000);
+    </script>
+    {% endif %}
+    
+    <!-- Modal de confirmación de entrega (P3.1) -->
+    <div class="submit-modal-overlay" id="submitModalOverlay">
+        <div class="submit-modal">
+            <h3>📤 Confirmar Entrega</h3>
+            <p id="submitModalMessage">
+                ¿Estás seguro de que quieres entregar esta actividad?
+            </p>
+            <div class="submit-status-message" id="submitStatusMessage"></div>
+            <div class="submit-modal-actions">
+                <button class="btn btn-cancel" id="btnCancelSubmit">Cancelar</button>
+                <button class="btn btn-confirm" id="btnConfirmSubmit">
+                    <span id="btnConfirmSubmitText">Entregar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    // Sistema de entrega de actividades (P3.1)
+    (function() {
+        // Solo inicializar si hay IDE_CONFIG con actividad
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initActivitySubmitSystem, 500);
+        });
+        
+        function initActivitySubmitSystem() {
+            // Verificar si hay contexto de actividad
+            if (typeof IDE_CONFIG === 'undefined' || !IDE_CONFIG.activityId) {
+                console.debug('[Submit] No hay contexto de actividad');
+                return;
+            }
+            
+            console.debug('[Submit] Inicializando sistema de entrega para actividad:', IDE_CONFIG.activityId);
+            
+            // Mostrar contenedor de estado
+            const statusContainer = document.getElementById('activityStatusContainer');
+            const submitBtn = document.getElementById('btnSubmitActivity');
+            const badge = document.getElementById('submissionStatusBadge');
+            
+            if (statusContainer) {
+                statusContainer.style.display = 'flex';
+            }
+            
+            // Mostrar botón si puede entregar
+            if (submitBtn && IDE_CONFIG.canSubmit && !IDE_CONFIG.isReadOnly && !IDE_CONFIG.isFrozen) {
+                submitBtn.style.display = 'inline-flex';
+                submitBtn.addEventListener('click', openSubmitModal);
+            }
+            
+            // Actualizar badge según estado actual
+            updateBadgeFromConfig();
+            
+            // Botón Guardar progreso
+            const btnSaveProgress = document.getElementById('btnSaveActivityProgress');
+            if (btnSaveProgress) {
+                btnSaveProgress.addEventListener('click', async function() {
+                    if (typeof workspace === 'undefined' || typeof arduinoGenerator === 'undefined') return;
+                    btnSaveProgress.disabled = true;
+                    btnSaveProgress.innerHTML = '<span class="mini-spinner"></span> Guardando...';
+                    try {
+                        const xml = Blockly.Xml.workspaceToDom(workspace);
+                        const xml_content = Blockly.Xml.domToText(xml);
+                        const arduino_code = arduinoGenerator.workspaceToCode(workspace);
+                        const res = await fetch(IDE_CONFIG.saveUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': IDE_CONFIG.csrfToken || (typeof getCsrfToken === 'function' ? getCsrfToken() : '')
+                            },
+                            body: JSON.stringify({ xml_content: xml_content, arduino_code: arduino_code })
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (res.ok && data.ok) {
+                            if (typeof showToast === 'function') {
+                                showToast('Progreso guardado ✓', 'success');
+                            } else {
+                                alert('Progreso guardado.');
+                            }
+                        } else {
+                            throw new Error(data.error || 'Error al guardar');
+                        }
+                    } catch (e) {
+                        if (typeof showToast === 'function') {
+                            showToast('Error: ' + (e.message || 'No se pudo guardar'), 'error');
+                        } else {
+                            alert('Error: ' + (e.message || 'No se pudo guardar'));
+                        }
+                    } finally {
+                        btnSaveProgress.disabled = false;
+                        btnSaveProgress.innerHTML = '💾 Guardar progreso';
+                    }
+                });
+            }
+            
+            // Event listeners del modal
+            document.getElementById('btnCancelSubmit')?.addEventListener('click', closeSubmitModal);
+            document.getElementById('btnConfirmSubmit')?.addEventListener('click', performSubmit);
+            document.getElementById('submitModalOverlay')?.addEventListener('click', function(e) {
+                if (e.target === this) closeSubmitModal();
+            });
+        }
+        
+        function updateBadgeFromConfig() {
+            const badge = document.getElementById('submissionStatusBadge');
+            if (!badge) return;
+            
+            // Detectar estado desde IDE_CONFIG o desde la página
+            if (IDE_CONFIG.isFrozen || IDE_CONFIG.isReadOnly) {
+                if (IDE_CONFIG.submissionStatus === 'graded') {
+                    badge.innerHTML = '<span class="badge-graded">🟢 Calificada</span>';
+                } else {
+                    badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
+                }
+            } else {
+                badge.innerHTML = '<span class="badge-inprogress">🟡 En progreso</span>';
+            }
+        }
+        
+        window.openSubmitModal = function() {
+            const modal = document.getElementById('submitModalOverlay');
+            const statusMsg = document.getElementById('submitStatusMessage');
+            const confirmBtn = document.getElementById('btnConfirmSubmit');
+            const confirmText = document.getElementById('btnConfirmSubmitText');
+            
+            // Reset estado
+            if (statusMsg) {
+                statusMsg.className = 'submit-status-message';
+                statusMsg.textContent = '';
+            }
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (confirmText) confirmText.textContent = 'Entregar';
+            
+            // Actualizar mensaje
+            const msgEl = document.getElementById('submitModalMessage');
+            if (msgEl) {
+                let msg = '¿Estás seguro de que quieres entregar esta actividad?';
+                if (IDE_CONFIG.allowResubmit === false) {
+                    msg += '<br><strong>⚠️ Nota:</strong> Esta actividad no permite re-entregas. Una vez entregada, no podrás editarla.';
+                }
+                msgEl.innerHTML = msg;
+            }
+            
+            if (modal) modal.classList.add('active');
+        };
+        
+        window.closeSubmitModal = function() {
+            const modal = document.getElementById('submitModalOverlay');
+            if (modal) modal.classList.remove('active');
+        };
+        
+        window.performSubmit = async function() {
+            const confirmBtn = document.getElementById('btnConfirmSubmit');
+            const confirmText = document.getElementById('btnConfirmSubmitText');
+            const statusMsg = document.getElementById('submitStatusMessage');
+            
+            if (confirmBtn) confirmBtn.disabled = true;
+            if (confirmText) confirmText.innerHTML = '<span class="mini-spinner"></span> Entregando...';
+            if (statusMsg) statusMsg.className = 'submit-status-message';
+            
+            try {
+                const submitUrl = IDE_CONFIG.submitUrl || 
+                    `/i/${IDE_CONFIG.institutionSlug}/api/activity/${IDE_CONFIG.activityId}/submit/`;
+                
+                // Obtener XML y código del workspace
+                let xml_content = '';
+                let arduino_code = '';
+                if (typeof workspace !== 'undefined') {
+                    const xml = Blockly.Xml.workspaceToDom(workspace);
+                    xml_content = Blockly.Xml.domToText(xml);
+                }
+                if (typeof arduinoGenerator !== 'undefined') {
+                    arduino_code = arduinoGenerator.workspaceToCode(workspace);
+                }
+                
+                const body = JSON.stringify({
+                    xml_content: xml_content,
+                    arduino_code: arduino_code,
+                    notes: ''
+                });
+                
+                const response = await fetch(submitUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': IDE_CONFIG.csrfToken || getCsrfToken()
+                    },
+                    body: body
+                });
+                
+                const data = await response.json().catch(() => ({}));
+                if (response.ok && data.ok) {
+                    if (statusMsg) {
+                        statusMsg.className = 'submit-status-message show success';
+                        statusMsg.textContent = '✓ ¡Actividad entregada exitosamente!';
+                    }
+                    if (confirmText) confirmText.textContent = '✓ Entregado';
+                    
+                    const badge = document.getElementById('submissionStatusBadge');
+                    if (badge) {
+                        badge.innerHTML = '<span class="badge-submitted">🔵 Entregada</span>';
+                    }
+                    
+                    if (!IDE_CONFIG.allowResubmit) {
+                        const submitBtn = document.getElementById('btnSubmitActivity');
+                        if (submitBtn) submitBtn.style.display = 'none';
+                    }
+                    
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    throw new Error(data.error || 'Error en la respuesta del servidor');
+                }
+            } catch (error) {
+                if (statusMsg) {
+                    statusMsg.className = 'submit-status-message show error';
+                    statusMsg.textContent = '✗ Error al entregar: ' + (error.message || 'Intenta de nuevo');
+                }
+                if (confirmBtn) confirmBtn.disabled = false;
+                if (confirmText) confirmText.textContent = 'Reintentar';
+            }
+        };
+    })();
+    </script>
+</body>
+</html>

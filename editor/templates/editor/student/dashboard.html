@@ -1,0 +1,63 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}Mi Panel - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>👋 Bienvenido, {{ student.user.get_full_name|default:student.user.username }}</h1>
+    
+    <div style="margin-top: 20px;">
+        <p><strong>ID Estudiante:</strong> {{ student.student_id }}</p>
+        <p><strong>Curso:</strong> {{ student.course.name|default:"Sin curso asignado" }}</p>
+        <p><strong>Institución:</strong> {{ student.course.institution.name|default:"-" }}</p>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat-card">
+        <h3>{{ projects_count }}</h3>
+        <p>Proyectos Totales</p>
+    </div>
+</div>
+
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>📦 Mis Proyectos Recientes</h2>
+        <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}" class="btn">Abrir Editor</a>
+    </div>
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Última Modificación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in projects %}
+            <tr>
+                <td><strong>{{ project.name }}</strong></td>
+                <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <a href="{% url 'editor:project_detail' project.id %}" class="btn btn-sm btn-primary">Abrir en Editor</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="3" style="text-align: center; color: #8b949e;">
+                    No tienes proyectos aún. <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}">¡Crea tu primer proyecto!</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 20px; text-align: center;">
+    <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}" class="btn btn-primary" style="font-size: 18px; padding: 15px 30px;">
+        🚀 Abrir MAX-IDE Editor
+    </a>
+</div>
+{% endblock %}
+

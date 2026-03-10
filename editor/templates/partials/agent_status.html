@@ -1,0 +1,138 @@
+<!-- Banner de estado del Agent (para incluir en IDE) -->
+<div id="agentStatusBanner" class="agent-status-banner" style="display: none;">
+    <div class="agent-status-content">
+        <div class="agent-status-left">
+            <span class="agent-status-icon"></span>
+            <span class="agent-status-message"></span>
+        </div>
+        <div class="agent-status-right">
+            <button class="btn btn-sm btn-ghost" id="btnCheckAgent" title="Verificar conexión">
+                🔄 Verificar
+            </button>
+            <button class="btn btn-sm btn-ghost" id="btnAgentGuide" title="Guía de instalación">
+                📖 Guía
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .agent-status-banner {
+        background: var(--color-bg-card, #161b22);
+        border-bottom: 1px solid var(--color-border, #30363d);
+        padding: 12px 20px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+    
+    .agent-status-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .agent-status-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .agent-status-icon {
+        font-size: 18px;
+    }
+    
+    .agent-status-message {
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .agent-status-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .agent-status-online {
+        background: var(--color-success-glow, rgba(63, 185, 80, 0.15));
+        border-color: var(--color-success, #3fb950);
+        color: var(--color-success, #3fb950);
+    }
+    
+    .agent-status-offline {
+        background: var(--color-danger-glow, rgba(248, 81, 73, 0.15));
+        border-color: var(--color-danger, #f85149);
+        color: var(--color-danger, #f85149);
+    }
+    
+    .agent-status-error {
+        background: var(--color-warning-glow, rgba(210, 153, 34, 0.15));
+        border-color: var(--color-warning, #d29922);
+        color: var(--color-warning, #d29922);
+    }
+</style>
+
+<script>
+    // Función para verificar estado del Agent
+    async function checkAgentStatus(institutionSlug) {
+        try {
+            const response = await fetch(`/i/${institutionSlug}/api/agent/check/`);
+            const data = await response.json();
+            
+            const banner = document.getElementById('agentStatusBanner');
+            const icon = banner.querySelector('.agent-status-icon');
+            const message = banner.querySelector('.agent-status-message');
+            
+            if (data.ok && data.agent_online) {
+                banner.className = 'agent-status-banner agent-status-online';
+                icon.textContent = '✅';
+                message.textContent = `Agent Online - ${data.agent.hostname} (v${data.agent.version})`;
+                banner.style.display = 'block';
+                return true;
+            } else {
+                banner.className = 'agent-status-banner agent-status-offline';
+                icon.textContent = '⚠️';
+                message.textContent = 'Agent Offline - No se puede compilar ni subir código';
+                banner.style.display = 'block';
+                return false;
+            }
+        } catch (error) {
+            const banner = document.getElementById('agentStatusBanner');
+            const icon = banner.querySelector('.agent-status-icon');
+            const message = banner.querySelector('.agent-status-message');
+            banner.className = 'agent-status-banner agent-status-error';
+            icon.textContent = '⚠️';
+            message.textContent = 'Error al verificar Agent';
+            banner.style.display = 'block';
+            return false;
+        }
+    }
+    
+    // Verificar estado del Agent al cargar (si hay institutionSlug)
+    document.addEventListener('DOMContentLoaded', function() {
+        const institutionSlugElement = document.querySelector('[data-institution-slug]');
+        if (institutionSlugElement) {
+            const institutionSlug = institutionSlugElement.getAttribute('data-institution-slug');
+            checkAgentStatus(institutionSlug);
+            
+            // Verificar periódicamente (cada 30 segundos)
+            setInterval(() => {
+                checkAgentStatus(institutionSlug);
+            }, 30000);
+        }
+    });
+    
+    // Botón de verificar
+    document.getElementById('btnCheckAgent')?.addEventListener('click', function() {
+        const institutionSlugElement = document.querySelector('[data-institution-slug]');
+        if (institutionSlugElement) {
+            const institutionSlug = institutionSlugElement.getAttribute('data-institution-slug');
+            checkAgentStatus(institutionSlug);
+        }
+    });
+    
+    // Botón de guía
+    document.getElementById('btnAgentGuide')?.addEventListener('click', function() {
+        window.open('/static/editor/docs/agent-installation-guide.html', '_blank');
+    });
+</script>

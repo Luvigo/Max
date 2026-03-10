@@ -1,0 +1,57 @@
+@startuml
+title Módulo 1: Auth + Roles (sin panel Admin en templates)
+left to right direction
+
+actor Admin
+actor Tutor
+actor Estudiante
+
+rectangle "Módulo 1: Auth + Roles" {
+  usecase "Iniciar sesión" as UC_Login
+  usecase "Cerrar sesión" as UC_Logout
+  usecase "Acceder área Tutor" as UC_TutorDash
+  usecase "Acceder área Estudiante" as UC_StudentDash
+  usecase "Admin usa Django Admin (/admin/)" as UC_AdminDjangoAdmin
+  usecase "Seleccionar institución" as UC_SelectInst
+
+  usecase "ERROR: Credenciales inválidas" as E_Login
+  usecase "ERROR: Acceso denegado (403)" as E_403
+  usecase "ERROR: Sin rol asignado" as E_NoRole
+}
+
+Admin --> UC_Login
+Admin --> UC_Logout
+Tutor --> UC_Login
+Tutor --> UC_Logout
+Estudiante --> UC_Login
+Estudiante --> UC_Logout
+
+Admin --> UC_AdminDjangoAdmin : "Usa /admin/"
+
+Tutor --> UC_TutorDash
+Tutor --> UC_SelectInst
+
+Estudiante --> UC_StudentDash
+Estudiante --> UC_SelectInst
+
+UC_Login ..> E_Login : <<extend>>
+UC_Login ..> E_NoRole : <<extend>>
+UC_TutorDash ..> E_403 : <<extend>>
+UC_StudentDash ..> E_403 : <<extend>>
+
+note right of UC_AdminDjangoAdmin
+  El Admin NO tiene dashboard
+  en templates. Usa exclusivamente
+  el panel de Django Admin.
+end note
+
+note bottom of UC_TutorDash
+  Ruta: /i/<slug>/dashboard/tutor/
+  Decorator: @tutor_required
+end note
+
+note bottom of UC_StudentDash
+  Ruta: /i/<slug>/dashboard/student/
+  Decorator: @student_required
+end note
+@enduml
