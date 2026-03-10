@@ -74,7 +74,7 @@ const BOARDS_FALLBACK = [
     { label: 'Arduino Nano (Old Bootloader)', fqbn: 'arduino:avr:nano:cpu=atmega328old', family: 'avr', notes: 'Clones CH340 suelen necesitarlo' },
     { label: 'Arduino Mega', fqbn: 'arduino:avr:mega', family: 'avr', notes: '' },
     { label: 'Arduino Leonardo', fqbn: 'arduino:avr:leonardo', family: 'avr', notes: '' },
-    { label: 'ESP32 DevKit V1', fqbn: 'esp32:esp32:esp32', family: 'esp32', notes: 'Estándar' }
+    { label: 'ESP32 Dev Module', fqbn: 'esp32:esp32:esp32', family: 'esp32', notes: 'Estándar' }
 ];
 let boardsRegistry = BOARDS_FALLBACK.slice();
 
@@ -394,7 +394,12 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 
         if (!compileRes.ok || !compileData.ok) {
             const err = compileData.error || `HTTP ${compileRes.status}`;
+            const fam = compileData.family || getBoardFamily(fqbn);
+            const tag = fam === 'esp32' ? '[ESP32]' : '[AVR]';
             onLog(`[UPLOAD] ✗ Compilación fallida: ${err}`);
+            if (compileData.hint) {
+                onLog(`${tag} 💡 ${compileData.hint}`);
+            }
             return {
                 success: false,
                 error: err,
@@ -406,7 +411,7 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 
         const jobId = compileData.job_id;
         const family = compileData.family || getBoardFamily(fqbn);
-        onLog(`[UPLOAD] ✓ Compilado (${compileData.size || '?'} bytes). Subiendo...`);
+        onLog(`[UPLOAD] ✓ Compilado (${compileData.size || '?'} bytes). ${family === 'esp32' ? '[ESP32] ' : ''}Subiendo...`);
 
         // 2) Upload
         const uploadUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
@@ -435,7 +440,11 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 
         const err = uploadData.error || `HTTP ${uploadRes.status}`;
         onLog(`[UPLOAD] ✗ Error: ${err}`);
-        if (uploadData.hint) onLog(`[UPLOAD] 💡 ${uploadData.hint}`);
+        const errTag = family === 'esp32' ? '[ESP32]' : '[AVR]';
+        if (uploadData.hint) onLog(`${errTag} 💡 ${uploadData.hint}`);
+        if (family === 'esp32' && uploadData.hints && Array.isArray(uploadData.hints)) {
+            uploadData.hints.slice(0, 3).forEach(h => onLog(`[ESP32] 💡 ${h}`));
+        }
         return {
             success: false,
             error: err,
@@ -466,8 +475,16 @@ function uploadErrorToHumanMessage(result, family) {
         err.includes('access denied') || err.includes('dialout')) {
         return 'Drivers faltantes (CH340/CP2102)';
     }
+    if (code === 'CORE_NOT_INSTALLED' || err.includes('core') && err.includes('no disponible')) {
+        return fam === 'esp32'
+            ? 'ESP32: Core no instalado. Ejecuta: arduino-cli core install esp32:esp32'
+            : 'Core Arduino no instalado';
+    }
     if (fam === 'esp32' && (code === 'TIMEOUT' || err.includes('timeout') || err.includes('boot') || err.includes('bootloader'))) {
         return 'ESP32: mantén BOOT y presiona EN';
+    }
+    if (fam === 'esp32' && (code === 'UPLOAD_FAIL' || code === 'JOB_NOT_FOUND')) {
+        return result.hint || 'ESP32: Error al subir. Revisa puerto y drivers.';
     }
     if (result.hint) return result.hint;
     return result.error ? String(result.error).substring(0, 120) : 'Error al subir';
@@ -1819,6 +1836,11 @@ async function verifyCode() {
                 const errorLines = data.error.split('\n').filter(l => l.trim()).slice(-5);
                 errorLines.forEach(line => logToConsole(`[ERROR] ${line}`, 'error'));
             }
+            if (data.hint && data.family === 'esp32') {
+                logToConsole(`[ESP32] ${data.hint}`, 'warning');
+            } else if (data.hint) {
+                logToConsole(`[AVR] ${data.hint}`, 'warning');
+            }
             
             showToast('Error de verificación', 'error');
         }
@@ -1984,6 +2006,10 @@ async function uploadCode() {
             const family = result.family || getBoardFamily(currentBoard);
             if (result.errorCode === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe')) {
                 showToast('No se detectó puerto', 'error');
+            } else if (result.errorCode === 'CORE_NOT_INSTALLED' || (errorLower.includes('core') && errorLower.includes('no disponible'))) {
+                showToast(family === 'esp32'
+                    ? 'ESP32: arduino-cli core install esp32:esp32'
+                    : 'Core Arduino no instalado', 'error');
             } else if (result.errorCode === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('permiso') || errorLower.includes('denied') || errorLower.includes('access')) {
                 showToast('Drivers faltantes (CH340/CP2102)', 'error');
             } else if (family === 'esp32' && (result.errorCode === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader'))) {

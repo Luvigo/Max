@@ -373,6 +373,80 @@ def get_cores_status():
     _cached_cores_ts = now
     return _cached_cores_status
 
+
+def _core_id_from_fqbn(fqbn):
+    """Extrae el core ID (package:arch) de un FQBN. Ej: esp32:esp32:esp32 -> esp32:esp32."""
+    if not fqbn or not isinstance(fqbn, str):
+        return None
+    parts = fqbn.split(':')
+    if len(parts) >= 2:
+        return f'{parts[0]}:{parts[1]}'
+    return None
+
+
+def ensure_core_for_fqbn(fqbn, log_func=None):
+    """
+    Asegura que el core necesario para el FQBN esté instalado.
+    Solo instala el core específico (no toca arduino:avr si compilamos ESP32 y viceversa).
+    
+    Returns:
+        (ok: bool, error_msg: str|None) - ok=True si el core está listo, error_msg si falló.
+    """
+    def log(msg):
+        if log_func:
+            log_func(msg)
+        else:
+            print(f"[CORES] {msg}")
+
+    core_id = _core_id_from_fqbn(fqbn)
+    if not core_id:
+        return True, None  # FQBN sin core reconocible, continuar
+
+    if not ARDUINO_CLI:
+        return False, 'arduino-cli no encontrado'
+
+    # Listar cores instalados
+    try:
+        r = subprocess.run(
+            [ARDUINO_CLI, 'core', 'list'],
+            capture_output=True, text=True, timeout=30
+        )
+        if r.returncode != 0:
+            return False, 'No se pudo listar cores'
+        installed = []
+        for line in r.stdout.strip().split('\n')[1:]:
+            parts = line.split()
+            if parts:
+                installed.append(parts[0])
+    except Exception as e:
+        log(f"Error listando cores: {e}")
+        return False, str(e)
+
+    is_installed = any(c == core_id or c.startswith(core_id + ':') for c in installed)
+    if is_installed:
+        log(f"Core {core_id} ya instalado")
+        return True, None
+
+    log(f"Instalando core {core_id} para {fqbn}...")
+    try:
+        subprocess.run(
+            [ARDUINO_CLI, 'core', 'update-index'],
+            capture_output=True, text=True, timeout=120
+        )
+        r = subprocess.run(
+            [ARDUINO_CLI, 'core', 'install', core_id],
+            capture_output=True, text=True, timeout=180
+        )
+        if r.returncode == 0:
+            log(f"✓ Core {core_id} instalado correctamente")
+            return True, None
+        err = (r.stderr or r.stdout or '').strip()[:300]
+        return False, f'Error instalando core {core_id}: {err}'
+    except subprocess.TimeoutExpired:
+        return False, f'Timeout instalando core {core_id}'
+    except Exception as e:
+        return False, str(e)
+
 # ============================================
 # FLASK APP
 # ============================================
@@ -998,6 +1072,17 @@ def compile_code():
             return err_resp(f'FQBN "{fqbn}" no está en el registry de placas soportadas')
         
         family = board.get('family', 'avr')
+
+        # Asegurar que el core necesario esté instalado (esp32:esp32 o arduino:avr)
+        core_ok, core_err = ensure_core_for_fqbn(fqbn, log)
+        if not core_ok:
+            hint_esp32 = ''
+            if family == 'esp32':
+                hint_esp32 = ' Para ESP32, ejecuta manualmente: arduino-cli core install esp32:esp32'
+            return err_resp(
+                f'Core no disponible: {core_err}.{hint_esp32}',
+                400
+            )
         
         # sketch: { code?, files? } o retrocompat: code en raíz
         sketch = data.get('sketch') or {}
@@ -1051,7 +1136,8 @@ def compile_code():
             compile_cmd.append('--warnings')
             compile_cmd.append('all')
         
-        log(f"Compilando para {fqbn} (family={family})")
+        tag = '[ESP32]' if family == 'esp32' else '[AVR]'
+        log(f"{tag} Compilando para {fqbn} (family={family})")
         
         compile_result = subprocess.run(
             compile_cmd,
@@ -1072,6 +1158,14 @@ def compile_code():
         if compile_result.returncode != 0:
             error_msg = compile_result.stderr or compile_result.stdout or 'Error desconocido'
             log(f"Error de compilación (exit code: {compile_result.returncode})")
+            # Mensajes específicos según familia
+            hint = None
+            if family == 'esp32':
+                hint = 'ESP32: Verifica que el core esté instalado (arduino-cli core install esp32:esp32)'
+                if 'platform' in error_msg.lower() or 'package' in error_msg.lower() or 'unknown' in error_msg.lower():
+                    hint = 'ESP32: Instala el core con: arduino-cli core install esp32:esp32'
+            elif family == 'avr':
+                hint = 'AVR: Verifica sintaxis y que el sketch tenga setup() y loop()'
             return jsonify({
                 'ok': False,
                 'error': error_msg,
@@ -1079,7 +1173,8 @@ def compile_code():
                 'exit_code': compile_result.returncode,
                 'fqbn': fqbn,
                 'family': family,
-                'compile_log': '\n'.join(logs)
+                'compile_log': '\n'.join(logs),
+                'hint': hint
             }), 400
         
         # Detectar artefactos (AVR: .hex, ESP32: .bin)
@@ -1106,10 +1201,14 @@ def compile_code():
             job_id = _store_upload_job(build_dir, family, fqbn)
             job_dir = os.path.join(jobs_base, job_id)
             os.makedirs(job_dir, exist_ok=True)
-            for f in os.listdir(build_dir):
-                src = os.path.join(build_dir, f)
+            # Copiar todo el árbol de build (AVR: .hex; ESP32: .bin en posible subdir)
+            for item in os.listdir(build_dir):
+                src = os.path.join(build_dir, item)
+                dst = os.path.join(job_dir, item)
                 if os.path.isfile(src):
-                    shutil.copy2(src, os.path.join(job_dir, f))
+                    shutil.copy2(src, dst)
+                elif os.path.isdir(src):
+                    shutil.copytree(src, dst)
             _upload_job_store[job_id]['build_dir'] = job_dir
             resp_data['job_id'] = job_id
         return jsonify(resp_data)
@@ -1359,10 +1458,10 @@ def _resolve_bin_for_upload_esp32(data, temp_dir, log_func):
     Resuelve build_dir o artefactos .bin para ESP32.
     Returns: (build_dir_path, error_msg) - build_dir contiene firmware.bin, etc.
     """
-    # 1) build_dir explícito
+    # 1) build_dir explícito (incl. job_id -> build_dir)
     build_dir = data.get('build_dir') or data.get('build_path')
     if build_dir and os.path.isdir(build_dir):
-        if any(f.endswith('.bin') for f in os.listdir(build_dir)):
+        if any(Path(build_dir).rglob('*.bin')):
             log_func(f"Usando build_dir: {build_dir}")
             return build_dir, None
         return None, f"build_dir {build_dir} no contiene archivos .bin"
@@ -1465,9 +1564,7 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
     else:
         hints.insert(0, "Mantén BOOT y presiona EN para entrar en modo bootloader, luego reintenta.")
 
-    # Estrategia 1: arduino-cli
-    log_func("Estrategia 1: arduino-cli upload...")
-    t1 = time.time()
+    # Estrategia 1: arduino-cli (con reintento tras fallo timeout/bootloader)
     upload_cmd = [
         ARDUINO_CLI, 'upload',
         '-p', port,
@@ -1475,26 +1572,47 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
         '--input-dir', build_dir,
         '-v'
     ]
-    try:
-        r = subprocess.run(upload_cmd, capture_output=True, text=True, timeout=120)
-        elapsed = time.time() - t1
-        log_func(f"arduino-cli upload: {elapsed:.1f}s, exit={r.returncode}")
-        if r.returncode == 0:
-            log_func(f"✓ Upload exitoso (arduino-cli) en {time.time()-t0:.1f}s")
-            return True, 'arduino-cli', None, None, hints
-        err_out = r.stderr + r.stdout
-        log_func(f"arduino-cli falló: {err_out[:300]}")
-    except subprocess.TimeoutExpired:
-        log_func("arduino-cli timeout")
-        return False, 'arduino-cli', 'TIMEOUT', 'Timeout. Verifica conexión.', hints
-    except FileNotFoundError:
-        log_func("arduino-cli no encontrado")
-        return False, None, 'ARDUINO_CLI_MISSING', 'arduino-cli no encontrado', hints
-    except Exception as e:
-        log_func(f"arduino-cli error: {e}")
-        err_out = str(e)
+    err_out = ''
+    for attempt in range(2):
+        if attempt > 0:
+            log_func("Reintento con reset a modo bootloader...")
+            if _esp32_reset_for_bootloader(port, log_func):
+                time.sleep(0.5)
+        log_func(f"Estrategia 1: arduino-cli upload (intento {attempt + 1}/2)...")
+        t1 = time.time()
+        try:
+            r = subprocess.run(upload_cmd, capture_output=True, text=True, timeout=120)
+            elapsed = time.time() - t1
+            log_func(f"arduino-cli upload: {elapsed:.1f}s, exit={r.returncode}")
+            if r.returncode == 0:
+                log_func(f"✓ Upload ESP32 exitoso (arduino-cli) en {time.time()-t0:.1f}s")
+                return True, 'arduino-cli', None, None, hints
+            err_out = r.stderr + r.stdout
+            log_func(f"arduino-cli falló: {err_out[:300]}")
+            # Reintentar solo si parece timeout/bootloader
+            if 'timed out' in err_out.lower() or 'timeout' in err_out.lower() or 'connecting' in err_out.lower():
+                continue
+            break
+        except subprocess.TimeoutExpired:
+            log_func("arduino-cli timeout")
+            err_out = 'Timeout'
+            if attempt == 0:
+                continue
+            return False, 'arduino-cli', 'TIMEOUT', 'ESP32: Timeout. Mantén BOOT pulsado y presiona EN.', hints
+        except FileNotFoundError:
+            log_func("arduino-cli no encontrado")
+            return False, None, 'ARDUINO_CLI_MISSING', 'arduino-cli no encontrado', hints
+        except Exception as e:
+            log_func(f"arduino-cli error: {e}")
+            err_out = str(e)
+        break
 
-    # Estrategia 2: esptool
+    # Estrategia 2: esptool (fallback cuando arduino-cli falla)
+    # Reintentar reset bootloader antes de esptool
+    log_func("arduino-cli falló. Reintentando modo bootloader para esptool...")
+    if _esp32_reset_for_bootloader(port, log_func):
+        time.sleep(0.5)
+
     esptool_path = _find_esptool()
     if not esptool_path:
         return False, 'arduino-cli', 'UPLOAD_FAIL', 'arduino-cli falló y esptool no está instalado. pip install esptool', hints
@@ -1614,7 +1732,8 @@ def upload():
             log(f"Puerto {port} no encontrado en la lista de puertos")
             return err('PORT_NOT_FOUND', f'Puerto "{port}" no existe o no está disponible', 'Verifica que el dispositivo esté conectado.')
 
-        log(f"Iniciando upload a {port} con {fqbn} (family={family})")
+        tag = '[ESP32]' if family == 'esp32' else '[AVR]'
+        log(f"{tag} Iniciando upload a {port} con {fqbn} (family={family})")
 
         # Resolver job_id si se proporciona (artifacts desde compile previo)
         job_id = data.get('job_id')
@@ -1636,6 +1755,16 @@ def upload():
                     'logs': logs, 'port': port, 'fqbn': fqbn, 'family': family,
                     'upload_log': '\n'.join(logs), 'error_code': 'JOB_NOT_FOUND'
                 }), 400
+
+        # Asegurar que el core esté instalado (tras resolver job_id, tenemos fqbn final)
+        core_ok, core_err = ensure_core_for_fqbn(fqbn, log)
+        if not core_ok:
+            hint = ' Para ESP32: arduino-cli core install esp32:esp32' if family == 'esp32' else ''
+            return jsonify({
+                'ok': False, 'error': f'Core no disponible: {core_err}.{hint}',
+                'logs': logs, 'error_code': 'CORE_NOT_INSTALLED', 'family': family,
+                'upload_log': '\n'.join(logs)
+            }), 400
 
         home_tmp = os.path.join(os.path.expanduser('~'), 'snap', 'arduino-cli', 'common', 'maxide-tmp') if (ARDUINO_CLI and 'snap' in ARDUINO_CLI) else os.path.join(os.path.expanduser('~'), '.maxide-agent', 'tmp')
         os.makedirs(home_tmp, exist_ok=True)

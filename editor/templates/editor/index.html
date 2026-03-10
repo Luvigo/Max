@@ -289,7 +289,7 @@
                         <option value="arduino:avr:nano:cpu=atmega328old">Arduino Nano (Old Bootloader)</option>
                         <option value="arduino:avr:mega">Arduino Mega</option>
                         <option value="arduino:avr:leonardo">Arduino Leonardo</option>
-                        <option value="esp32:esp32:esp32">ESP32 DevKit V1</option>
+                        <option value="esp32:esp32:esp32">ESP32 Dev Module</option>
                     </select>
                 </div>
                 
@@ -588,7 +588,7 @@ void loop() {
                             <div class="step-number">4</div>
                             <div class="step-content">
                                 <div class="step-title">Opcional: ESP32 o clones</div>
-                                <div class="step-desc">Si usas <strong>ESP32 DevKit V1</strong>: abre CMD y ejecuta <code>arduino-cli core install esp32:esp32</code>.</div>
+                                <div class="step-desc">Si usas <strong>ESP32 Dev Module</strong>: abre CMD y ejecuta <code>arduino-cli core install esp32:esp32</code>.</div>
                                 <div class="step-desc" style="margin-top: 8px;">Si no detecta el puerto (clones/ESP32): instala el driver <strong>CH340</strong> o <strong>CP2102</strong> según tu placa.</div>
                                 <div class="step-note">Cierra Arduino IDE o el Monitor Serial de MAX-IDE si están usando el puerto.</div>
                             </div>
@@ -637,7 +637,7 @@ void loop() {
                                 <div class="agent-terminal" style="margin-top: 10px;">
                                     <code>brew install arduino-cli python3<br>arduino-cli core update-index<br>arduino-cli core install arduino:avr</code>
                                 </div>
-                                <div class="step-note">Para ESP32 DevKit V1: <code>arduino-cli core install esp32:esp32</code></div>
+                                <div class="step-note">Para ESP32 Dev Module: <code>arduino-cli core install esp32:esp32</code></div>
                                 <div class="step-note">Si no detecta el puerto (ESP32/clones): instala driver CP2102 de Silicon Labs. CH340 suele funcionar sin driver en Mac.</div>
                             </div>
                         </div>
