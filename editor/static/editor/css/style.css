@@ -69,15 +69,16 @@ body {
    ============================================ */
 
 .header {
-    height: var(--header-height);
+    min-height: var(--header-height);
     background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
-    gap: 20px;
+    padding: 0 16px;
+    gap: 12px;
     flex-shrink: 0;
+    flex-wrap: wrap;
 }
 
 .logo {
@@ -121,19 +122,23 @@ body {
 .header-controls {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex: 1;
     justify-content: flex-end;
+    min-width: 0;
+    flex-wrap: wrap;
 }
 
 .control-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     background: var(--bg-tertiary);
-    padding: 8px 14px;
+    padding: 6px 12px;
     border-radius: 10px;
     border: 1px solid var(--border-color);
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .control-group label {
@@ -149,12 +154,13 @@ body {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     color: var(--text-bright);
-    padding: 6px 12px;
+    padding: 6px 10px;
     border-radius: 6px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
     cursor: pointer;
-    min-width: 150px;
+    min-width: 120px;
+    max-width: 180px;
 }
 
 .control-group select:focus {
@@ -241,7 +247,132 @@ body {
 
 .action-buttons {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   HEADER RESPONSIVE
+   ============================================ */
+
+@media (max-width: 1200px) {
+    .header {
+        padding: 0 12px;
+        gap: 10px;
+    }
+    .header-controls {
+        gap: 8px;
+    }
+    .control-group select {
+        min-width: 100px;
+        max-width: 150px;
+    }
+}
+
+@media (max-width: 992px) {
+    .logo-text {
+        font-size: 1.1rem;
+    }
+    .logo-badge {
+        display: none;
+    }
+    .control-group {
+        padding: 6px 10px;
+    }
+    .control-group select {
+        min-width: 90px;
+        max-width: 130px;
+        font-size: 0.75rem;
+    }
+    .projects-dropdown .btn span:nth-child(2) {
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .action-buttons .btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+    .logo-text {
+        font-size: 1rem;
+    }
+    .control-group label {
+        display: none;
+    }
+    .control-group select {
+        min-width: 80px;
+        max-width: 110px;
+    }
+    .control-group .btn-icon-only {
+        padding: 6px;
+        min-width: 32px;
+    }
+    .action-buttons .btn span:last-child {
+        display: none;
+    }
+    .action-buttons .btn {
+        padding: 8px 10px;
+        min-width: 36px;
+    }
+}
+
+@media (max-width: 576px) {
+    .header-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+    .control-group.projects-dropdown {
+        order: -1;
+        flex: 1;
+        min-width: 0;
+    }
+    .control-group.projects-dropdown .btn span:nth-child(2) {
+        max-width: 80px;
+    }
+}
+
+/* Status bar y agent banner responsive */
+@media (max-width: 768px) {
+    .status-bar {
+        padding: 0 12px;
+        font-size: 0.68rem;
+        flex-wrap: wrap;
+        min-height: var(--status-height);
+        height: auto;
+    }
+    .status-left, .status-right {
+        gap: 12px;
+    }
+    .agent-banner-content {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .agent-banner-text span {
+        display: none;
+    }
+    .agent-banner-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 480px) {
+    .status-bar {
+        padding: 0 10px;
+    }
 }
 
 /* ============================================
