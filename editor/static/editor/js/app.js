@@ -116,13 +116,14 @@ function updateBoardHint(fqbn) {
         hintEl = document.createElement('span');
         hintEl.id = 'boardHint';
         hintEl.className = 'board-hint';
-        hintEl.style.cssText = 'display:none;font-size:0.75rem;color:var(--text-muted, #666);margin-top:2px;';
+        hintEl.title = 'ESP32 puede requerir BOOT/EN en algunos equipos';
+        hintEl.style.cssText = 'display:none;flex-shrink:0;';
         sel.parentElement.appendChild(hintEl);
     }
     const family = getBoardFamily(fqbn);
     if (family === 'esp32') {
-        hintEl.textContent = 'ESP32 puede requerir BOOT/EN en algunos equipos';
-        hintEl.style.display = 'block';
+        hintEl.textContent = 'ℹ';
+        hintEl.style.display = 'inline-flex';
     } else {
         hintEl.style.display = 'none';
     }

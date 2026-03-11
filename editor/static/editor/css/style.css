@@ -169,6 +169,17 @@ body {
     box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.2);
 }
 
+.board-hint {
+    color: var(--accent-cyan);
+    opacity: 0.8;
+    font-size: 0.9rem !important;
+    cursor: help;
+}
+
+.board-hint:hover {
+    opacity: 1;
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
