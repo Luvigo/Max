@@ -1,0 +1,33 @@
+{% extends 'editor/base.html' %}
+
+{% block title %}{{ action }} Institución - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>{{ action }} Institución</h1>
+    
+    <form method="post" style="margin-top: 20px;">
+        {% csrf_token %}
+        <div class="form-group">
+            <label for="name">Nombre *</label>
+            <input type="text" id="name" name="name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="code">Código *</label>
+            <input type="text" id="code" name="code" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Descripción</label>
+            <textarea id="description" name="description" rows="4"></textarea>
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a href="/admin/institutions/" class="btn">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+

@@ -1,0 +1,207 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Nueva Actividad{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-clipboard-list"></i>
+            Nueva Actividad
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    {% if not groups %}
+    <div class="card animate-in">
+        <div class="card-body">
+            <div class="empty-state">
+                <i class="fas fa-layer-group"></i>
+                <p>No tienes grupos creados. Crea un grupo primero para poder asignar actividades.</p>
+                <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Grupo
+                </a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card animate-in">
+        <div class="card-body">
+            <form method="post" class="form-grid">
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h4><i class="fas fa-users"></i> Grupo de Destino</h4>
+                    <div class="form-group">
+                        <label for="group">Selecciona el grupo *</label>
+                        <select id="group" name="group" required>
+                            <option value="">-- Selecciona un grupo --</option>
+                            {% for g in groups %}
+                            <option value="{{ g.id }}">{{ g.name }} ({{ g.code }}) - {{ g.get_students_count }} estudiantes</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4><i class="fas fa-info-circle"></i> Información General</h4>
+                    
+                    <div class="form-group">
+                        <label for="title">Título *</label>
+                        <input type="text" id="title" name="title" required
+                               placeholder="Ej: Proyecto LED con Arduino">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="objective">Objetivo</label>
+                        <textarea id="objective" name="objective" rows="2"
+                                  placeholder="Objetivo de aprendizaje..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="instructions">Instrucciones *</label>
+                        <textarea id="instructions" name="instructions" rows="5" required
+                                  placeholder="Instrucciones detalladas para los estudiantes..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <h4><i class="fas fa-cog"></i> Configuración</h4>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="deadline">Fecha Límite</label>
+                            <input type="datetime-local" id="deadline" name="deadline">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="max_score">Puntuación Máxima</label>
+                            <input type="number" id="max_score" name="max_score" min="1" max="1000" value="100">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="status">Estado</label>
+                            <select id="status" name="status">
+                                <option value="draft" selected>Borrador</option>
+                                <option value="published">Publicada</option>
+                                <option value="closed">Cerrada</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="allow_resubmit" name="allow_resubmit">
+                            <label for="allow_resubmit">Permitir re-entrega</label>
+                        </div>
+                        
+                        <div class="form-group checkbox-group">
+                            <input type="checkbox" id="allow_late_submit" name="allow_late_submit">
+                            <label for="allow_late_submit">Permitir entrega tardía</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="btn btn-ghost">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Crear Actividad
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .form-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }
+    .form-section {
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--color-border);
+    }
+    .form-section:last-of-type {
+        border-bottom: none;
+    }
+    .form-section h4 {
+        margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .form-section h4 i {
+        color: var(--color-primary);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+    .form-group label {
+        font-weight: 500;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+        font-size: 14px;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-glow);
+    }
+    .checkbox-group {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+    }
+    .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding-top: 20px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .empty-state p {
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}

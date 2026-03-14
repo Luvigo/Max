@@ -1,0 +1,243 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{{ student.full_name }} - Tutor{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-user-graduate"></i>
+            {{ student.full_name }}
+        </h1>
+        <p class="page-subtitle">{{ student.student_id }} - {{ institution.name }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_student_edit' institution_slug=institution.slug student_id=student.id %}" class="btn btn-primary">
+            <i class="fas fa-edit"></i> Editar
+        </a>
+    </div>
+</div>
+
+<div class="content-body">
+    <div class="profile-layout">
+        <!-- Info Principal -->
+        <div class="card animate-in">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-id-card" style="color: var(--color-primary);"></i>
+                    Información del Estudiante
+                </h3>
+                <span class="badge {% if student.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                    {% if student.is_active %}Activo{% else %}Inactivo{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Nombre Completo</span>
+                        <span class="info-value">{{ student.full_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">ID de Estudiante</span>
+                        <span class="info-value"><code>{{ student.student_id }}</code></span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Usuario</span>
+                        <span class="info-value">{{ student.user.username }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Email</span>
+                        <span class="info-value">{{ student.user.email|default:"-" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Teléfono</span>
+                        <span class="info-value">{{ student.phone|default:"-" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Grupo</span>
+                        <span class="info-value">
+                            {% if student.group %}
+                            <a href="{% url 'editor:tutor_group_detail' institution_slug=institution.slug group_id=student.group.id %}">
+                                {{ student.group.name }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">Sin grupo</span>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contacto de Emergencia -->
+        <div class="card animate-in" style="animation-delay: 0.1s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-phone-alt" style="color: var(--color-warning);"></i>
+                    Contacto de Emergencia
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if student.emergency_contact or student.emergency_phone %}
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Nombre</span>
+                        <span class="info-value">{{ student.emergency_contact|default:"-" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Teléfono</span>
+                        <span class="info-value">{{ student.emergency_phone|default:"-" }}</span>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted" style="margin: 0;">Sin información de contacto de emergencia.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Notas -->
+        {% if student.notes %}
+        <div class="card animate-in" style="animation-delay: 0.2s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-sticky-note" style="color: var(--color-info);"></i>
+                    Notas
+                </h3>
+            </div>
+            <div class="card-body">
+                <p style="margin: 0; white-space: pre-wrap;">{{ student.notes }}</p>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Reasignar Grupo -->
+        <div class="card animate-in" style="animation-delay: 0.3s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-exchange-alt" style="color: var(--color-success);"></i>
+                    Reasignar Grupo
+                </h3>
+            </div>
+            <div class="card-body">
+                <form id="assignGroupForm" class="assign-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="student_id" value="{{ student.id }}">
+                    <div class="form-row">
+                        <select name="group_id" id="groupSelect">
+                            <option value="">Sin grupo</option>
+                            {% for group in groups %}
+                            <option value="{{ group.id }}" 
+                                    {% if student.group and student.group.id == group.id %}selected{% endif %}
+                                    {% if group.is_full and student.group != group %}disabled{% endif %}>
+                                {{ group.name }} ({{ group.get_students_count }}/{{ group.max_students }})
+                                {% if group.is_full and student.group != group %}[LLENO]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                    </div>
+                </form>
+                <div id="assignResult" style="margin-top: 12px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('assignGroupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const resultDiv = document.getElementById('assignResult');
+    
+    try {
+        const response = await fetch('{% url "editor:tutor_assign_student_to_group" institution_slug=institution.slug %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        resultDiv.style.display = 'block';
+        if (data.ok) {
+            resultDiv.innerHTML = '<div class="alert alert-success"><i class="fas fa-check"></i> ' + data.message + '</div>';
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-times"></i> ' + data.error + '</div>';
+        }
+    } catch (error) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<div class="alert alert-danger"><i class="fas fa-times"></i> Error de conexión</div>';
+    }
+});
+</script>
+
+<style>
+    .profile-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    .info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .info-label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .info-value {
+        font-size: 14px;
+        color: var(--color-text);
+    }
+    .info-value code {
+        background: var(--color-bg-tertiary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: monospace;
+    }
+    .assign-form .form-row {
+        display: flex;
+        gap: 12px;
+    }
+    .assign-form select {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .alert-success {
+        background: rgba(46, 160, 67, 0.1);
+        border: 1px solid rgba(46, 160, 67, 0.3);
+        color: #2ea043;
+    }
+    .alert-danger {
+        background: rgba(248, 81, 73, 0.1);
+        border: 1px solid rgba(248, 81, 73, 0.3);
+        color: #f85149;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mis Estudiantes - Tutor{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-user-graduate"></i>
+            Mis Estudiantes
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Nuevo Estudiante
+        </a>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Filtros -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <form method="get" class="filters-form">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Grupo</label>
+                        <select name="group" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            {% for group in groups %}
+                            <option value="{{ group.id }}" {% if group_filter == group.id|stringformat:"s" %}selected{% endif %}>{{ group.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Estado</label>
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Activos</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactivos</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Estudiantes -->
+    <div class="card animate-in">
+        <div class="card-body" style="padding: 0;">
+            {% if students %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre</th>
+                        <th>ID</th>
+                        <th>Grupo</th>
+                        <th>Email</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <strong>{{ student.user.get_full_name|default:student.user.username }}</strong>
+                        </td>
+                        <td><span class="badge badge-secondary">{{ student.student_id }}</span></td>
+                        <td>
+                            {% if student.group %}
+                            <span class="badge badge-info">{{ student.group.name }}</span>
+                            {% else %}
+                            <span class="badge badge-warning">Sin grupo</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ student.user.email|default:"-" }}</td>
+                        <td>
+                            <span class="badge {% if student.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                                {% if student.is_active %}Activo{% else %}Inactivo{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:tutor_student_detail' institution_slug=institution.slug student_id=student.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'editor:tutor_student_edit' institution_slug=institution.slug student_id=student.id %}" 
+                               class="btn btn-sm btn-ghost" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <!-- Paginación -->
+            {% if students.has_other_pages %}
+            <div class="pagination-container">
+                <nav class="pagination">
+                    {% if students.has_previous %}
+                    <a href="?page={{ students.previous_page_number }}&group={{ group_filter }}&status={{ status_filter }}" class="btn btn-ghost">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    <span class="pagination-info">
+                        Página {{ students.number }} de {{ students.paginator.num_pages }}
+                    </span>
+                    
+                    {% if students.has_next %}
+                    <a href="?page={{ students.next_page_number }}&group={{ group_filter }}&status={{ status_filter }}" class="btn btn-ghost">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-user-graduate"></i>
+                <h3>No tienes estudiantes</h3>
+                <p>Crea tu primer estudiante para comenzar.</p>
+                <a href="{% url 'editor:tutor_student_create' institution_slug=institution.slug %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Estudiante
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .filters-form .filter-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-item label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .filter-item select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .pagination-container {
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+    }
+    .pagination {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .pagination-info {
+        color: var(--color-text-muted);
+        font-size: 14px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .empty-state h3 {
+        margin: 0 0 8px 0;
+        color: var(--color-text);
+    }
+    .empty-state p {
+        margin: 0 0 20px 0;
+    }
+</style>
+{% endblock %}

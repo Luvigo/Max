@@ -1,0 +1,53 @@
+{% extends "base_dashboard.html" %}
+{# 
+    LIMPIEZA ARQUITECTÓNICA
+    
+    ❌ TEMPLATE DEPRECADO
+    La institución es SOLO información, NO tiene cuenta ni dashboard.
+    
+    Este template solo muestra un mensaje y redirige.
+#}
+
+{% block title %}Rol Deprecado - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-exclamation-triangle" style="color: var(--color-warning);"></i>
+        Rol No Disponible
+    </h1>
+</div>
+
+<div class="card animate-in">
+    <div class="card-body" style="text-align: center; padding: 3rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">
+            <i class="fas fa-building" style="color: var(--color-text-muted);"></i>
+        </div>
+        <h2 style="margin-bottom: 1rem;">El rol de "Institución" ha sido deprecado</h2>
+        <p style="color: var(--color-text-muted); margin-bottom: 2rem;">
+            La arquitectura del sistema ha sido actualizada. Las instituciones ahora son solo información,
+            no cuentas de usuario. Por favor, contacta al administrador para obtener acceso como 
+            <strong>Tutor</strong> o <strong>Estudiante</strong>.
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="{% url 'logout' %}" class="btn btn-primary">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+            </a>
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                <i class="fas fa-home"></i> Ir al Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-warning" style="margin-top: 2rem;">
+    <i class="fas fa-info-circle"></i>
+    <span>
+        <strong>Cambios en la arquitectura:</strong><br>
+        • <strong>Admin:</strong> Usa Django Admin (/admin/) para gestionar todo el sistema<br>
+        • <strong>Tutor:</strong> Gestiona grupos, estudiantes y actividades desde la plataforma<br>
+        • <strong>Estudiante:</strong> Accede a actividades y proyectos desde la plataforma<br>
+        • <strong>Institución:</strong> Solo información (no es un rol de usuario)
+    </span>
+</div>
+{% endblock %}

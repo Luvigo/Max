@@ -1,0 +1,160 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}{% if edit_mode %}Editar{% else %}Nuevo{% endif %} Grupo - Tutor{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-users"></i>
+            {% if edit_mode %}Editar Grupo{% else %}Nuevo Grupo{% endif %}
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-edit" style="color: var(--color-primary);"></i>
+                Información del Grupo
+            </h3>
+        </div>
+        <div class="card-body">
+            <form method="post" class="form-grid">
+                {% csrf_token %}
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Nombre del Grupo *</label>
+                        <input type="text" id="name" name="name" required
+                               value="{% if group %}{{ group.name }}{% endif %}"
+                               placeholder="Ej: Grupo A - Programación">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="code">Código *</label>
+                        <input type="text" id="code" name="code" required
+                               value="{% if group %}{{ group.code }}{% endif %}"
+                               placeholder="Ej: GA-2026"
+                               {% if edit_mode %}readonly{% endif %}>
+                        {% if edit_mode %}
+                        <small class="form-hint">El código no se puede modificar.</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="academic_year">Año Académico *</label>
+                        <input type="text" id="academic_year" name="academic_year" required
+                               value="{% if group %}{{ group.academic_year }}{% else %}{{ current_year }}{% endif %}"
+                               placeholder="Ej: 2026">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="semester">Semestre/Período</label>
+                        <input type="text" id="semester" name="semester"
+                               value="{% if group %}{{ group.semester }}{% endif %}"
+                               placeholder="Ej: Primer Semestre">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="max_students">Máximo de Estudiantes</label>
+                        <input type="number" id="max_students" name="max_students" min="1" max="100"
+                               value="{% if group %}{{ group.max_students }}{% else %}30{% endif %}">
+                    </div>
+                    
+                    {% if edit_mode %}
+                    <div class="form-group">
+                        <label for="status">Estado</label>
+                        <select id="status" name="status">
+                            <option value="active" {% if group.status == 'active' %}selected{% endif %}>Activo</option>
+                            <option value="inactive" {% if group.status == 'inactive' %}selected{% endif %}>Inactivo</option>
+                            <option value="archived" {% if group.status == 'archived' %}selected{% endif %}>Archivado</option>
+                        </select>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="form-group full-width">
+                    <label for="description">Descripción</label>
+                    <textarea id="description" name="description" rows="3"
+                              placeholder="Descripción opcional del grupo...">{% if group %}{{ group.description }}{% endif %}</textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="btn btn-ghost">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        {% if edit_mode %}Guardar Cambios{% else %}Crear Grupo{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+    .form-group label {
+        font-weight: 500;
+        color: var(--color-text);
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+        font-size: 14px;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        outline: none;
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 3px var(--color-primary-glow);
+    }
+    .form-group input[readonly] {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    .form-hint {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding-top: 20px;
+        border-top: 1px solid var(--color-border);
+    }
+</style>
+{% endblock %}

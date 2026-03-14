@@ -1,0 +1,490 @@
+<!-- 
+    LIMPIEZA ARQUITECTÓNICA - Sidebar
+    
+    ROLES VÁLIDOS ÚNICOS:
+    - Tutor: Sección completa de gestión
+    - Estudiante: Sección de área personal
+    
+    ❌ ELIMINADOS:
+    - Sección de Admin (usa Django Admin /admin/)
+    - Sección de Institución (institución es solo info)
+    - "Mis Cursos" (unificado con Grupos de Estudiantes)
+-->
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-logo">M</div>
+        <div class="sidebar-brand">
+            <span class="sidebar-brand-name">MAX-IDE</span>
+            <span class="sidebar-brand-sub">Arduino Education</span>
+        </div>
+    </div>
+    
+    <nav class="sidebar-nav">
+        {% if institution %}
+        
+        {% if user_role == 'tutor' %}
+        <!-- ============================================ -->
+        <!-- ✅ TUTOR -->
+        <!-- ============================================ -->
+        <div class="nav-section">
+            <div class="nav-section-title">Mi Área</div>
+            
+            <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'tutor_dashboard' %}active{% endif %}">
+                <i class="fas fa-chalkboard-teacher"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}/dashboard/{% endif %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/profile/" class="nav-item {% if request.resolver_match.url_name == 'tutor_profile' %}active{% endif %}">
+                <i class="fas fa-user-tie"></i>
+                <span>Mi Perfil</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/my-institution/" class="nav-item {% if request.resolver_match.url_name == 'tutor_my_institution' %}active{% endif %}">
+                <i class="fas fa-building"></i>
+                <span>Mi Institución</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Gestionar</div>
+            
+            <a href="{% url 'editor:tutor_groups_list' institution_slug=institution.slug %}" class="nav-item {% if 'group' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-users"></i>
+                <span>Mis Grupos</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/students/" class="nav-item {% if 'student' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-user-graduate"></i>
+                <span>Mis Estudiantes</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/tutor/activities/" class="nav-item {% if request.resolver_match.url_name == 'tutor_my_activities_list' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Mis Actividades</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Crear</div>
+            
+            <a href="/i/{{ institution.slug }}/tutor/activities/new/" class="nav-item {% if request.resolver_match.url_name == 'tutor_activity_create' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Nueva Actividad</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Soporte</div>
+            
+            <a href="/i/{{ institution.slug }}/tutor/errors/" class="nav-item">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Ver Errores</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% if user_role == 'student' %}
+        <!-- ============================================ -->
+        <!-- ✅ ESTUDIANTE -->
+        <!-- ============================================ -->
+        <div class="nav-section">
+            <div class="nav-section-title">Mi Área</div>
+            
+            <a href="{% url 'student_dashboard' slug=institution.slug %}" class="nav-item {% if request.resolver_match.url_name == 'student_dashboard' %}active{% endif %}">
+                <i class="fas fa-user"></i>
+                <span>Dashboard</span>
+            </a>
+            
+            <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}/dashboard/{% endif %}" class="nav-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                <i class="fas fa-code"></i>
+                <span>Editor IDE</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/student/my-info/" class="nav-item {% if request.resolver_match.url_name == 'student_my_context' %}active{% endif %}">
+                <i class="fas fa-id-card"></i>
+                <span>Mi Información</span>
+            </a>
+            
+            <a href="/i/{{ institution.slug }}/student/my-institution/" class="nav-item {% if request.resolver_match.url_name == 'student_my_institution' %}active{% endif %}">
+                <i class="fas fa-building"></i>
+                <span>Mi Institución</span>
+            </a>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Aprendizaje</div>
+            
+            <a href="/i/{{ institution.slug }}/student/activities/" class="nav-item {% if 'activities' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="fas fa-tasks"></i>
+                <span>Mis Actividades</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        {% elif user.is_superuser %}
+        <!-- ============================================ -->
+        <!-- ✅ ADMIN (sin institución en contexto) -->
+        <!-- ============================================ -->
+        <div class="nav-section">
+            <div class="nav-section-title">Administración</div>
+            <a href="/admin/" class="nav-item">
+                <i class="fas fa-cog"></i>
+                <span>Django Admin</span>
+            </a>
+            <a href="{% url 'admin_errors_list' %}" class="nav-item {% if request.resolver_match.url_name == 'admin_errors_list' or request.resolver_match.url_name == 'admin_error_detail' %}active{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>Errores Reportados</span>
+            </a>
+        </div>
+        {% endif %}
+        
+        <!-- Ayuda -->
+        <div class="nav-section">
+            <div class="nav-section-title">Ayuda</div>
+            
+            <a href="#" class="nav-item" onclick="showDocumentationModal(); return false;">
+                <i class="fas fa-question-circle"></i>
+                <span>Documentación</span>
+            </a>
+            
+            <a href="#" class="nav-item" onclick="showReportProblemModal(); return false;">
+                <i class="fas fa-bug"></i>
+                <span>Reportar Problema</span>
+            </a>
+        </div>
+    </nav>
+    
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">
+                {{ user.first_name|slice:":1"|default:user.username|slice:":1"|upper }}
+            </div>
+            <div class="user-details">
+                <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+                <div class="user-role role-{{ user_role }}">
+                    {% if user_role == 'tutor' %}
+                        <i class="fas fa-chalkboard-teacher"></i> Tutor
+                    {% elif user_role == 'student' %}
+                        <i class="fas fa-user-graduate"></i> Estudiante
+                    {% else %}
+                        <i class="fas fa-user"></i> Usuario
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{% url 'logout' %}" class="topbar-btn" title="Cerrar Sesión">
+                <i class="fas fa-sign-out-alt"></i>
+            </a>
+        </div>
+    </div>
+</aside>
+
+<!-- Modal de Documentación -->
+<div id="documentationModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-book"></i> Documentación</h3>
+            <button class="modal-close" onclick="closeDocumentationModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="doc-section">
+                <h4><i class="fas fa-play-circle"></i> Primeros Pasos</h4>
+                <ul>
+                    <li>Usa el <strong>Editor IDE</strong> para crear programas con bloques visuales</li>
+                    <li>Conecta tu Arduino mediante el <strong>Agent Local</strong></li>
+                    <li>Compila y sube tu código con un solo clic</li>
+                </ul>
+            </div>
+            <div class="doc-section">
+                <h4><i class="fas fa-puzzle-piece"></i> Bloques Disponibles</h4>
+                <ul>
+                    <li><strong>Control:</strong> Bucles, condicionales, delays</li>
+                    <li><strong>Lógica:</strong> Comparaciones, operadores AND/OR</li>
+                    <li><strong>Matemáticas:</strong> Operaciones numéricas</li>
+                    <li><strong>MAX Robot:</strong> Motores, sensores, servos</li>
+                </ul>
+            </div>
+            <div class="doc-section">
+                <h4><i class="fas fa-keyboard"></i> Atajos de Teclado</h4>
+                <ul>
+                    <li><kbd>Ctrl</kbd> + <kbd>S</kbd> - Guardar proyecto</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Z</kbd> - Deshacer</li>
+                    <li><kbd>Ctrl</kbd> + <kbd>Y</kbd> - Rehacer</li>
+                    <li><kbd>Delete</kbd> - Eliminar bloque seleccionado</li>
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeDocumentationModal()">Entendido</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Reportar Problema -->
+<div id="reportProblemModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-bug"></i> Reportar Problema</h3>
+            <button class="modal-close" onclick="closeReportProblemModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="reportProblemForm">
+                <div class="form-group">
+                    <label for="problemType">Tipo de Problema</label>
+                    <select id="problemType" class="form-control" required>
+                        <option value="">Selecciona una opción...</option>
+                        <option value="bug">🐛 Error en la aplicación</option>
+                        <option value="ide">💻 Problema con el IDE</option>
+                        <option value="agent">🔌 Problema de conexión con Agent</option>
+                        <option value="compile">⚙️ Error de compilación</option>
+                        <option value="upload">📤 Error al subir código</option>
+                        <option value="other">❓ Otro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="problemDescription">Descripción del Problema</label>
+                    <textarea id="problemDescription" class="form-control" rows="4" placeholder="Describe el problema con el mayor detalle posible..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="problemSteps">Pasos para Reproducir (opcional)</label>
+                    <textarea id="problemSteps" class="form-control" rows="3" placeholder="1. Abrir el IDE&#10;2. Crear un bloque...&#10;3. ..."></textarea>
+                </div>
+            </form>
+            <div class="alert alert-info" style="margin-top: 15px;">
+                <i class="fas fa-info-circle"></i> Tu reporte será enviado al administrador del sistema para su revisión.
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeReportProblemModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="submitProblemReport()">
+                <i class="fas fa-paper-plane"></i> Enviar Reporte
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Estilos para los modales -->
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    background: var(--bg-secondary, #1e1e2e);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-color, #3d3d5c);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color, #3d3d5c);
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: var(--text-primary, #fff);
+    font-size: 1.2rem;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary, #888);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--text-primary, #fff);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid var(--border-color, #3d3d5c);
+}
+
+.doc-section {
+    margin-bottom: 20px;
+}
+
+.doc-section h4 {
+    color: var(--accent-color, #58a6ff);
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.doc-section ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--text-secondary, #ccc);
+}
+
+.doc-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+kbd {
+    background: var(--bg-tertiary, #2d2d4a);
+    border: 1px solid var(--border-color, #3d3d5c);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    font-family: monospace;
+    color: var(--text-primary, #fff);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-primary, #fff);
+    font-weight: 500;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    background: var(--bg-tertiary, #2d2d4a);
+    border: 1px solid var(--border-color, #3d3d5c);
+    border-radius: 6px;
+    color: var(--text-primary, #fff);
+    font-size: 14px;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-color, #58a6ff);
+}
+
+.alert-info {
+    background: rgba(88, 166, 255, 0.1);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+    border-radius: 6px;
+    padding: 12px;
+    color: #58a6ff;
+    font-size: 0.9rem;
+}
+</style>
+
+<!-- Scripts para los modales -->
+<script>
+function showDocumentationModal() {
+    document.getElementById('documentationModal').style.display = 'flex';
+}
+
+function closeDocumentationModal() {
+    document.getElementById('documentationModal').style.display = 'none';
+}
+
+function showReportProblemModal() {
+    document.getElementById('reportProblemModal').style.display = 'flex';
+}
+
+function closeReportProblemModal() {
+    document.getElementById('reportProblemModal').style.display = 'none';
+    document.getElementById('reportProblemForm').reset();
+}
+
+function submitProblemReport() {
+    const form = document.getElementById('reportProblemForm');
+    const problemType = document.getElementById('problemType').value;
+    const problemDescription = document.getElementById('problemDescription').value;
+    const problemSteps = document.getElementById('problemSteps').value;
+    
+    if (!problemType || !problemDescription) {
+        alert('Por favor completa los campos requeridos.');
+        return;
+    }
+    
+    const typeToCode = {
+        'bug': 'GenericError',
+        'ide': 'WorkspaceCorrupt',
+        'agent': 'AgentMissing',
+        'compile': 'CompilationError',
+        'upload': 'UploadFailed',
+        'other': 'GenericError'
+    };
+    const code = typeToCode[problemType] || 'GenericError';
+    const message = problemDescription + (problemSteps ? '\n\nPasos: ' + problemSteps : '');
+    
+    fetch('/api/errors/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': (typeof getCsrfToken === 'function' ? getCsrfToken() : null) || 
+                document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''
+        },
+        body: JSON.stringify({
+            code: code,
+            severity: 'medium',
+            message: message,
+            context: { type: problemType, source: 'reportar_problema' }
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            alert('✅ Reporte enviado correctamente.\n\nGracias por ayudarnos a mejorar MAX-IDE. El administrador lo revisará.');
+        } else {
+            alert('Error al enviar: ' + (data.error || 'Intenta de nuevo'));
+        }
+        closeReportProblemModal();
+    })
+    .catch(() => {
+        alert('Error de conexión. Intenta de nuevo.');
+    });
+}
+
+// Cerrar modales con Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeDocumentationModal();
+        closeReportProblemModal();
+    }
+});
+
+// Cerrar modales al hacer clic fuera
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+});
+</script>

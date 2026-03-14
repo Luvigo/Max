@@ -1,0 +1,176 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Actividades - {{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-tasks"></i>
+            Actividades
+        </h1>
+        <p class="page-subtitle">{{ group.name }} - {{ institution.name }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_group_activity_create' institution_slug=institution.slug group_id=group.id %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nueva Actividad
+        </a>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Filtros -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <form method="get" class="filters-form">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Estado</label>
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Borrador</option>
+                            <option value="published" {% if status_filter == 'published' %}selected{% endif %}>Publicada</option>
+                            <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Cerrada</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Actividades -->
+    <div class="activities-grid">
+        {% for activity in activities %}
+        <div class="card animate-in activity-card" style="animation-delay: {{ forloop.counter0|divisibleby:10 }}s;">
+            <div class="card-header">
+                <h3 class="card-title">{{ activity.title }}</h3>
+                <span class="badge {% if activity.status == 'published' %}badge-success{% elif activity.status == 'draft' %}badge-warning{% else %}badge-secondary{% endif %}">
+                    {{ activity.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                {% if activity.objective %}
+                <p class="activity-objective">{{ activity.objective|truncatewords:20 }}</p>
+                {% endif %}
+                
+                <div class="activity-meta">
+                    {% if activity.deadline %}
+                    <div class="meta-item {% if activity.is_deadline_passed %}text-danger{% endif %}">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>{{ activity.deadline|date:"d/m/Y H:i" }}</span>
+                        {% if activity.is_deadline_passed %}
+                        <span class="badge badge-danger">Vencida</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="meta-item">
+                        <i class="fas fa-inbox"></i>
+                        <span>{{ activity.submissions_count }}/{{ group.get_students_count }} entregas</span>
+                    </div>
+                    
+                    {% if activity.pending_count > 0 %}
+                    <div class="meta-item">
+                        <span class="badge badge-warning">{{ activity.pending_count }} pendientes</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'editor:tutor_activity_submissions_list' institution_slug=institution.slug activity_id=activity.id %}" 
+                   class="btn btn-sm btn-primary">
+                    <i class="fas fa-eye"></i> Ver Entregas
+                </a>
+                <a href="{% url 'editor:tutor_group_activity_edit' institution_slug=institution.slug group_id=group.id activity_id=activity.id %}" 
+                   class="btn btn-sm btn-ghost">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="card animate-in">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>No hay actividades</h3>
+                    <p>Crea tu primera actividad para este grupo.</p>
+                    <a href="{% url 'editor:tutor_group_activity_create' institution_slug=institution.slug group_id=group.id %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Crear Actividad
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .activities-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+    .activity-card .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+    }
+    .activity-objective {
+        color: var(--color-text-muted);
+        font-size: 14px;
+        margin: 0 0 16px 0;
+    }
+    .activity-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--color-text-muted);
+    }
+    .meta-item i {
+        width: 16px;
+    }
+    .card-footer {
+        padding: 12px 16px;
+        border-top: 1px solid var(--color-border);
+        display: flex;
+        gap: 8px;
+    }
+    .filters-form .filter-row {
+        display: flex;
+        gap: 16px;
+    }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-item label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .filter-item select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,193 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mis Grupos - Tutor{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-users"></i>
+            Mis Grupos
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+    <div class="page-actions">
+        <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Nuevo Grupo
+        </a>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Filtros -->
+    <div class="card animate-in" style="margin-bottom: 20px;">
+        <div class="card-body">
+            <form method="get" class="filters-form">
+                <div class="filter-row">
+                    <div class="filter-item">
+                        <label>Estado</label>
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Activos</option>
+                            <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactivos</option>
+                            <option value="archived" {% if status_filter == 'archived' %}selected{% endif %}>Archivados</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Año Académico</label>
+                        <select name="year" onchange="this.form.submit()">
+                            <option value="">Todos</option>
+                            {% for year in academic_years %}
+                            <option value="{{ year }}" {% if year_filter == year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista de Grupos -->
+    <div class="card animate-in">
+        <div class="card-body" style="padding: 0;">
+            {% if groups %}
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Grupo</th>
+                        <th>Código</th>
+                        <th>Año</th>
+                        <th>Estudiantes</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for group in groups %}
+                    <tr>
+                        <td>
+                            <strong>{{ group.name }}</strong>
+                            {% if group.description %}
+                            <br><small class="text-muted">{{ group.description|truncatewords:10 }}</small>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-secondary">{{ group.code }}</span></td>
+                        <td>{{ group.academic_year }}</td>
+                        <td>
+                            <span class="badge badge-info">
+                                {{ group.get_students_count }}/{{ group.max_students }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge {% if group.status == 'active' %}badge-success{% elif group.status == 'inactive' %}badge-warning{% else %}badge-secondary{% endif %}">
+                                {{ group.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'editor:tutor_group_detail' institution_slug=institution.slug group_id=group.id %}" 
+                               class="btn btn-sm btn-ghost" title="Ver Detalle">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            <a href="{% url 'editor:tutor_group_edit' institution_slug=institution.slug group_id=group.id %}" 
+                               class="btn btn-sm btn-ghost" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            <!-- Paginación -->
+            {% if groups.has_other_pages %}
+            <div class="pagination-container">
+                <nav class="pagination">
+                    {% if groups.has_previous %}
+                    <a href="?page={{ groups.previous_page_number }}&status={{ status_filter }}&year={{ year_filter }}" class="btn btn-ghost">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    {% endif %}
+                    
+                    <span class="pagination-info">
+                        Página {{ groups.number }} de {{ groups.paginator.num_pages }}
+                    </span>
+                    
+                    {% if groups.has_next %}
+                    <a href="?page={{ groups.next_page_number }}&status={{ status_filter }}&year={{ year_filter }}" class="btn btn-ghost">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    {% endif %}
+                </nav>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-users"></i>
+                <h3>No tienes grupos</h3>
+                <p>Crea tu primer grupo para comenzar a organizar estudiantes.</p>
+                <a href="{% url 'editor:tutor_group_create' institution_slug=institution.slug %}" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Grupo
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .filters-form .filter-row {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .filter-item label {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .filter-item select {
+        padding: 8px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text);
+    }
+    .pagination-container {
+        padding: 16px;
+        display: flex;
+        justify-content: center;
+    }
+    .pagination {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .pagination-info {
+        color: var(--color-text-muted);
+        font-size: 14px;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--color-text-muted);
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+    .empty-state h3 {
+        margin: 0 0 8px 0;
+        color: var(--color-text);
+    }
+    .empty-state p {
+        margin: 0 0 20px 0;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base_dashboard.html" %}
+{# 
+    LIMPIEZA ARQUITECTÓNICA
+    
+    ❌ TEMPLATE DEPRECADO
+    El Admin usa EXCLUSIVAMENTE Django Admin (/admin/)
+    
+    Este template solo muestra un mensaje de redirección.
+#}
+
+{% block title %}Acceso Administrador - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-shield-alt" style="color: var(--color-warning);"></i>
+        Área de Administración
+    </h1>
+</div>
+
+<div class="card animate-in">
+    <div class="card-body" style="text-align: center; padding: 3rem;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">
+            <i class="fas fa-user-shield" style="color: var(--color-primary);"></i>
+        </div>
+        <h2 style="margin-bottom: 1rem;">Panel de Administración</h2>
+        <p style="color: var(--color-text-muted); margin-bottom: 2rem;">
+            Como administrador, debes usar el panel de Django Admin para gestionar el sistema.
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+            <a href="/admin/" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.75rem 1.5rem;">
+                <i class="fas fa-cog"></i> Ir a Django Admin
+            </a>
+            <a href="{% url 'logout' %}" class="btn btn-secondary">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info" style="margin-top: 2rem;">
+    <i class="fas fa-info-circle"></i>
+    <span>
+        <strong>¿Qué puedes hacer en Django Admin?</strong><br>
+        • Gestionar instituciones, tutores y estudiantes<br>
+        • Administrar grupos, cursos y actividades<br>
+        • Ver entregas y calificaciones<br>
+        • Revisar logs de errores y auditoría
+    </span>
+</div>
+{% endblock %}

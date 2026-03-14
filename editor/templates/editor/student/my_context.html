@@ -1,0 +1,323 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Mi Información - Estudiante{% endblock %}
+
+{% block content %}
+<div class="content-header">
+    <div class="page-header">
+        <h1 class="page-title">
+            <i class="fas fa-user"></i>
+            Mi Información
+        </h1>
+        <p class="page-subtitle">{{ institution.name }}</p>
+    </div>
+</div>
+
+<div class="content-body">
+    <!-- Información del Estudiante -->
+    <div class="card animate-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-id-card" style="color: var(--color-primary);"></i>
+                Mi Perfil
+            </h3>
+            <span class="badge {% if student.is_active %}badge-success{% else %}badge-danger{% endif %}">
+                {% if student.is_active %}Activo{% else %}Inactivo{% endif %}
+            </span>
+        </div>
+        <div class="card-body">
+            <div class="profile-grid">
+                <div class="profile-avatar">
+                    <div class="avatar-circle">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
+                </div>
+                <div class="profile-info">
+                    <h2 class="profile-name">{{ student.full_name }}</h2>
+                    
+                    <div class="profile-details">
+                        <div class="detail-item">
+                            <i class="fas fa-id-badge"></i>
+                            <span>ID: <strong>{{ student.student_id }}</strong></span>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <i class="fas fa-envelope"></i>
+                            <span>{{ student.email|default:"Sin email" }}</span>
+                        </div>
+                        
+                        {% if student.phone %}
+                        <div class="detail-item">
+                            <i class="fas fa-phone"></i>
+                            <span>{{ student.phone }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mi Contexto Académico -->
+    <div class="context-grid">
+        <!-- Institución -->
+        <div class="card animate-in" style="animation-delay: 0.1s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-university" style="color: var(--color-info);"></i>
+                    Mi Institución
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="context-item">
+                    <div class="context-icon">
+                        <i class="fas fa-building"></i>
+                    </div>
+                    <div class="context-info">
+                        <h4>{{ institution.name }}</h4>
+                        {% if institution.city or institution.state %}
+                        <p>{{ institution.city }}{% if institution.state %}, {{ institution.state }}{% endif %}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Grupo -->
+        <div class="card animate-in" style="animation-delay: 0.2s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-users" style="color: var(--color-success);"></i>
+                    Mi Grupo
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if student.group %}
+                <div class="context-item">
+                    <div class="context-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <div class="context-info">
+                        <h4>{{ student.group.name }}</h4>
+                        <p>Código: {{ student.group.code }}</p>
+                        <p>{{ student.group.academic_year }} {{ student.group.semester }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>No estás asignado a ningún grupo.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Tutor -->
+        <div class="card animate-in" style="animation-delay: 0.3s;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chalkboard-teacher" style="color: var(--color-warning);"></i>
+                    Mi Tutor
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if tutor_info %}
+                <div class="context-item">
+                    <div class="context-icon">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="context-info">
+                        <h4>{{ tutor_info.name }}</h4>
+                        {% if tutor_info.specialization %}
+                        <p><i class="fas fa-graduation-cap"></i> {{ tutor_info.specialization }}</p>
+                        {% endif %}
+                        {% if tutor_info.email %}
+                        <p><i class="fas fa-envelope"></i> {{ tutor_info.email }}</p>
+                        {% endif %}
+                        {% if tutor_info.office %}
+                        <p><i class="fas fa-door-open"></i> {{ tutor_info.office }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="no-data">
+                    <i class="fas fa-inbox"></i>
+                    <p>No tienes un tutor asignado.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Compañeros de Grupo -->
+    {% if classmates %}
+    <div class="card animate-in" style="animation-delay: 0.4s; margin-top: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-user-friends" style="color: var(--color-primary);"></i>
+                Mis Compañeros de Grupo
+            </h3>
+            <span class="badge badge-info">{{ classmates|length }} compañeros</span>
+        </div>
+        <div class="card-body">
+            <div class="classmates-grid">
+                {% for classmate in classmates %}
+                <div class="classmate-item">
+                    <div class="classmate-avatar">
+                        {{ classmate.user.first_name|slice:":1"|default:classmate.user.username|slice:":1"|upper }}
+                    </div>
+                    <div class="classmate-info">
+                        <span class="classmate-name">{{ classmate.user.get_full_name|default:classmate.user.username }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .profile-grid {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+    }
+    
+    .profile-avatar .avatar-circle {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, var(--color-primary-glow), var(--color-primary));
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: white;
+    }
+    
+    .profile-name {
+        margin: 0 0 16px 0;
+        font-size: 1.5rem;
+    }
+    
+    .profile-details {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .detail-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--color-text-muted);
+    }
+    
+    .detail-item i {
+        width: 20px;
+        text-align: center;
+        color: var(--color-primary);
+    }
+    
+    .context-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .context-item {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+    }
+    
+    .context-icon {
+        width: 50px;
+        height: 50px;
+        background: var(--color-bg-tertiary);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        color: var(--color-primary);
+    }
+    
+    .context-info h4 {
+        margin: 0 0 8px 0;
+        font-size: 16px;
+    }
+    
+    .context-info p {
+        margin: 0 0 4px 0;
+        font-size: 14px;
+        color: var(--color-text-muted);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .context-info p i {
+        font-size: 12px;
+    }
+    
+    .no-data {
+        text-align: center;
+        padding: 20px;
+        color: var(--color-text-muted);
+    }
+    
+    .no-data i {
+        font-size: 32px;
+        margin-bottom: 8px;
+        opacity: 0.5;
+    }
+    
+    .classmates-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 12px;
+    }
+    
+    .classmate-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        background: var(--color-bg-tertiary);
+        border-radius: 8px;
+    }
+    
+    .classmate-avatar {
+        width: 36px;
+        height: 36px;
+        background: var(--color-primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+        font-size: 14px;
+    }
+    
+    .classmate-name {
+        font-size: 14px;
+    }
+    
+    @media (max-width: 768px) {
+        .profile-grid {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .context-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
