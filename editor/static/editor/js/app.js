@@ -425,7 +425,11 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
         const family = compileData.family || getBoardFamily(fqbn);
         onLog(`[UPLOAD] ✓ Compilado (${compileData.size || '?'} bytes). ${family === 'esp32' ? '[ESP32] ' : ''}Subiendo...`);
 
-        // 2) Upload
+        // 2) Upload - Incluir code para Agents que requieren hex_url o code (root agent.py legacy)
+        const uploadPayload = { fqbn, port, code: codeStr };
+        if (jobId) uploadPayload.job_id = jobId;
+        if (window.IDE_DEBUG) console.debug('[UPLOAD] Payload:', Object.keys(uploadPayload).join(', '));
+
         const uploadUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
         const uploadCtrl = new AbortController();
         const uploadTimeout = setTimeout(() => uploadCtrl.abort(), 120000);
@@ -433,7 +437,7 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
         const uploadRes = await fetch(uploadUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fqbn, port, job_id: jobId }),
+            body: JSON.stringify(uploadPayload),
             signal: uploadCtrl.signal
         });
         clearTimeout(uploadTimeout);

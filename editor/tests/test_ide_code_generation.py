@@ -116,6 +116,15 @@ class BuildPayloadTest(TestCase):
         valid, _, _ = validate_compile_payload(verify_payload)
         self.assertTrue(valid, 'Payload de verify debe ser válido para compile')
 
+    def test_upload_payload_must_include_code_for_agent_compatibility(self):
+        """Upload debe incluir code para Agents que requieren hex_url o code (evitar error)."""
+        code = 'void setup() { pinMode(13, OUTPUT); } void loop() { delay(1000); }'
+        upload_payload = build_upload_payload(code, 'COM3', 'arduino:avr:uno')
+        self.assertIn('code', upload_payload)
+        self.assertEqual(upload_payload['code'], code)
+        valid, _, _ = validate_upload_payload(upload_payload)
+        self.assertTrue(valid)
+
 
 class CodeStructureTest(TestCase):
     """Tests de estructura de código generado (lo que el backend espera)."""
