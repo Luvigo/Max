@@ -78,7 +78,7 @@ body {
     padding: 0 16px;
     gap: 12px;
     flex-shrink: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .logo {
@@ -126,7 +126,9 @@ body {
     flex: 1;
     justify-content: flex-end;
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 1;
+    overflow-x: auto;
 }
 
 .control-group {
@@ -260,6 +262,16 @@ body {
     display: flex;
     gap: 8px;
     flex-shrink: 0;
+}
+
+/* En pantallas pequeñas permitir wrap del header para no cortar controles */
+@media (max-width: 900px) {
+    .header {
+        flex-wrap: wrap;
+    }
+    .header-controls {
+        flex-wrap: wrap;
+    }
 }
 
 /* Reservar ancho para "Verificando..." / "Subiendo..." para que el botón no se desplace */

@@ -611,21 +611,23 @@
     /**
      * Devuelve el XML completo del toolbox según el robot
      * @param {string} robot - 'MAX' o 'Calvin'
-     * @returns {string} XML del toolbox
+     * @returns {string} XML del toolbox (contenido para hijos directos de #toolbox)
      */
     function getToolboxXml(robot) {
         const robotCat = (robot === 'Calvin') ? TOOLBOX_CALVIN : TOOLBOX_MAX;
-        return '<xml>' + TOOLBOX_BASE + robotCat + TOOLBOX_AVANZADO + '</xml>';
+        return TOOLBOX_BASE + robotCat + TOOLBOX_AVANZADO;
     }
 
     /**
-     * Construye el toolbox en el elemento DOM
+     * Construye el toolbox en el elemento DOM.
+     * El elemento #toolbox es <xml>: sus hijos deben ser <category> directamente.
+     * Evitar <xml> anidado que Blockly no interpreta correctamente.
      * @param {string} robot - 'MAX' o 'Calvin'
      * @param {HTMLElement} el - elemento con id="toolbox"
      */
     function buildToolboxElement(robot, el) {
         if (!el) return;
-        el.innerHTML = getToolboxXml(robot);
+        el.innerHTML = getToolboxXml(robot).trim();
     }
 
     /**
