@@ -9,6 +9,7 @@ Uso:
 Endpoints:
     GET  /health   - Estado del agent
     GET  /ports    - Lista de puertos seriales
+    GET  /boards   - Lista de placas soportadas (boards_registry.json)
     POST /compile  - Compilar código (sin subir)
     POST /upload   - Compilar y subir código al Arduino
 """
@@ -286,6 +287,36 @@ def list_ports():
         'count': len(ports),
         'total_scanned': len(all_ports)
     })
+
+# ============================================
+# ENDPOINT: GET /boards
+# ============================================
+
+def _load_boards_registry():
+    """Carga el registry de placas desde agent/boards_registry.json"""
+    for rel in ('agent/boards_registry.json', 'boards_registry.json'):
+        registry_path = Path(__file__).resolve().parent / rel
+        try:
+            if registry_path.exists():
+                with open(registry_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data if isinstance(data, list) else data.get('boards', [])
+        except Exception as e:
+            print(f"[BOARDS] Error cargando {rel}: {e}")
+    return []
+
+
+@app.route('/boards', methods=['GET', 'OPTIONS'])
+def list_boards():
+    """
+    Lista las placas soportadas (board registry).
+    Fuente: agent/boards_registry.json
+    
+    Response:
+        { "ok": true, "boards": [...] }
+    """
+    boards = _load_boards_registry()
+    return jsonify({'ok': True, 'boards': boards})
 
 # ============================================
 # ENDPOINT: POST /compile
