@@ -1061,18 +1061,21 @@ function initBlockly() {
         // Verificar si hay blocklyXml definido globalmente (desde templates)
         if (typeof blocklyXml !== 'undefined' && blocklyXml && blocklyXml.trim()) {
             try {
-                const xml = Blockly.utils.xml.textToDom(blocklyXml);
+                const textToDom = (Blockly.utils && Blockly.utils.xml && Blockly.utils.xml.textToDom) ? Blockly.utils.xml.textToDom : Blockly.Xml.textToDom;
+                const xml = textToDom(blocklyXml);
                 workspace.clear();
                 Blockly.Xml.domToWorkspace(xml, workspace);
-                updateCode();
-                logToConsole('Proyecto cargado desde template', 'success');
+                if (workspace.getTopBlocks(false).length === 0) {
+                    addInitialBlocks();
+                } else {
+                    updateCode();
+                    logToConsole('Proyecto cargado desde template', 'success');
+                }
             } catch (e) {
                 console.error('Error cargando proyecto desde template:', e);
-                // Si falla, cargar bloques iniciales vacíos
                 addInitialBlocks();
             }
         } else {
-            // Si no hay proyecto, cargar bloques iniciales vacíos
             addInitialBlocks();
         }
     }, 100);
@@ -1209,22 +1212,22 @@ function applyCustomStyles() {
  * Añade bloques iniciales al workspace (setup y loop vacíos)
  */
 function addInitialBlocks() {
-    const xml = `
-        <xml>
-            <block type="arduino_setup" x="50" y="50">
-                <statement name="SETUP_CODE">
-                </statement>
-            </block>
-            <block type="arduino_loop" x="50" y="220">
-                <statement name="LOOP_CODE">
-                </statement>
-            </block>
-        </xml>
-    `;
-    
-    const dom = Blockly.utils.xml.textToDom(xml);
-    Blockly.Xml.domToWorkspace(dom, workspace);
-    updateCode();
+    if (!workspace) return;
+    try {
+        const xml = '<xml><block type="arduino_setup" x="50" y="50"><statement name="SETUP_CODE"></statement></block><block type="arduino_loop" x="50" y="220"><statement name="LOOP_CODE"></statement></block></xml>';
+        const textToDom = (typeof Blockly !== 'undefined' && Blockly.utils && Blockly.utils.xml && Blockly.utils.xml.textToDom)
+            ? Blockly.utils.xml.textToDom
+            : (Blockly.Xml && Blockly.Xml.textToDom) ? Blockly.Xml.textToDom : null;
+        if (!textToDom) {
+            console.warn('[MAX-IDE] No se pudo parsear XML de bloques iniciales');
+            return;
+        }
+        const dom = textToDom(xml);
+        Blockly.Xml.domToWorkspace(dom, workspace);
+        updateCode();
+    } catch (e) {
+        console.error('[MAX-IDE] Error añadiendo bloques iniciales setup/loop:', e);
+    }
 }
 
 // ============================================
@@ -1491,20 +1494,27 @@ function tryRestoreDraft() {
             
             // Verificar que hay contenido
             if (draft.xml && draft.xml.trim()) {
-                // Restaurar automáticamente
-                const xml = Blockly.utils.xml.textToDom(draft.xml);
-                workspace.clear();
-                Blockly.Xml.domToWorkspace(xml, workspace);
-                if (typeof arduinoGenerator !== 'undefined') {
-                    try { arduinoGenerator.init(workspace); } catch (e) { /* ok */ }
+                try {
+                    const xml = Blockly.utils.xml.textToDom(draft.xml);
+                    workspace.clear();
+                    Blockly.Xml.domToWorkspace(xml, workspace);
+                    const blockCount = workspace.getTopBlocks(false).length;
+                    if (blockCount === 0) {
+                        if (typeof addInitialBlocks === 'function') addInitialBlocks();
+                    } else {
+                        if (typeof arduinoGenerator !== 'undefined') {
+                            try { arduinoGenerator.init(workspace); } catch (e) { /* ok */ }
+                        }
+                        updateCode();
+                        _autoSaveLastXml = draft.xml;
+                        _autoSaveDirty = false;
+                        logToConsole('Borrador restaurado automáticamente', 'info');
+                        showAutoSaveIndicator('success', '✓ Borrador restaurado');
+                    }
+                } catch (parseErr) {
+                    if (window.IDE_DEBUG) console.debug('[AutoSave] Error parseando borrador:', parseErr);
+                    if (typeof addInitialBlocks === 'function') addInitialBlocks();
                 }
-                updateCode();
-                
-                _autoSaveLastXml = draft.xml;
-                _autoSaveDirty = false;
-                
-                logToConsole('Borrador restaurado automáticamente', 'info');
-                showAutoSaveIndicator('success', '✓ Borrador restaurado');
             }
         }
     } catch (e) {
