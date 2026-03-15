@@ -262,6 +262,13 @@ body {
     flex-shrink: 0;
 }
 
+/* Reservar ancho para "Verificando..." / "Subiendo..." para que el botón no se desplace */
+.action-buttons #btnCompile,
+.action-buttons #btnUpload {
+    min-width: 8.5rem;
+    white-space: nowrap;
+}
+
 /* ============================================
    HEADER RESPONSIVE
    ============================================ */
@@ -1527,6 +1534,11 @@ kbd {
    ============================================ */
 
 .autosave-indicator {
+    /* Fixed para no afectar layout ni causar reflow de bloques */
+    position: fixed;
+    top: 14px;
+    right: 24px;
+    z-index: 90;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -1534,16 +1546,16 @@ kbd {
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--text-muted);
-    background: transparent;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     opacity: 0;
     transition: opacity 0.3s ease, color 0.3s ease;
     pointer-events: none;
-    margin-left: auto;
 }
 
 .autosave-indicator.saving {
-    opacity: 0.8;
+    opacity: 0.9;
     color: var(--text-secondary);
 }
 
@@ -1561,12 +1573,12 @@ kbd {
     opacity: 0;
 }
 
-/* Versión fixed para fallback */
+/* Versión fixed para fallback (mismo estilo base) */
 .autosave-indicator-fixed {
     position: fixed;
-    top: 12px;
-    right: 200px;
-    z-index: 100;
+    top: 14px;
+    right: 24px;
+    z-index: 90;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 6px 12px;

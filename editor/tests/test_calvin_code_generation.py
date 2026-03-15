@@ -1,0 +1,240 @@
+"""
+Tests de generación de código Calvin.
+
+Valida que calvin_generator.js tenga los handlers esperados y que
+las expresiones de generación produzcan patrones de código válido.
+
+Categorías: control, operadores, serial, I/O, BotFlow 1, BotFlow 2, BLE.
+No testea hardware real. Analiza el código fuente JS.
+"""
+import re
+from pathlib import Path
+from django.test import TestCase
+
+
+def _get_generator_path():
+    return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'calvin_generator.js'
+
+
+def _extract_for_block_handlers(content):
+    """Extrae bloques registrados en arduinoGenerator.forBlock['...']."""
+    return re.findall(r"arduinoGenerator\.forBlock\['([^']+)'\]", content)
+
+
+def _has_pattern(content, pattern, flags=0):
+    """Comprueba si el contenido contiene el patrón."""
+    return bool(re.search(pattern, content, flags))
+
+
+class CalvinGeneratorStructureTest(TestCase):
+    """Tests de estructura del generador Calvin."""
+
+    def setUp(self):
+        path = _get_generator_path()
+        self.assertTrue(path.exists(), f'No existe {path}')
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_control_handlers_registered(self):
+        """Control: delay, if, if_else, while, for, switch, case, default."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_control_delay',
+            'calvin_control_if',
+            'calvin_control_if_else',
+            'calvin_control_while',
+            'calvin_control_for',
+            'calvin_control_switch',
+            'calvin_control_case',
+            'calvin_control_default',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_operators_handlers_registered(self):
+        """Operadores: number, add, subtract, multiply, divide, gt, lt, eq, and, or."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_operator_number',
+            'calvin_operator_add',
+            'calvin_operator_subtract',
+            'calvin_operator_multiply',
+            'calvin_operator_divide',
+            'calvin_operator_gt',
+            'calvin_operator_lt',
+            'calvin_operator_eq',
+            'calvin_operator_and',
+            'calvin_operator_or',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_serial_handlers_registered(self):
+        """Serial: begin, print, has_data, read_string, set_timeout."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_serial_begin',
+            'calvin_serial_print',
+            'calvin_serial_has_data',
+            'calvin_serial_read_string',
+            'calvin_serial_set_timeout',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_io_handlers_registered(self):
+        """I/O: digital_write, digital_read, analog_read, analog_write, high_low."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_io_digital_write',
+            'calvin_io_digital_read',
+            'calvin_io_analog_read',
+            'calvin_io_analog_write',
+            'calvin_io_high_low',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_botflow1_handlers_registered(self):
+        """BotFlow 1: init_proximidad, init_nota, init_rgb, init_motores, adelante, distancia, nota, led_color."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_botflow1_init_proximidad',
+            'calvin_botflow1_distancia',
+            'calvin_botflow1_init_nota',
+            'calvin_botflow1_nota_octava',
+            'calvin_botflow1_init_rgb',
+            'calvin_botflow1_led_color',
+            'calvin_botflow1_init_motores',
+            'calvin_botflow1_adelante',
+            'calvin_botflow1_girar_motor',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_botflow2_handlers_registered(self):
+        """BotFlow 2: init_lineas, calibrar, linea_valor, linea_umbral, condition."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_botflow2_init_lineas',
+            'calvin_botflow2_calibrar_lineas',
+            'calvin_botflow2_linea_valor',
+            'calvin_botflow2_linea_umbral',
+            'calvin_botflow2_condition',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+    def test_ble_handlers_registered(self):
+        """BLE: init, service, characteristic, write, char_value_number, char_value_string."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'calvin_ble_init',
+            'calvin_ble_service',
+            'calvin_ble_characteristic',
+            'calvin_ble_write',
+            'calvin_ble_char_value_number',
+            'calvin_ble_char_value_string',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Falta handler: {h}')
+
+
+class CalvinGeneratorOutputPatternsTest(TestCase):
+    """Tests de patrones de salida del generador (análisis del código fuente)."""
+
+    def setUp(self):
+        path = _get_generator_path()
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_control_delay_generates_delay_call(self):
+        """calvin_control_delay debe producir delay(ms)."""
+        self.assertTrue(_has_pattern(self.content, r"delay\(\$\{ms\}\)"))
+
+    def test_control_if_generates_if_statement(self):
+        """calvin_control_if debe producir if (cond) { ... }."""
+        self.assertTrue(_has_pattern(self.content, r"if \(\$\{cond\}\)"))
+
+    def test_serial_begin_generates_serial_begin(self):
+        """calvin_serial_begin debe producir Serial.begin(baud)."""
+        self.assertTrue(_has_pattern(self.content, r"Serial\.begin\(\$\{baud\}\)"))
+
+    def test_serial_print_generates_println(self):
+        """calvin_serial_print debe producir Serial.println(...)."""
+        self.assertTrue(_has_pattern(self.content, r"Serial\.println\("))
+
+    def test_io_digital_write_generates_digital_write(self):
+        """calvin_io_digital_write debe producir digitalWrite(pin, stat)."""
+        self.assertTrue(_has_pattern(self.content, r"digitalWrite\(\$\{pin\}"))
+
+    def test_io_digital_read_generates_digital_read(self):
+        """calvin_io_digital_read debe producir digitalRead(pin)."""
+        self.assertTrue(_has_pattern(self.content, r"digitalRead\(\$\{pin\}\)"))
+
+    def test_operator_add_generates_addition(self):
+        """calvin_operator_add debe producir (a + b)."""
+        self.assertTrue(_has_pattern(self.content, r"\(\$\{a\} \+ \$\{b\}\)"))
+
+
+class CalvinBLEESP32Test(TestCase):
+    """Tests de generación BLE para ESP32."""
+
+    def setUp(self):
+        path = _get_generator_path()
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_ble_checks_esp32_via_get_board_family(self):
+        """BLE debe comprobar ESP32 con getBoardFamily(currentBoard) === 'esp32'."""
+        self.assertTrue(_has_pattern(self.content, r"getBoardFamily\s*\(\s*currentBoard\s*\)\s*===\s*['\"]esp32['\"]"))
+
+    def test_ble_init_includes_bledevice_when_esp32(self):
+        """calvin_ble_init debe incluir BLEDevice cuando es ESP32."""
+        self.assertIn('#include <BLEDevice.h>', self.content)
+        self.assertIn('BLEDevice::init', self.content)
+
+    def test_ble_includes_ble_stack(self):
+        """Código BLE debe registrar includes BLEDevice, BLEServer, BLEUtils, BLE2902."""
+        self.assertIn('BLEDevice.h', self.content)
+        self.assertIn('BLEServer.h', self.content)
+        self.assertIn('BLEUtils.h', self.content)
+        self.assertIn('BLE2902.h', self.content)
+
+
+class CalvinMaxUnchangedTest(TestCase):
+    """Verifica que el generador Calvin no modifique bloques MAX."""
+
+    def setUp(self):
+        path = _get_generator_path()
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_no_max_block_modifications(self):
+        """calvin_generator no debe registrar handlers para max_* ni arduino_*."""
+        handlers = _extract_for_block_handlers(self.content)
+        max_handlers = [h for h in handlers if h.startswith('max_') or h.startswith('arduino_')]
+        self.assertEqual(len(max_handlers), 0,
+                         f'calvin_generator no debe modificar max_*/arduino_*: {max_handlers}')
+
+
+class MaxBlocksStillWorkTest(TestCase):
+    """Verifica que los bloques MAX sigan definidos en arduino_generator (no se rompan)."""
+
+    def setUp(self):
+        path = Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'arduino_generator.js'
+        self.assertTrue(path.exists(), f'No existe {path}')
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_max_handlers_exist_in_arduino_generator(self):
+        """arduino_generator debe tener handlers para bloques max_* clave."""
+        handlers = _extract_for_block_handlers(self.content)
+        expected = [
+            'max_init_motores',
+            'max_adelante',
+            'max_medir_distancia',
+            'max_tocar_nota',
+            'max_leer_linea_izq',
+        ]
+        for h in expected:
+            self.assertIn(h, handlers, f'Bloque MAX {h} debe existir en arduino_generator')
+
+    def test_max_adelante_generates_adelante_call(self):
+        """max_adelante debe generar llamada adelante(vel)."""
+        self.assertTrue(_has_pattern(self.content, r"adelante\(\$\{vel\}\)"))

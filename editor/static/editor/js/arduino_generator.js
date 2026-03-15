@@ -23,16 +23,22 @@ arduinoGenerator.ORDER_CONDITIONAL = 13;
 arduinoGenerator.ORDER_ASSIGNMENT = 14;
 arduinoGenerator.ORDER_NONE = 99;
 
-// Variables para almacenar includes y variables globales
+// Variables para almacenar includes, variables, funciones y setups
 arduinoGenerator.includes_ = {};
 arduinoGenerator.variables_ = {};
+arduinoGenerator.functions_ = {};
 arduinoGenerator.setups_ = {};
 
 // Función de inicialización
 arduinoGenerator.init = function(workspace) {
     arduinoGenerator.includes_ = {};
     arduinoGenerator.variables_ = {};
+    arduinoGenerator.functions_ = {};
     arduinoGenerator.setups_ = {};
+    // Calvin BLE: reset estado entre generaciones
+    arduinoGenerator.bleChars_ = {};
+    arduinoGenerator.bleSvcIndex = 0;
+    arduinoGenerator.bleCbIndex = 0;
 };
 
 // Función para terminar la generación
@@ -49,6 +55,12 @@ arduinoGenerator.finish = function(code) {
         variables += arduinoGenerator.variables_[name] + '\n';
     }
     
+    // Generar funciones Calvin (definiciones)
+    let functions = '';
+    for (let name in arduinoGenerator.functions_) {
+        functions += arduinoGenerator.functions_[name] + '\n';
+    }
+    
     // Generar setups adicionales
     let setups = '';
     for (let name in arduinoGenerator.setups_) {
@@ -58,6 +70,7 @@ arduinoGenerator.finish = function(code) {
     let finalCode = '';
     if (includes) finalCode += includes + '\n';
     if (variables) finalCode += variables + '\n';
+    if (functions) finalCode += functions + '\n';
     
     // Inyectar setups adicionales dentro del void setup() si existen
     if (setups && code.includes('void setup() {')) {

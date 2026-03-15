@@ -1006,12 +1006,18 @@ function showAgentBanner() {
  * Inicializa el workspace de Blockly
  */
 function initBlockly() {
-    const toolbox = document.getElementById('toolbox');
+    const toolboxEl = document.getElementById('toolbox');
     const blocklyDiv = document.getElementById('blocklyDiv');
     const readOnly = typeof isReadOnlyMode === 'function' && isReadOnlyMode();
-    
+
+    // Toolbox dinámico: construir según robot guardado (MAX/Calvin)
+    if (typeof ToolboxConfig !== 'undefined' && toolboxEl) {
+        const robot = ToolboxConfig.getStoredRobot();
+        ToolboxConfig.buildToolboxElement(robot, toolboxEl);
+    }
+
     workspace = Blockly.inject(blocklyDiv, {
-        toolbox: toolbox,
+        toolbox: toolboxEl,
         theme: darkTheme,
         readOnly: readOnly,
         grid: {
@@ -1077,6 +1083,99 @@ function initBlockly() {
     
     // Aplicar estilos adicionales después de inyectar
     setTimeout(applyCustomStyles, 100);
+
+    // Selector de robot (MAX/Calvin)
+    initRobotSelector();
+}
+
+/**
+ * Inicializa el selector de robot y su listener
+ */
+function initRobotSelector() {
+    const sel = document.getElementById('robotSelect');
+    if (!sel || typeof ToolboxConfig === 'undefined') return;
+
+    sel.value = ToolboxConfig.getStoredRobot();
+    sel.addEventListener('change', function() {
+        const robot = sel.value;
+        if (robot === 'MAX' || robot === 'Calvin') {
+            switchRobot(robot);
+        }
+    });
+}
+
+/**
+ * Cambia el robot y actualiza el toolbox dinámicamente
+ * Preserva los bloques del workspace. Solo cambia el toolbox, no limpia el workspace.
+ */
+function switchRobot(robot) {
+    if (typeof ToolboxConfig === 'undefined' || !workspace) return;
+    if (robot !== 'MAX' && robot !== 'Calvin') return;
+
+    if (ToolboxConfig.hasCrossRobotBlocks && ToolboxConfig.hasCrossRobotBlocks(workspace, robot)) {
+        if (typeof showToast === 'function') {
+            showToast('Hay bloques del otro robot en el workspace. Puedes editarlos o eliminarlos.', 'warning');
+        } else if (typeof logToConsole === 'function') {
+            logToConsole('Aviso: hay bloques del otro robot; el toolbox cambió pero el workspace se mantuvo.', 'info');
+        }
+    }
+
+    ToolboxConfig.setStoredRobot(robot);
+
+    const toolboxEl = document.getElementById('toolbox');
+    if (toolboxEl) {
+        ToolboxConfig.buildToolboxElement(robot, toolboxEl);
+    }
+
+    // Blockly: reinject para aplicar nuevo toolbox (preservando bloques)
+    const blocklyDiv = document.getElementById('blocklyDiv');
+    if (!blocklyDiv) return;
+
+    const readOnly = typeof isReadOnlyMode === 'function' && isReadOnlyMode();
+
+    try {
+        const xml = Blockly.Xml.workspaceToDom(workspace);
+        const xmlText = Blockly.Xml.domToText(xml);
+
+        workspace.dispose();
+
+        workspace = Blockly.inject(blocklyDiv, {
+            toolbox: toolboxEl,
+            theme: darkTheme,
+            readOnly: readOnly,
+            grid: { spacing: 25, length: 3, colour: '#1e2530', snap: true },
+            zoom: { controls: true, wheel: true, startScale: 1.0, maxScale: 3, minScale: 0.3, scaleSpeed: 1.2 },
+            trashcan: true,
+            move: { scrollbars: true, drag: true, wheel: true },
+            renderer: 'zelos'
+        });
+
+        if (xmlText) {
+            const dom = Blockly.utils.xml.textToDom(xmlText);
+            Blockly.Xml.domToWorkspace(dom, workspace);
+        }
+
+        workspace.addChangeListener(function(event) {
+            if (event.type === Blockly.Events.BLOCK_CHANGE ||
+                event.type === Blockly.Events.BLOCK_CREATE ||
+                event.type === Blockly.Events.BLOCK_DELETE ||
+                event.type === Blockly.Events.BLOCK_MOVE) {
+                updateCode();
+                updateBlockCount();
+                markWorkspaceDirty();
+            }
+        });
+
+        updateCode();
+        updateBlockCount();
+        setTimeout(applyCustomStyles, 100);
+
+        if (typeof logToConsole === 'function') {
+            logToConsole(`Robot cambiado a ${robot}`, 'info');
+        }
+    } catch (e) {
+        console.error('Error al cambiar robot:', e);
+    }
 }
 
 /**
@@ -1186,21 +1285,12 @@ function serializeWorkspace() {
 function showAutoSaveIndicator(state, message) {
     let indicator = document.getElementById('autosaveIndicator');
     
-    // Crear indicador si no existe
+    // Crear indicador si no existe (siempre en body para evitar reflow en header/workspace)
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'autosaveIndicator';
         indicator.className = 'autosave-indicator';
-        
-        // Intentar insertarlo en el header del IDE
-        const header = document.querySelector('.header') || document.querySelector('.workspace-header');
-        if (header) {
-            header.appendChild(indicator);
-        } else {
-            // Fallback: insertarlo en el body con posición fixed
-            indicator.classList.add('autosave-indicator-fixed');
-            document.body.appendChild(indicator);
-        }
+        document.body.appendChild(indicator);
     }
     
     // Actualizar contenido y estado
