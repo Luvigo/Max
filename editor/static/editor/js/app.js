@@ -2297,24 +2297,26 @@ async function connectSerial() {
         addSerialLine(`Puerto seleccionado`, 'system');
         
         // Si el puerto ya está abierto, cerrarlo primero
-        if (serialPort.readable || serialPort.writable) {
-            try {
+        try {
+            if (serialPort.readable || serialPort.writable) {
                 await serialPort.close();
-            } catch (e) {}
-        }
+                await new Promise(r => setTimeout(r, 300));
+            }
+        } catch (e) {}
         
         // Abrir conexión
         await serialPort.open({ baudRate: baudrate });
         
-        // Configurar lectura
+        // Configurar lectura: readable -> TextDecoderStream (bytes -> texto)
         const decoder = new TextDecoderStream();
         const inputStream = serialPort.readable.pipeThrough(decoder);
         serialReader = inputStream.getReader();
         
-        // Configurar escritura
+        // Configurar escritura: TextEncoderStream acepta texto, su readable envía bytes al puerto
+        // WritableStream no tiene pipeThrough; hay que usar encoder.readable.pipeTo(port.writable)
         const encoder = new TextEncoderStream();
-        const outputStream = serialPort.writable.pipeThrough(encoder);
-        serialWriter = outputStream.getWriter();
+        encoder.readable.pipeTo(serialPort.writable);
+        serialWriter = encoder.writable.getWriter();
         
         isSerialConnected = true;
         updateSerialUI(true, 'Serial', baudrate);
@@ -2328,31 +2330,38 @@ async function connectSerial() {
         logToConsole('Monitor serial conectado (Web Serial)', 'success');
         
     } catch (error) {
-        if (error.name === 'NotFoundError') {
+        serialPort = null;
+        if (error.message && error.message.includes('No port selected')) {
+            // Usuario cerró el diálogo sin seleccionar - no es error crítico
+            showToast('No se seleccionó ningún puerto', 'info');
+        } else if (error.message && error.message.includes('already open')) {
+            showToast('El puerto está en uso. Cierra Arduino IDE o espera unos segundos tras subir.', 'warning');
+            logToConsole('Serial: Puerto en uso. Espera y reintenta.', 'warning');
+        } else if (error.name === 'NotFoundError') {
             showToast('No se seleccionó ningún puerto', 'warning');
         } else {
-            showToast('Error al conectar: ' + error.message, 'error');
+            showToast('Error al conectar: ' + (error.message || error), 'error');
+            logToConsole('Error serial: ' + (error.message || error), 'error');
         }
-        logToConsole('Error serial: ' + error.message, 'error');
-        serialPort = null;
     }
 }
 
 async function disconnectSerial() {
     try {
         if (serialReader) {
-            await serialReader.cancel();
-            serialReader.releaseLock();
+            try { await serialReader.cancel(); } catch (e) {}
+            try { serialReader.releaseLock(); } catch (e) {}
             serialReader = null;
         }
         
         if (serialWriter) {
-            await serialWriter.close();
+            try { await serialWriter.close(); } catch (e) {}
             serialWriter = null;
         }
         
         if (serialPort) {
-            await serialPort.close();
+            await new Promise(r => setTimeout(r, 100));
+            try { await serialPort.close(); } catch (e) {}
             serialPort = null;
         }
         
@@ -2366,6 +2375,7 @@ async function disconnectSerial() {
         console.error('Error al desconectar:', error);
         isSerialConnected = false;
         updateSerialUI(false);
+        serialPort = null;
     }
 }
 
