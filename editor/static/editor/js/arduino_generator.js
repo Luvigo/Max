@@ -5,6 +5,20 @@
 // Crear el generador de Arduino
 const arduinoGenerator = new Blockly.Generator('Arduino');
 
+// Compatibilidad Blockly 9.3: blockToCode usa this[blockType], no forBlock.
+// Crear forBlock y sincronizar asignaciones con arduinoGenerator[type]
+arduinoGenerator.forBlock = arduinoGenerator.forBlock || {};
+(function() {
+    const fb = arduinoGenerator.forBlock;
+    arduinoGenerator.forBlock = new Proxy(fb, {
+        set: function(_, prop, value) {
+            fb[prop] = value;
+            arduinoGenerator[prop] = value;
+            return true;
+        }
+    });
+})();
+
 // Precedencia de operadores
 arduinoGenerator.ORDER_ATOMIC = 0;
 arduinoGenerator.ORDER_UNARY_POSTFIX = 1;
