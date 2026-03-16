@@ -383,11 +383,13 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
     }
 
     onLog('[UPLOAD] Compilando...');
+    const isEsp32 = (fqbn || '').includes('esp32');
+    const compileTimeoutMs = isEsp32 ? 300000 : 120000;  // ESP32: 5 min (1ª compilación tarda)
     try {
         // 1) Compilar
         const compileUrl = AgentConfig.baseUrl + AgentConfig.endpoints.compile;
         const compileCtrl = new AbortController();
-        const compileTimeout = setTimeout(() => compileCtrl.abort(), 120000);
+        const compileTimeout = setTimeout(() => compileCtrl.abort(), compileTimeoutMs);
 
         // Usar mismo formato que Verificar: { code, fqbn } - evita "No hay código para compilar"
         const compileRes = await fetch(compileUrl, {
@@ -433,7 +435,8 @@ async function uploadViaAgent(code, port, fqbn, onLog = () => {}) {
 
         const uploadUrl = AgentConfig.baseUrl + AgentConfig.endpoints.upload;
         const uploadCtrl = new AbortController();
-        const uploadTimeout = setTimeout(() => uploadCtrl.abort(), 120000);
+        const uploadTimeoutMs = isEsp32 ? 300000 : 120000;
+        const uploadTimeout = setTimeout(() => uploadCtrl.abort(), uploadTimeoutMs);
 
         const uploadRes = await fetch(uploadUrl, {
             method: 'POST',
@@ -2279,7 +2282,9 @@ async function uploadCode() {
             } else if (result.errorCode === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('permiso') || errorLower.includes('denied') || errorLower.includes('access')) {
                 showToast('Drivers faltantes (CH340/CP2102)', 'error');
             } else if (family === 'esp32' && (result.errorCode === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader'))) {
-                showToast('ESP32: mantén BOOT y presiona EN', 'error');
+                showToast(errorLower.includes('boot') || errorLower.includes('bootloader')
+                    ? 'ESP32: mantén BOOT y presiona EN'
+                    : 'Timeout. La compilación ESP32 puede tardar 3-5 min la 1ª vez', 'error');
             } else if (result.errorCode === 'PORT_BUSY' || errorLower.includes('busy')) {
                 showToast('Puerto ocupado. Cierra otras aplicaciones que lo usen.', 'error');
             } else if (isSyncError && family !== 'esp32') {
@@ -2296,14 +2301,18 @@ async function uploadCode() {
                 const isBusy = code === 'PORT_BUSY' || errorLower.includes('busy');
                 const isNotFound = code === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe');
                 const isTimeout = code === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader');
+                const isTimeoutAtConnect = errorLower.includes('boot') || errorLower.includes('bootloader');
                 if (isCompilerAccessDenied) {
                     logToConsole('[UPLOAD] 💡 El antivirus bloquea el compilador. Añade la carpeta Arduino15\\packages\\esp32 a exclusiones de Windows Defender.', 'warning');
                 } else if (isCompilerNotFound) {
                     logToConsole('[UPLOAD] 💡 Abre CMD y ejecuta: arduino-cli core install esp32:esp32', 'warning');
+                } else if (isTimeout && !isTimeoutAtConnect) {
+                    logToConsole('[UPLOAD] 💡 La compilación ESP32 puede tardar 3-5 min la primera vez. Ahora damos hasta 5 min.', 'warning');
                 } else if (isDriver || isNotFound || isTimeout) {
                     logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
                 }
-                if (isBusy || isNotFound || isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
+                if ((isBusy || isNotFound) && !isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
+                if (isTimeout && isTimeoutAtConnect) logToConsole('[UPLOAD] 💡 Mantén BOOT pulsado y presiona EN antes de subir.', 'warning');
             }
         }
     } catch (error) {

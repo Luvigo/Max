@@ -497,12 +497,13 @@ def compile_code():
         ]
         
         log(f"Compilando...")
+        compile_timeout = 300 if 'esp32' in fqbn else 120  # ESP32: hasta 5 min (1ª vez tarda)
         
         compile_result = subprocess.run(
             compile_cmd,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=compile_timeout
         )
         
         # Capturar salida
@@ -545,12 +546,13 @@ def compile_code():
         })
         
     except subprocess.TimeoutExpired:
-        log("Timeout de compilación (120s)")
+        log("Timeout de compilación")
+        hint = 'La compilación ESP32 puede tardar 3-5 min la primera vez. Intenta de nuevo.' if 'esp32' in fqbn else 'La compilación tardó más de 2 minutos.'
         return jsonify({
             'ok': False,
             'error': 'Timeout de compilación',
             'logs': logs,
-            'hint': 'La compilación tardó más de 2 minutos.'
+            'hint': hint
         }), 408
         
     except Exception as e:
@@ -742,12 +744,12 @@ def upload():
             ]
             
             log(f"Ejecutando: {' '.join(compile_cmd)}")
-            
+            compile_timeout = 300 if 'esp32' in fqbn else 120
             compile_result = subprocess.run(
                 compile_cmd,
                 capture_output=True,
                 text=True,
-                timeout=120
+                timeout=compile_timeout
             )
             
             if compile_result.returncode != 0:
@@ -792,12 +794,12 @@ def upload():
         ]
         
         log(f"Comando: {' '.join(upload_cmd)}")
-        
+        upload_timeout = 300 if 'esp32' in fqbn else 120
         upload_result = subprocess.run(
             upload_cmd,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=upload_timeout
         )
         
         # Capturar output completo
