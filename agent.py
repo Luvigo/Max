@@ -19,6 +19,7 @@ import os
 import sys
 import json
 import time
+import uuid
 import shutil
 import tempfile
 import platform
@@ -26,6 +27,37 @@ import argparse
 import subprocess
 from pathlib import Path
 from datetime import datetime
+
+# Job store: compile -> upload sin recompilar (evita doble compilación ESP32)
+_upload_job_store = {}
+JOB_TTL_SEC = 600  # 10 min
+
+def _store_upload_job(build_dir, fqbn):
+    job_id = str(uuid.uuid4())[:12]
+    _upload_job_store[job_id] = {
+        'build_dir': build_dir,
+        'fqbn': fqbn,
+        'created_at': time.time(),
+    }
+    return job_id
+
+def _get_upload_job(job_id):
+    job = _upload_job_store.get(job_id)
+    if not job:
+        return None
+    if time.time() - job['created_at'] > JOB_TTL_SEC:
+        try:
+            parent = os.path.dirname(job['build_dir'])
+            if os.path.isdir(parent):
+                shutil.rmtree(parent, ignore_errors=True)
+        except Exception:
+            pass
+        del _upload_job_store[job_id]
+        return None
+    if not os.path.isdir(job['build_dir']):
+        del _upload_job_store[job_id]
+        return None
+    return job
 
 try:
     from flask import Flask, request, jsonify, make_response
@@ -424,6 +456,7 @@ def compile_code():
     
     logs = []
     temp_dir = None
+    job_stored = [False]  # mutable para finally
     
     def log(msg):
         """Añade mensaje al log."""
@@ -453,6 +486,7 @@ def compile_code():
         
         code = data.get('code', '')
         fqbn = data.get('fqbn', 'arduino:avr:uno')
+        return_job_id = data.get('return_job_id', False)
         
         if not code or not code.strip():
             return jsonify({
@@ -537,13 +571,20 @@ def compile_code():
         
         log(f"✓ Compilación exitosa ({hex_size} bytes)")
         
-        return jsonify({
+        resp_data = {
             'ok': True,
             'message': 'Compilación exitosa',
             'logs': logs,
             'size': hex_size,
-            'fqbn': fqbn
-        })
+            'fqbn': fqbn,
+            'family': 'esp32' if 'esp32' in fqbn else 'avr'
+        }
+        if return_job_id:
+            job_id = _store_upload_job(build_dir, fqbn)
+            resp_data['job_id'] = job_id
+            job_stored[0] = True
+        
+        return jsonify(resp_data)
         
     except subprocess.TimeoutExpired:
         log("Timeout de compilación")
@@ -564,16 +605,11 @@ def compile_code():
         }), 500
         
     finally:
-        # Limpiar directorio temporal
-        if temp_dir and os.path.exists(temp_dir):
+        if temp_dir and os.path.exists(temp_dir) and not job_stored[0]:
             try:
                 shutil.rmtree(temp_dir)
             except Exception as e:
                 print(f"[COMPILE] Error limpiando temp: {e}")
-
-# ============================================
-# ENDPOINT: POST /upload
-# ============================================
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload():
@@ -638,6 +674,7 @@ def upload():
         fqbn = data.get('fqbn', 'arduino:avr:uno')
         hex_url = data.get('hex_url')
         code = data.get('code')
+        job_id = data.get('job_id')
         
         # Validar parámetros
         if not port:
@@ -647,10 +684,10 @@ def upload():
                 'logs': logs
             }), 400
         
-        if not hex_url and not code:
+        if not hex_url and not code and not job_id:
             return jsonify({
                 'ok': False,
-                'error': 'Parámetro "hex_url" o "code" requerido',
+                'error': 'Parámetro "hex_url", "code" o "job_id" requerido',
                 'logs': logs
             }), 400
         
@@ -669,9 +706,41 @@ def upload():
         hex_file = None
         
         # ========================================
+        # OPCIÓN 0: Usar job_id (compilación previa, sin recompilar)
+        # ========================================
+        if job_id:
+            job = _get_upload_job(job_id)
+            if not job:
+                return jsonify({
+                    'ok': False,
+                    'error': f'job_id "{job_id}" no encontrado o expirado',
+                    'logs': logs,
+                    'hint': 'La compilación anterior expiró (10 min). Vuelve a intentar.'
+                }), 404
+            build_dir = job['build_dir']
+            fqbn = job.get('fqbn', fqbn)
+            log(f"Usando compilación previa (job_id={job_id})")
+            # Buscar firmware: .hex (AVR) o .bin (ESP32), puede estar en subdirs
+            hex_file = None
+            for root, _, files in os.walk(build_dir):
+                for f in files:
+                    if f.endswith('.hex') or f.endswith('.bin'):
+                        hex_file = os.path.join(root, f)
+                        break
+                if hex_file:
+                    break
+            if not hex_file:
+                return jsonify({
+                    'ok': False,
+                    'error': 'No se encontró firmware en el job',
+                    'logs': logs
+                }), 500
+            log(f"Firmware: {hex_file}")
+        
+        # ========================================
         # OPCIÓN 1: Descargar HEX desde URL
         # ========================================
-        if hex_url:
+        elif hex_url:
             log(f"Descargando HEX desde: {hex_url}")
             
             try:
@@ -718,7 +787,7 @@ def upload():
                 }), 500
         
         # ========================================
-        # OPCIÓN 2: Compilar código localmente
+        # OPCIÓN 2: Compilar código localmente (sin job_id)
         # ========================================
         elif code:
             log("Compilando código localmente...")
@@ -818,6 +887,15 @@ def upload():
         # Analizar resultado
         if upload_result.returncode == 0:
             log("✓ Upload exitoso!")
+            if job_id and job_id in _upload_job_store:
+                job = _upload_job_store[job_id]
+                try:
+                    parent = os.path.dirname(job['build_dir'])
+                    if os.path.isdir(parent):
+                        shutil.rmtree(parent, ignore_errors=True)
+                except Exception:
+                    pass
+                del _upload_job_store[job_id]
             return jsonify({
                 'ok': True,
                 'success': True,
