@@ -2224,6 +2224,9 @@ async function uploadCode() {
                 showToast(family === 'esp32'
                     ? 'ESP32: arduino-cli core install esp32:esp32'
                     : 'Core Arduino no instalado', 'error');
+            } else if (errorLower.includes('access is denied') && (errorLower.includes('fork/exec') || errorLower.includes('xtensa-esp32') || errorLower.includes('packages\\esp32'))) {
+                // Antivirus bloqueando el compilador ESP32 - NO es problema de drivers
+                showToast('Antivirus bloquea el compilador. Añade exclusiones en Windows Defender.', 'error');
             } else if (result.errorCode === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('permiso') || errorLower.includes('denied') || errorLower.includes('access')) {
                 showToast('Drivers faltantes (CH340/CP2102)', 'error');
             } else if (family === 'esp32' && (result.errorCode === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader'))) {
@@ -2238,11 +2241,16 @@ async function uploadCode() {
             // Hints para ESP32 con errores típicos
             if (family === 'esp32') {
                 const code = result.errorCode || '';
-                const isDriver = code === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('access') || errorLower.includes('denied');
+                const isCompilerAccessDenied = errorLower.includes('access is denied') && (errorLower.includes('fork/exec') || errorLower.includes('xtensa-esp32') || errorLower.includes('packages\\esp32') || errorLower.includes('packages/esp32'));
+                const isDriver = !isCompilerAccessDenied && (code === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('access') || errorLower.includes('denied'));
                 const isBusy = code === 'PORT_BUSY' || errorLower.includes('busy');
                 const isNotFound = code === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe');
                 const isTimeout = code === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader');
-                if (isDriver || isNotFound || isTimeout) logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
+                if (isCompilerAccessDenied) {
+                    logToConsole('[UPLOAD] 💡 El antivirus bloquea el compilador. Añade la carpeta Arduino15\\packages\\esp32 a exclusiones de Windows Defender.', 'warning');
+                } else if (isDriver || isNotFound || isTimeout) {
+                    logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
+                }
                 if (isBusy || isNotFound || isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
             }
         }
