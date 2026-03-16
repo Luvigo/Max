@@ -62,7 +62,8 @@ const AgentConfig = {
         compile: '/compile',
         upload: '/upload',
         ports: '/ports',
-        boards: '/boards'
+        boards: '/boards',
+        esp32Install: '/esp32/install'
     }
 };
 
@@ -2216,8 +2217,53 @@ async function uploadCode() {
                 
                 showToast('Cambia a "Arduino Nano (Old Bootloader)" en el selector de Board', 'warning');
             }
-            // Mensajes humanos según tipo de error
             const family = result.family || getBoardFamily(currentBoard);
+            const isCompilerNotFound = family === 'esp32' && errorLower.includes('createprocess') && (errorLower.includes('no such file') || errorLower.includes('no such file or directory')) && errorLower.includes('xtensa-esp32');
+            const isCoreNotInstalled = family === 'esp32' && (result.errorCode === 'CORE_NOT_INSTALLED' || (errorLower.includes('core') && errorLower.includes('no disponible')));
+            // Oferta instalación automática ESP32 (un clic, sin abrir CMD)
+            if (isCompilerNotFound || isCoreNotInstalled) {
+                const instalar = confirm(
+                    '❌ Herramientas ESP32 no encontradas\n\n' +
+                    '¿Quieres que las instalemos automáticamente?\n' +
+                    '(Solo un clic, tarda 1-2 minutos. No hace falta abrir CMD)\n\n' +
+                    '• SÍ = Instalar ahora\n' +
+                    '• NO = Ver instrucciones manuales'
+                );
+                if (instalar) {
+                    btn.innerHTML = '<span>⏳</span><span>Instalando ESP32...</span>';
+                    const ac = new AbortController();
+                    const t = setTimeout(() => ac.abort(), 300000);
+                    try {
+                        const r = await fetch(AgentConfig.baseUrl + AgentConfig.endpoints.esp32Install, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: ac.signal
+                        });
+                        clearTimeout(t);
+                        const data = await r.json();
+                        if (data.ok) {
+                            showToast('✓ Herramientas ESP32 instaladas', 'success');
+                            logToConsole('[UPLOAD] ✓ Core ESP32 instalado correctamente', 'success');
+                            if (data.logs && data.logs.length) data.logs.forEach(l => logToConsole(l, 'info'));
+                            const reintentar = confirm('¿Reintentar subir ahora?');
+                            if (reintentar) uploadCode();
+                        } else {
+                            showToast(data.error || 'Error instalando', 'error');
+                            logToConsole('[UPLOAD] ✗ ' + (data.error || ''), 'error');
+                        }
+                    } catch (e) {
+                        clearTimeout(t);
+                        const msg = e.name === 'AbortError' ? 'Tiempo agotado (5 min)' : e.message;
+                        showToast('Error: ' + msg, 'error');
+                        logToConsole('[UPLOAD] ✗ ' + msg, 'error');
+                    }
+                    btn.disabled = false;
+                    btn.setAttribute('aria-busy', 'false');
+                    btn.innerHTML = '<span>🚀</span><span>Subir</span>';
+                    return;
+                }
+            }
+            // Mensajes humanos según tipo de error
             if (result.errorCode === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe')) {
                 showToast('No se detectó puerto', 'error');
             } else if (result.errorCode === 'CORE_NOT_INSTALLED' || (errorLower.includes('core') && errorLower.includes('no disponible'))) {
@@ -2225,8 +2271,11 @@ async function uploadCode() {
                     ? 'ESP32: arduino-cli core install esp32:esp32'
                     : 'Core Arduino no instalado', 'error');
             } else if (errorLower.includes('access is denied') && (errorLower.includes('fork/exec') || errorLower.includes('xtensa-esp32') || errorLower.includes('packages\\esp32'))) {
-                // Antivirus bloqueando el compilador ESP32 - NO es problema de drivers
+                // Antivirus bloqueando el compilador ESP32
                 showToast('Antivirus bloquea el compilador. Añade exclusiones en Windows Defender.', 'error');
+            } else if (family === 'esp32' && errorLower.includes('createprocess') && (errorLower.includes('no such file') || errorLower.includes('no such file or directory')) && errorLower.includes('xtensa-esp32')) {
+                // Compilador ESP32 no encontrado - instalación incompleta o antivirus lo eliminó
+                showToast('Compilador ESP32 no encontrado. Reinstala el core esp32:esp32', 'error');
             } else if (result.errorCode === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('permiso') || errorLower.includes('denied') || errorLower.includes('access')) {
                 showToast('Drivers faltantes (CH340/CP2102)', 'error');
             } else if (family === 'esp32' && (result.errorCode === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader'))) {
@@ -2242,12 +2291,15 @@ async function uploadCode() {
             if (family === 'esp32') {
                 const code = result.errorCode || '';
                 const isCompilerAccessDenied = errorLower.includes('access is denied') && (errorLower.includes('fork/exec') || errorLower.includes('xtensa-esp32') || errorLower.includes('packages\\esp32') || errorLower.includes('packages/esp32'));
-                const isDriver = !isCompilerAccessDenied && (code === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('access') || errorLower.includes('denied'));
+                const isCompilerNotFound = errorLower.includes('createprocess') && (errorLower.includes('no such file') || errorLower.includes('no such file or directory')) && errorLower.includes('xtensa-esp32');
+                const isDriver = !isCompilerAccessDenied && !isCompilerNotFound && (code === 'PERMISSION_DENIED' || errorLower.includes('permission') || errorLower.includes('access') || errorLower.includes('denied'));
                 const isBusy = code === 'PORT_BUSY' || errorLower.includes('busy');
                 const isNotFound = code === 'PORT_NOT_FOUND' || errorLower.includes('not found') || errorLower.includes('no existe');
                 const isTimeout = code === 'TIMEOUT' || errorLower.includes('timeout') || errorLower.includes('boot') || errorLower.includes('bootloader');
                 if (isCompilerAccessDenied) {
                     logToConsole('[UPLOAD] 💡 El antivirus bloquea el compilador. Añade la carpeta Arduino15\\packages\\esp32 a exclusiones de Windows Defender.', 'warning');
+                } else if (isCompilerNotFound) {
+                    logToConsole('[UPLOAD] 💡 Abre CMD y ejecuta: arduino-cli core install esp32:esp32', 'warning');
                 } else if (isDriver || isNotFound || isTimeout) {
                     logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
                 }

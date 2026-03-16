@@ -7,11 +7,12 @@ Uso:
     python agent.py [--port 8765] [--arduino-cli /path/to/arduino-cli]
 
 Endpoints:
-    GET  /health   - Estado del agent
-    GET  /ports    - Lista de puertos seriales
-    GET  /boards   - Lista de placas soportadas (boards_registry.json)
-    POST /compile  - Compilar código (sin subir)
-    POST /upload   - Compilar y subir código al Arduino
+    GET  /health       - Estado del agent
+    GET  /ports        - Lista de puertos seriales
+    GET  /boards       - Lista de placas soportadas (boards_registry.json)
+    POST /esp32/install - Instalar core ESP32 automáticamente (un clic para estudiantes)
+    POST /compile      - Compilar código (sin subir)
+    POST /upload       - Compilar y subir código al Arduino
 """
 
 import os
@@ -317,6 +318,83 @@ def list_boards():
     """
     boards = _load_boards_registry()
     return jsonify({'ok': True, 'boards': boards})
+
+# ============================================
+# ENDPOINT: POST /esp32/install
+# ============================================
+
+@app.route('/esp32/install', methods=['POST', 'OPTIONS'])
+def install_esp32_core():
+    """
+    Instala el core ESP32 automáticamente (arduino-cli core install esp32:esp32).
+    Pensado para estudiantes: un solo clic en vez de abrir CMD.
+    
+    Response:
+        { "ok": true/false, "logs": [...], "error": "..." }
+    """
+    logs = []
+    
+    def log(msg):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        entry = f"[{timestamp}] {msg}"
+        logs.append(entry)
+        print(f"[ESP32-INSTALL] {msg}")
+    
+    try:
+        if not ARDUINO_CLI:
+            return jsonify({
+                'ok': False,
+                'error': 'arduino-cli no encontrado',
+                'logs': logs
+            }), 500
+        
+        log('Instalando core esp32:esp32... (puede tardar 1-3 minutos)')
+        
+        result = subprocess.run(
+            [ARDUINO_CLI, 'core', 'install', 'esp32:esp32'],
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 min para descarga grande
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+        
+        if result.stdout:
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    log(line)
+        if result.stderr:
+            for line in result.stderr.strip().split('\n'):
+                if line.strip():
+                    log(line)
+        
+        if result.returncode == 0:
+            log('✓ Core esp32:esp32 instalado correctamente')
+            return jsonify({
+                'ok': True,
+                'logs': logs,
+                'message': 'Core ESP32 instalado. Intenta subir de nuevo.'
+            })
+        
+        return jsonify({
+            'ok': False,
+            'error': result.stderr or result.stdout or 'Error desconocido',
+            'logs': logs
+        }), 500
+        
+    except subprocess.TimeoutExpired:
+        log('Tiempo de espera agotado')
+        return jsonify({
+            'ok': False,
+            'error': 'La instalación tardó demasiado (timeout 5 min)',
+            'logs': logs
+        }), 500
+    except Exception as e:
+        log(f'Error: {e}')
+        return jsonify({
+            'ok': False,
+            'error': str(e),
+            'logs': logs
+        }), 500
 
 # ============================================
 # ENDPOINT: POST /compile
