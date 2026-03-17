@@ -554,12 +554,17 @@ def compile_code():
         if compile_result.returncode != 0:
             error_msg = compile_result.stderr or compile_result.stdout or 'Error desconocido'
             log(f"Error de compilación (exit code: {compile_result.returncode})")
-            return jsonify({
+            resp = {
                 'ok': False,
                 'error': error_msg,
                 'logs': logs,
-                'exit_code': compile_result.returncode
-            }), 400
+                'exit_code': compile_result.returncode,
+                'family': 'esp32' if 'esp32' in fqbn else 'avr'
+            }
+            err_lower = error_msg.lower()
+            if 'platform' in err_lower and ('not found' in err_lower or 'not installed' in err_lower):
+                resp['hint'] = 'Ejecuta: arduino-cli core install esp32:esp32' if 'esp32' in fqbn else 'Instala el core: arduino-cli core install arduino:avr'
+            return jsonify(resp), 400
         
         # Buscar archivo HEX para obtener tamaño
         hex_size = 0

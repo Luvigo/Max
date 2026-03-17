@@ -16,7 +16,7 @@ cd /d "%~dp0"
 REM ========================================
 REM PASO 1: Verificar winget
 REM ========================================
-echo [1/5] Verificando winget...
+echo [1/6] Verificando winget...
 winget --version >nul 2>&1
 if errorlevel 1 (
     echo.
@@ -38,7 +38,7 @@ echo.
 REM ========================================
 REM PASO 2: Verificar/Instalar Python
 REM ========================================
-echo [2/5] Verificando Python...
+echo [2/6] Verificando Python...
 python --version >nul 2>&1
 if errorlevel 1 (
     echo       Python no encontrado. Instalando con winget...
@@ -71,7 +71,7 @@ echo.
 REM ========================================
 REM PASO 3: Verificar/Instalar Arduino CLI
 REM ========================================
-echo [3/5] Verificando Arduino CLI...
+echo [3/6] Verificando Arduino CLI...
 arduino-cli version >nul 2>&1
 if errorlevel 1 (
     echo       Arduino CLI no encontrado. Instalando con winget...
@@ -100,7 +100,7 @@ echo.
 REM ========================================
 REM PASO 4: Verificar/Instalar Core Arduino AVR
 REM ========================================
-echo [4/5] Verificando core arduino:avr...
+echo [4/6] Verificando core arduino:avr...
 arduino-cli core list 2>nul | findstr /C:"arduino:avr" >nul
 if errorlevel 1 (
     echo       Instalando core arduino:avr...
@@ -120,9 +120,32 @@ if errorlevel 1 (
 echo.
 
 REM ========================================
-REM PASO 5: Instalar dependencias Python
+REM PASO 5: Verificar/Instalar Core ESP32
 REM ========================================
-echo [5/5] Verificando dependencias Python...
+echo [5/6] Verificando core esp32:esp32...
+arduino-cli core list 2>nul | findstr /C:"esp32:esp32" >nul
+if errorlevel 1 (
+    echo       Instalando core esp32:esp32 (ESP32 Dev Module)...
+    echo       Esto puede tardar 2-5 minutos (descarga ~200MB)...
+    echo.
+    arduino-cli core update-index
+    arduino-cli core install esp32:esp32
+    if errorlevel 1 (
+        echo       ERROR: No se pudo instalar el core esp32:esp32.
+        echo       Puedes instalarlo despues desde el IDE con el boton de ayuda.
+        pause
+        exit /b 1
+    )
+    echo       [OK] Core esp32:esp32 instalado
+) else (
+    echo       [OK] Core esp32:esp32 encontrado
+)
+echo.
+
+REM ========================================
+REM PASO 6: Instalar dependencias Python
+REM ========================================
+echo [6/6] Verificando dependencias Python...
 python -c "import flask" >nul 2>&1
 if errorlevel 1 (
     echo       Instalando dependencias (flask, pyserial, etc.)...

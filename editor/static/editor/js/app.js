@@ -2014,7 +2014,9 @@ async function verifyCode() {
     
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+        const isEsp32 = (currentBoard || '').includes('esp32');
+        const verifyTimeout = isEsp32 ? 300000 : 120000;
+        const timeoutId = setTimeout(() => controller.abort(), verifyTimeout);
         
         const response = await fetch(AgentConfig.baseUrl + '/compile', {
             method: 'POST',
@@ -2047,6 +2049,42 @@ async function verifyCode() {
                 logToConsole(`[ESP32] ${data.hint}`, 'warning');
             } else if (data.hint) {
                 logToConsole(`[AVR] ${data.hint}`, 'warning');
+            }
+            
+            const fam = data.family || getBoardFamily(currentBoard);
+            const errLower = (data.error || '').toLowerCase();
+            const isEsp32CoreMissing = fam === 'esp32' && (errLower.includes('platform') && (errLower.includes('not found') || errLower.includes('not installed')) || errLower.includes('core install esp32'));
+            if (isEsp32CoreMissing) {
+                const instalar = confirm(
+                    '❌ Herramientas ESP32 no instaladas\n\n' +
+                    '¿Quieres que las instalemos automáticamente?\n' +
+                    '(Solo un clic, tarda 1-2 minutos)\n\n' +
+                    '• SÍ = Instalar ahora\n' +
+                    '• NO = Cancelar'
+                );
+                if (instalar) {
+                    btn.innerHTML = '<span>⏳</span><span>Instalando ESP32...</span>';
+                    const ac = new AbortController();
+                    const t = setTimeout(() => ac.abort(), 300000);
+                    try {
+                        const r = await fetch(AgentConfig.baseUrl + AgentConfig.endpoints.esp32Install, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            signal: ac.signal
+                        });
+                        clearTimeout(t);
+                        const d = await r.json();
+                        if (d.ok) {
+                            showToast('✓ Herramientas ESP32 instaladas', 'success');
+                            logToConsole('[VERIFY] ✓ Core ESP32 instalado. Puedes verificar de nuevo.', 'success');
+                        } else {
+                            showToast(d.error || 'Error instalando', 'error');
+                        }
+                    } catch (e) {
+                        clearTimeout(t);
+                        showToast('Error: ' + (e.name === 'AbortError' ? 'Tiempo agotado' : e.message), 'error');
+                    }
+                }
             }
             
             showToast('Error de verificación', 'error');
