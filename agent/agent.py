@@ -1194,7 +1194,7 @@ def compile_code():
         if family == 'esp32':
             lib_servo = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libraries', 'Servo')
             if os.path.isdir(lib_servo):
-                compile_cmd.insert(-1, '-l')
+                compile_cmd.insert(-1, '--library')
                 compile_cmd.insert(-1, lib_servo)
         
         options = data.get('options') or {}
@@ -1594,7 +1594,7 @@ def _resolve_bin_for_upload_esp32(data, temp_dir, log_func):
         compile_args = [ARDUINO_CLI, 'compile', '--fqbn', fqbn, '--output-dir', build_dir]
         lib_servo = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libraries', 'Servo')
         if os.path.isdir(lib_servo):
-            compile_args.extend(['-l', lib_servo])
+            compile_args.extend(['--library', lib_servo])
         compile_args.append(sketch_dir)
         try:
             r = subprocess.run(compile_args, capture_output=True, text=True, timeout=120)
