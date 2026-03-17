@@ -1,6 +1,8 @@
 #!/bin/bash
 # =============================================
 # Build MAX-IDE Agent distribution package
+# Linux/macOS: bash build_package.sh
+# Windows:     powershell -File build_package.ps1
 # =============================================
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

@@ -75,8 +75,10 @@
      → NO uses snap. Desinstala con: sudo snap remove arduino-cli
      → Instala la versión binaria oficial (ver arriba)
    
-   • "Port busy" / Puerto ocupado
-     → Cierra Arduino IDE, Serial Monitor u otras apps
+   • "Port busy" / "Puerto ocupado" / "Se agotó el tiempo de espera del semáforo"
+     → Cierra el Monitor Serial si está abierto en MAX-IDE
+     → Cierra Arduino IDE, puTTY u otras apps que usen el puerto COM
+     → Desconecta y reconecta el cable USB del ESP32
    
    • "Sync error" / Error de sincronización
      → Prueba otro cable USB o presiona RESET en el Arduino

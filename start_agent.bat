@@ -150,7 +150,7 @@ echo [6/6] Verificando dependencias Python...
 python -c "import flask" >nul 2>&1
 if errorlevel 1 (
     echo       Instalando dependencias (flask, pyserial, etc.)...
-    pip install flask flask-cors pyserial requests --quiet --disable-pip-version-check
+    pip install flask flask-cors pyserial requests esptool --quiet --disable-pip-version-check
     if errorlevel 1 (
         echo       ERROR: No se pudieron instalar las dependencias.
         pause

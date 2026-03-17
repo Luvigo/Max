@@ -217,7 +217,7 @@ goto CHECK_AGENT
 :INSTALL_DEPS
 echo       Instalando dependencias (flask, pyserial, etc.)...
 echo.
-python -m pip install flask flask-cors pyserial requests
+python -m pip install flask flask-cors pyserial requests esptool
 if errorlevel 1 goto DEPS_ERROR
 echo       [OK] Dependencias instaladas
 echo.
@@ -227,7 +227,7 @@ goto CHECK_AGENT
 echo.
 echo       ERROR: No se pudieron instalar las dependencias.
 echo       Intenta ejecutar manualmente:
-echo       pip install flask flask-cors pyserial requests
+echo       pip install flask flask-cors pyserial requests esptool
 echo.
 pause
 exit /b 1

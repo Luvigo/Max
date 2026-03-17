@@ -3,4 +3,5 @@ flask>=2.0.0
 flask-cors>=3.0.0
 requests>=2.25.0
 pyserial>=3.5
+esptool>=4.0.0  # Fallback para upload ESP32 si arduino-cli falla (puerto ocupado)
 
