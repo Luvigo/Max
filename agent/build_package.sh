@@ -55,6 +55,7 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
       winget install -e --id ArduinoSA.CLI
       arduino-cli core update-index
       arduino-cli core install arduino:avr
+      arduino-cli core install esp32:esp32
    
    3. Haz doble clic en: start_agent.bat
    
@@ -66,6 +67,7 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
    1. Instala arduino-cli:
       brew install arduino-cli
       arduino-cli core install arduino:avr
+      arduino-cli core install esp32:esp32
    
    2. Ejecuta el Agent:
       cd ~/Downloads/maxide-agent
@@ -81,6 +83,7 @@ cat > "$PACKAGE_DIR/LEEME.txt" << 'EOF'
       sudo mv bin/arduino-cli /usr/local/bin/
       arduino-cli core update-index
       arduino-cli core install arduino:avr
+      arduino-cli core install esp32:esp32
    
    2. Agrega permisos de puerto serial:
       sudo usermod -a -G dialout $USER

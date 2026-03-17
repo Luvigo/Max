@@ -103,7 +103,9 @@ function getBoardLabel(fqbn) {
  */
 function getBoardFamily(fqbn) {
     const b = boardsRegistry.find(x => x.fqbn === fqbn);
-    return b ? (b.family || 'avr') : 'avr';
+    if (b) return b.family || 'avr';
+    if (fqbn && fqbn.includes('esp32')) return 'esp32';
+    return 'avr';
 }
 
 /**
@@ -143,7 +145,12 @@ async function loadBoardsRegistry() {
         if (r.ok) {
             const data = await r.json();
             if (data.boards && Array.isArray(data.boards) && data.boards.length > 0) {
-                boardsRegistry = data.boards;
+                boardsRegistry = data.boards.map(b => {
+                    if (b.fqbn === 'esp32:esp32:esp32' && b.label !== 'ESP32 Dev Module') {
+                        return { ...b, label: 'ESP32 Dev Module' };
+                    }
+                    return b;
+                });
                 return boardsRegistry;
             }
         }
@@ -155,7 +162,7 @@ async function loadBoardsRegistry() {
             const data = await r.json();
             const arr = Array.isArray(data) ? data : (data.boards || []);
             if (arr.length > 0) {
-                boardsRegistry = arr;
+                boardsRegistry = arr.map(b => (b.fqbn === 'esp32:esp32:esp32' && b.label !== 'ESP32 Dev Module') ? { ...b, label: 'ESP32 Dev Module' } : b);
                 return boardsRegistry;
             }
         }
@@ -2051,9 +2058,10 @@ async function verifyCode() {
                 logToConsole(`[AVR] ${data.hint}`, 'warning');
             }
             
-            const fam = data.family || getBoardFamily(currentBoard);
+            const fam = data.family || getBoardFamily(currentBoard || data.fqbn);
             const errLower = (data.error || '').toLowerCase();
-            const isEsp32CoreMissing = fam === 'esp32' && (errLower.includes('platform') && (errLower.includes('not found') || errLower.includes('not installed')) || errLower.includes('core install esp32'));
+            const fqbnVal = data.fqbn || currentBoard || '';
+            const isEsp32CoreMissing = (fam === 'esp32' || fqbnVal.includes('esp32')) && (errLower.includes('platform') && (errLower.includes('not found') || errLower.includes('not installed')) || errLower.includes('core install esp32'));
             if (isEsp32CoreMissing) {
                 const instalar = confirm(
                     '❌ Herramientas ESP32 no instaladas\n\n' +

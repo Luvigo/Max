@@ -33,7 +33,7 @@ echo.
 REM ========================================
 REM PASO 1: Verificar winget
 REM ========================================
-echo [1/6] Verificando winget...
+echo [1/7] Verificando winget...
 winget --version >nul 2>&1
 if errorlevel 1 goto NO_WINGET
 echo       [OK] winget disponible
@@ -58,7 +58,7 @@ REM ========================================
 REM PASO 2: Verificar/Instalar Python
 REM ========================================
 :CHECK_PYTHON
-echo [2/6] Verificando Python...
+echo [2/7] Verificando Python...
 python --version >nul 2>&1
 if errorlevel 1 goto INSTALL_PYTHON
 echo       [OK] Python encontrado
@@ -93,7 +93,7 @@ REM ========================================
 REM PASO 3: Verificar/Instalar Arduino CLI
 REM ========================================
 :CHECK_ARDUINO
-echo [3/6] Verificando Arduino CLI...
+echo [3/7] Verificando Arduino CLI...
 arduino-cli version >nul 2>&1
 if errorlevel 1 goto INSTALL_ARDUINO
 echo       [OK] Arduino CLI encontrado
@@ -125,7 +125,7 @@ REM ========================================
 REM PASO 4: Verificar/Instalar Core Arduino AVR
 REM ========================================
 :CHECK_AVR
-echo [4/6] Verificando core arduino:avr...
+echo [4/7] Verificando core arduino:avr...
 arduino-cli core list 2>nul | findstr "arduino:avr" >nul
 if errorlevel 1 goto INSTALL_AVR
 echo       [OK] Core arduino:avr encontrado
@@ -149,10 +149,38 @@ pause
 exit /b 1
 
 REM ========================================
-REM PASO 5: Verificar/Instalar Librerias Arduino
+REM PASO 5: Verificar/Instalar Core ESP32
+REM ========================================
+:CHECK_ESP32
+echo [5/7] Verificando core esp32:esp32...
+arduino-cli core list 2>nul | findstr "esp32:esp32" >nul
+if errorlevel 1 goto INSTALL_ESP32
+echo       [OK] Core esp32:esp32 encontrado
+echo.
+goto CHECK_LIBS
+
+:INSTALL_ESP32
+echo       Instalando core esp32:esp32 (ESP32 Dev Module)...
+echo       Esto puede tardar 2-5 minutos (descarga ~200MB)...
+echo.
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+if errorlevel 1 goto ESP32_ERROR
+echo       [OK] Core esp32:esp32 instalado
+echo.
+goto CHECK_LIBS
+
+:ESP32_ERROR
+echo       ERROR: No se pudo instalar el core esp32:esp32.
+echo       Puedes instalarlo despues desde el IDE con el boton de ayuda.
+pause
+exit /b 1
+
+REM ========================================
+REM PASO 6: Verificar/Instalar Librerias Arduino
 REM ========================================
 :CHECK_LIBS
-echo [5/6] Verificando librerias Arduino...
+echo [6/7] Verificando librerias Arduino...
 arduino-cli lib list 2>nul | findstr "Servo" >nul
 if errorlevel 1 goto INSTALL_LIBS
 echo       [OK] Librerias instaladas
@@ -175,10 +203,10 @@ pause
 exit /b 1
 
 REM ========================================
-REM PASO 6: Instalar dependencias Python
+REM PASO 7: Instalar dependencias Python
 REM ========================================
 :CHECK_DEPS
-echo [6/6] Verificando dependencias Python...
+echo [7/7] Verificando dependencias Python...
 python -c "import flask" >nul 2>&1
 if errorlevel 1 goto INSTALL_DEPS
 echo       [OK] Dependencias ya instaladas

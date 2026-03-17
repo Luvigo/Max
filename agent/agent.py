@@ -996,6 +996,62 @@ def _do_upload_avr(port, fqbn, hex_file, log_func):
     return (False, 'UPLOAD_FAIL', (r.stderr or r.stdout or 'Error desconocido')[:500])
 
 
+# ============================================
+# ENDPOINT: POST /esp32/install
+# ============================================
+
+@app.route('/esp32/install', methods=['POST', 'OPTIONS'])
+def install_esp32_core():
+    """
+    Instala el core ESP32 automáticamente (arduino-cli core install esp32:esp32).
+    Un solo clic para estudiantes, sin abrir CMD.
+    """
+    logs = []
+
+    def log(msg):
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        entry = f"[{timestamp}] {msg}"
+        logs.append(entry)
+        print(f"[ESP32-INSTALL] {msg}")
+
+    try:
+        if not ARDUINO_CLI:
+            return jsonify({'ok': False, 'error': 'arduino-cli no encontrado', 'logs': logs}), 500
+
+        log('Instalando core esp32:esp32... (puede tardar 1-3 minutos)')
+        result = subprocess.run(
+            [ARDUINO_CLI, 'core', 'install', 'esp32:esp32'],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=os.path.dirname(os.path.abspath(__file__))
+        )
+
+        if result.stdout:
+            for line in result.stdout.strip().split('\n'):
+                if line.strip():
+                    log(line)
+        if result.stderr:
+            for line in result.stderr.strip().split('\n'):
+                if line.strip():
+                    log(line)
+
+        if result.returncode == 0:
+            log('✓ Core esp32:esp32 instalado correctamente')
+            return jsonify({'ok': True, 'logs': logs, 'message': 'Core ESP32 instalado. Intenta verificar/subir de nuevo.'})
+        return jsonify({
+            'ok': False,
+            'error': result.stderr or result.stdout or 'Error desconocido',
+            'logs': logs
+        }), 500
+    except subprocess.TimeoutExpired:
+        log('Tiempo de espera agotado')
+        return jsonify({'ok': False, 'error': 'La instalación tardó demasiado (timeout 5 min)', 'logs': logs}), 500
+    except Exception as e:
+        log(f'Error: {e}')
+        return jsonify({'ok': False, 'error': str(e), 'logs': logs}), 500
+
+
 @app.route('/boards', methods=['GET', 'OPTIONS'])
 def list_boards():
     """
