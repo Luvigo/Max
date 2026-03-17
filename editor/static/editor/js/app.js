@@ -507,6 +507,10 @@ function uploadErrorToHumanMessage(result, family) {
             ? 'ESP32: Core no instalado. Ejecuta: arduino-cli core install esp32:esp32'
             : 'Core Arduino no instalado';
     }
+    // Semaphore timeout (Windows error 121): problema de driver USB, no puerto ocupado
+    if (err.includes('semáforo') || err.includes('semaphore') || err.includes('121,')) {
+        return 'ESP32: Error USB driver. Pon el ESP32 en modo bootloader: mantén BOOT, pulsa EN, suelta EN, suelta BOOT.';
+    }
     if (fam === 'esp32' && (code === 'TIMEOUT' || err.includes('timeout') || err.includes('boot') || err.includes('bootloader'))) {
         return 'ESP32: mantén BOOT y presiona EN';
     }
@@ -2329,6 +2333,8 @@ async function uploadCode() {
                 showToast(errorLower.includes('boot') || errorLower.includes('bootloader')
                     ? 'ESP32: mantén BOOT y presiona EN'
                     : 'Timeout. La compilación ESP32 puede tardar 3-5 min la 1ª vez', 'error');
+            } else if (errorLower.includes('semáforo') || errorLower.includes('semaphore')) {
+                showToast('Error USB driver (semáforo). Pon ESP32 en modo bootloader: mantén BOOT → pulsa EN → suelta EN → suelta BOOT.', 'error');
             } else if (result.errorCode === 'PORT_BUSY' || errorLower.includes('busy')) {
                 showToast('Puerto ocupado. Cierra otras aplicaciones que lo usen.', 'error');
             } else if (isSyncError && family !== 'esp32') {
@@ -2355,8 +2361,14 @@ async function uploadCode() {
                 } else if (isDriver || isNotFound || isTimeout) {
                     logToConsole('[UPLOAD] 💡 Instala driver CH340/CP2102', 'warning');
                 }
-                if ((isBusy || isNotFound) && !isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
-                if (isTimeout && isTimeoutAtConnect) logToConsole('[UPLOAD] 💡 Mantén BOOT pulsado y presiona EN antes de subir.', 'warning');
+                const isSemTimeout = errorLower.includes('semáforo') || errorLower.includes('semaphore');
+                if (isSemTimeout) {
+                    logToConsole('[UPLOAD] 💡 Error USB/driver (semáforo): pon el ESP32 en modo bootloader MANUAL → mantén BOOT, pulsa EN, suelta EN, suelta BOOT. Luego vuelve a subir.', 'warning');
+                    logToConsole('[UPLOAD] 💡 Si sigue: desconecta USB 10 s, reconecta en otro puerto USB. Reinstala driver CH340/CP2102.', 'warning');
+                } else {
+                    if ((isBusy || isNotFound) && !isTimeout) logToConsole('[UPLOAD] 💡 Cierra apps que usan el puerto (Serial Monitor, Arduino IDE)', 'warning');
+                    if (isTimeout && isTimeoutAtConnect) logToConsole('[UPLOAD] 💡 Mantén BOOT pulsado y presiona EN antes de subir.', 'warning');
+                }
             }
         }
     } catch (error) {

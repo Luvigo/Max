@@ -1667,13 +1667,19 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
             err_out = str(e)
         break
 
-    # Hint específico cuando puerto ocupado / semaphore timeout (COM busy)
+    # Detectar semaphore timeout (Windows error 121): driver USB agota el tiempo,
+    # NO es puerto ocupado. Suele requerir modo bootloader manual o driver reinstalado.
     err_lower = (err_out or '').lower()
-    if any(x in err_lower for x in ('port is busy', 'puerto ocupado', 'semáforo', 'semaphore')) or ('timeout' in err_lower and 'open' in err_lower):
-        hints.insert(0, "Puerto ocupado: cierra TODAS las pestañas de MAX-IDE, desconecta el USB 10 seg, reconecta. Abre MAX-IDE de nuevo y sube sin abrir Serial. Si sigue: prueba otro puerto USB (USB 2.0 suele ir mejor).")
+    is_sem_timeout = 'semáforo' in err_lower or 'semaphore' in err_lower or '121' in (err_out or '')
+    is_port_busy = any(x in err_lower for x in ('port is busy', 'busy or doesn\'t', 'access denied', 'permission denied'))
+
+    if is_sem_timeout:
+        hints.insert(0, "Error USB (semáforo/timeout): el driver no puede abrir el puerto. Solución: mantén pulsado BOOT en el ESP32, luego pulsa y suelta EN. Cuando aparezca 'Connecting...' suelta BOOT. Si sigue: desconecta USB, espera 10 s, reconecta en otro puerto USB 2.0.")
+        hints.insert(1, "Si el error persiste: reinstala drivers CH340 (wch.cn) o CP2102 (Silicon Labs). En algunos casos hay que poner el ESP32 en modo descarga manualmente cada vez.")
+    elif is_port_busy:
+        hints.insert(0, "Puerto ocupado: cierra Serial Monitor, Arduino IDE y otras apps que usen COM3. Desconecta y reconecta el cable USB.")
 
     # Estrategia 2: esptool (fallback cuando arduino-cli falla)
-    # Reintentar reset bootloader antes de esptool
     log_func("arduino-cli falló. Reintentando modo bootloader para esptool...")
     if _esp32_reset_for_bootloader(port, log_func):
         time.sleep(0.5)
@@ -1682,8 +1688,6 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
     if not esptool_path:
         return False, 'arduino-cli', 'UPLOAD_FAIL', 'arduino-cli falló y esptool no está instalado. pip install esptool', hints
 
-    log_func("Estrategia 2: esptool write_flash...")
-    t2 = time.time()
     build_path = Path(build_dir)
     exclude = {'bootloader.bin', 'partitions.bin'}
     firmware = None
@@ -1696,7 +1700,6 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
     if not firmware or not firmware.is_file():
         return False, 'arduino-cli', 'UPLOAD_FAIL', 'No se encontró firmware.bin', hints
 
-    # Direcciones típicas ESP32 Arduino: 0x1000 bootloader, 0x8000 partitions, 0x10000 firmware
     bootloader = build_path / 'bootloader.bin'
     partitions = build_path / 'partitions.bin'
     flash_args = []
@@ -1706,25 +1709,41 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
         flash_args.extend(['0x8000', str(partitions)])
     flash_args.extend(['0x10000', str(firmware)])
 
-    if esptool_path.startswith(sys.executable) or ' -m ' in esptool_path:
-        cmd = esptool_path.split() + ['--port', port, 'write_flash'] + flash_args
-    else:
-        cmd = [esptool_path, '--port', port, 'write_flash'] + flash_args
+    def _run_esptool(before_mode):
+        """Ejecuta esptool con el modo de reset indicado."""
+        if esptool_path.startswith(sys.executable) or ' -m ' in esptool_path:
+            base = esptool_path.split()
+        else:
+            base = [esptool_path]
+        cmd = base + ['--chip', 'esp32', '--port', port, '--before', before_mode, 'write-flash'] + flash_args
+        t = time.time()
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            elapsed = time.time() - t
+            log_func(f"esptool ({before_mode}): {elapsed:.1f}s, exit={r.returncode}")
+            return r.returncode, r.stderr + r.stdout
+        except subprocess.TimeoutExpired:
+            return -1, 'TIMEOUT'
+        except Exception as e:
+            return -2, str(e)
 
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
-        elapsed = time.time() - t2
-        log_func(f"esptool write_flash: {elapsed:.1f}s, exit={r.returncode}")
-        if r.returncode == 0:
-            log_func(f"✓ Upload exitoso (esptool) en {time.time()-t0:.1f}s")
-            return True, 'esptool', None, None, hints
-        err_out = r.stderr + r.stdout
-        log_func(f"esptool falló: {err_out[:300]}")
-    except subprocess.TimeoutExpired:
-        return False, 'esptool', 'TIMEOUT', 'Timeout esptool.', hints
-    except Exception as e:
-        err_out = str(e)
-        log_func(f"esptool error: {e}")
+    # Intento 2a: reset normal
+    log_func("Estrategia 2a: esptool write-flash (default_reset)...")
+    t2 = time.time()
+    code2a, err2a = _run_esptool('default_reset')
+    if code2a == 0:
+        log_func(f"✓ Upload exitoso (esptool default_reset) en {time.time()-t0:.1f}s")
+        return True, 'esptool', None, None, hints
+
+    # Intento 2b: sin reset (usuario pone bootloader manualmente)
+    log_func("Estrategia 2b: esptool write-flash (no_reset) — modo bootloader manual...")
+    code2b, err2b = _run_esptool('no_reset')
+    if code2b == 0:
+        log_func(f"✓ Upload exitoso (esptool no_reset) en {time.time()-t0:.1f}s")
+        return True, 'esptool', None, None, hints
+
+    err_out = err2b or err2a
+    log_func(f"esptool falló: {err_out[:300]}")
 
     err_lower = err_out.lower()
     if 'permission denied' in err_lower or 'access denied' in err_lower:
