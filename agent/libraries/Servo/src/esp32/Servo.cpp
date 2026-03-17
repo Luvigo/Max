@@ -3,21 +3,21 @@
 #include <Servo.h>
 #include <Arduino.h>
 
+/* ESP32 Arduino 3.x: ledcSetup+ledcAttachPin -> ledcAttach; ledcDetachPin -> ledcDetach; ledcWrite/ledcRead usan pin */
 class ServoImpl {
   uint8_t pin;
 public:
-  ServoImpl(const uint8_t _pin, const uint8_t _channel) : pin(_pin) {
-    ledcSetup(_channel, (1000000 / REFRESH_INTERVAL), LEDC_MAX_BIT_WIDTH);
-    ledcAttachPin(pin, _channel);
+  ServoImpl(const uint8_t _pin) : pin(_pin) {
+    ledcAttach(pin, (1000000 / REFRESH_INTERVAL), LEDC_MAX_BIT_WIDTH);
   }
   ~ServoImpl() {
-    ledcDetachPin(pin);
+    ledcDetach(pin);
   }
-  void set(const uint8_t _channel, const uint32_t duration_us) {
-    ledcWrite(_channel, LEDC_US_TO_TICKS(duration_us));
+  void set(const uint32_t duration_us) {
+    ledcWrite(pin, LEDC_US_TO_TICKS(duration_us));
   }
-  uint32_t get(const uint8_t _channel) const {
-    return LEDC_TICKS_TO_US(ledcRead(_channel));
+  uint32_t get() const {
+    return LEDC_TICKS_TO_US(ledcRead(pin));
   }
 };
 
@@ -40,7 +40,7 @@ uint8_t Servo::attach(int pin) {
 }
 
 uint8_t Servo::attach(int pin, int min, int max) {
-  servos[this->servoIndex] = new ServoImpl(pin, this->servoIndex);
+  servos[this->servoIndex] = new ServoImpl(pin);
   this->min = (MIN_PULSE_WIDTH - min);
   this->max = (MAX_PULSE_WIDTH - max);
   return this->servoIndex;
@@ -62,11 +62,10 @@ void Servo::write(int value) {
 
 void Servo::writeMicroseconds(int value) {
   if (!servos[this->servoIndex]) return;
-  byte channel = this->servoIndex;
-  if (channel < MAX_PWM_SERVOS) {
+  if (this->servoIndex < MAX_PWM_SERVOS) {
     if (value < SERVO_MIN()) value = SERVO_MIN();
     else if (value > SERVO_MAX()) value = SERVO_MAX();
-    servos[this->servoIndex]->set(this->servoIndex, value);
+    servos[this->servoIndex]->set(value);
   }
 }
 
@@ -76,7 +75,7 @@ int Servo::read() {
 
 int Servo::readMicroseconds() {
   if (!servos[this->servoIndex]) return 0;
-  return servos[this->servoIndex]->get(this->servoIndex);
+  return servos[this->servoIndex]->get();
 }
 
 bool Servo::attached() {
