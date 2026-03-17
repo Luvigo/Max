@@ -514,17 +514,14 @@ def compile_code():
         sketch_dir = os.path.join(temp_dir, sketch_name)
         os.makedirs(sketch_dir)
         
+        out_code = code
+        if 'esp32' in fqbn and ('servo' in code.lower() or 'calvin' in code.lower()):
+            out_code = ('#ifndef SOC_LEDC_TIMER_BIT_WIDE_NUM\n'
+                        '#define SOC_LEDC_TIMER_BIT_WIDE_NUM SOC_LEDC_TIMER_BIT_WIDTH\n'
+                        '#endif\n\n') + code
         sketch_file = os.path.join(sketch_dir, f'{sketch_name}.ino')
         with open(sketch_file, 'w', encoding='utf-8') as f:
-            f.write(code)
-        
-        if 'esp32' in fqbn:
-            build_opt = os.path.join(sketch_dir, 'build_opt.h')
-            try:
-                with open(build_opt, 'w', encoding='utf-8') as f:
-                    f.write('-DSOC_LEDC_TIMER_BIT_WIDE_NUM=SOC_LEDC_TIMER_BIT_WIDTH\n')
-            except Exception:
-                pass
+            f.write(out_code)
         
         log(f"Sketch creado: {len(code)} caracteres")
         
