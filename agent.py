@@ -381,7 +381,8 @@ def install_esp32_core():
             }), 500
         
         log('Instalando core esp32:esp32... (puede tardar 1-3 minutos)')
-        
+        subprocess.run([ARDUINO_CLI, 'config', 'set', 'network.connection_timeout', '600s'],
+                      capture_output=True, timeout=10)
         result = subprocess.run(
             [ARDUINO_CLI, 'core', 'install', 'esp32:esp32'],
             capture_output=True,

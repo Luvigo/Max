@@ -430,6 +430,10 @@ def ensure_core_for_fqbn(fqbn, log_func=None):
     log(f"Instalando core {core_id} para {fqbn}...")
     try:
         subprocess.run(
+            [ARDUINO_CLI, 'config', 'set', 'network.connection_timeout', '600s'],
+            capture_output=True, text=True, timeout=10
+        )
+        subprocess.run(
             [ARDUINO_CLI, 'core', 'update-index'],
             capture_output=True, text=True, timeout=120
         )

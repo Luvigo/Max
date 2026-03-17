@@ -163,6 +163,7 @@ goto CHECK_LIBS
 echo       Instalando core esp32:esp32 (ESP32 Dev Module)...
 echo       Esto puede tardar 2-5 minutos (descarga ~200MB)...
 echo.
+arduino-cli config set network.connection_timeout 600s
 arduino-cli core update-index
 arduino-cli core install esp32:esp32
 if errorlevel 1 goto ESP32_ERROR
