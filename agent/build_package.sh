@@ -29,6 +29,7 @@ cp "$SCRIPT_DIR/requirements.txt" "$PACKAGE_DIR/"
 sed 's/\r$//' "$SCRIPT_DIR/start_agent.sh" > "$PACKAGE_DIR/start_agent.sh"
 cp "$SCRIPT_DIR/start_agent.bat" "$PACKAGE_DIR/"
 cp "$SCRIPT_DIR/install_autostart.bat" "$PACKAGE_DIR/"
+[ -d "$SCRIPT_DIR/libraries" ] && cp -r "$SCRIPT_DIR/libraries" "$PACKAGE_DIR/"
 
 # Make scripts executable
 chmod +x "$PACKAGE_DIR/start_agent.sh"

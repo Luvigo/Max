@@ -45,29 +45,6 @@ def _store_upload_job(build_dir, family, fqbn):
     return job_id
 
 
-# Fix para librería Servo en ESP32: versiones antiguas usan SOC_LEDC_TIMER_BIT_WIDE_NUM
-# que fue renombrado a SOC_LEDC_TIMER_BIT_WIDTH en ESP32 Arduino core 3.x.
-# Inyectamos el #define al inicio del código (después de Arduino.h implícito).
-SERVO_FIX_HEADER = '''// MAX-IDE: fix Servo en ESP32 core 3.x (SOC_LEDC_TIMER_BIT_WIDE_NUM)
-#ifndef SOC_LEDC_TIMER_BIT_WIDE_NUM
-#define SOC_LEDC_TIMER_BIT_WIDE_NUM SOC_LEDC_TIMER_BIT_WIDTH
-#endif
-
-'''
-
-
-def _inject_servo_fix_if_needed(code, family):
-    """Si es ESP32 y el código usa Servo, inyecta el fix al inicio."""
-    if family != 'esp32':
-        return code
-    code_lower = code.lower()
-    if 'servo' not in code_lower and 'calvin' not in code_lower:
-        return code
-    if SERVO_FIX_HEADER.strip() in code:
-        return code
-    return SERVO_FIX_HEADER + code
-
-
 def _get_upload_job(job_id):
     """Obtiene un job. Retorna dict o None si no existe/expirado."""
     job = _upload_job_store.get(job_id)
@@ -1193,18 +1170,14 @@ def compile_code():
                     continue
                 fpath = os.path.join(sketch_dir, fname)
                 os.makedirs(os.path.dirname(fpath) or '.', exist_ok=True)
-                txt = str(content)
-                if fname.endswith('.ino') and family == 'esp32':
-                    txt = _inject_servo_fix_if_needed(txt, family)
                 with open(fpath, 'w', encoding='utf-8') as f:
-                    f.write(txt)
+                    f.write(str(content))
             log(f"Sketch creado desde {len(files)} archivo(s)")
         else:
             main_ino = f'{sketch_name}.ino'
             if files and isinstance(files, list):
                 main_ino = next((f for f in files if f.endswith('.ino')), main_ino)
             out_code = code if code else 'void setup() {} void loop() {}'
-            out_code = _inject_servo_fix_if_needed(out_code, family)
             with open(os.path.join(sketch_dir, main_ino), 'w', encoding='utf-8') as f:
                 f.write(out_code)
             log(f"Sketch creado: {len(code)} caracteres")
@@ -1218,6 +1191,11 @@ def compile_code():
             '--output-dir', build_dir,
             sketch_dir
         ]
+        if family == 'esp32':
+            lib_servo = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libraries', 'Servo')
+            if os.path.isdir(lib_servo):
+                compile_cmd.insert(-1, '-l')
+                compile_cmd.insert(-1, lib_servo)
         
         options = data.get('options') or {}
         if options.get('warnings') == 'all':
@@ -1609,16 +1587,17 @@ def _resolve_bin_for_upload_esp32(data, temp_dir, log_func):
         fqbn = data.get('fqbn', 'esp32:esp32:esp32')
         sketch_dir = os.path.join(temp_dir, 'sketch_esp32')
         os.makedirs(sketch_dir)
-        out_code = _inject_servo_fix_if_needed(code, 'esp32')
         with open(os.path.join(sketch_dir, 'sketch_esp32.ino'), 'w', encoding='utf-8') as f:
-            f.write(out_code)
+            f.write(code)
         build_dir = os.path.join(temp_dir, 'build_esp32')
         os.makedirs(build_dir)
+        compile_args = [ARDUINO_CLI, 'compile', '--fqbn', fqbn, '--output-dir', build_dir]
+        lib_servo = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libraries', 'Servo')
+        if os.path.isdir(lib_servo):
+            compile_args.extend(['-l', lib_servo])
+        compile_args.append(sketch_dir)
         try:
-            r = subprocess.run(
-                [ARDUINO_CLI, 'compile', '--fqbn', fqbn, '--output-dir', build_dir, sketch_dir],
-                capture_output=True, text=True, timeout=120
-            )
+            r = subprocess.run(compile_args, capture_output=True, text=True, timeout=120)
             if r.returncode != 0:
                 return None, (r.stderr or r.stdout or 'Error de compilación')[:500]
             if any(f.endswith('.bin') for f in os.listdir(build_dir)):

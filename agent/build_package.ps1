@@ -25,6 +25,9 @@ Copy-Item (Join-Path $ScriptDir "requirements.txt") $PackageDir
 Copy-Item (Join-Path $ScriptDir "start_agent.bat") $PackageDir
 Copy-Item (Join-Path $ScriptDir "install_autostart.bat") $PackageDir
 Copy-Item (Join-Path $ScriptDir "LEEME.txt") $PackageDir
+if (Test-Path (Join-Path $ScriptDir "libraries")) {
+    Copy-Item (Join-Path $ScriptDir "libraries") (Join-Path $PackageDir "libraries") -Recurse -Force
+}
 
 # start_agent.sh: normalizar LF (quitar CR)
 $shContent = [System.IO.File]::ReadAllText((Join-Path $ScriptDir "start_agent.sh")).Replace("`r`n", "`n").Replace("`r", "`n")
