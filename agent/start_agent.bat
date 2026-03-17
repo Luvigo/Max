@@ -208,7 +208,7 @@ REM PASO 7: Instalar dependencias Python
 REM ========================================
 :CHECK_DEPS
 echo [7/7] Verificando dependencias Python...
-python -c "import flask" >nul 2>&1
+python -c "import flask; import esptool" >nul 2>&1
 if errorlevel 1 goto INSTALL_DEPS
 echo       [OK] Dependencias ya instaladas
 echo.
