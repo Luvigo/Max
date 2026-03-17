@@ -1670,7 +1670,7 @@ def _do_upload_esp32(port, fqbn, build_dir, log_func):
     # Hint específico cuando puerto ocupado / semaphore timeout (COM busy)
     err_lower = (err_out or '').lower()
     if any(x in err_lower for x in ('port is busy', 'puerto ocupado', 'semáforo', 'semaphore')) or ('timeout' in err_lower and 'open' in err_lower):
-        hints.insert(0, "Puerto ocupado: cierra el Monitor Serial si está abierto, desconecta y reconecta el cable USB, luego reintenta.")
+        hints.insert(0, "Puerto ocupado: cierra TODAS las pestañas de MAX-IDE, desconecta el USB 10 seg, reconecta. Abre MAX-IDE de nuevo y sube sin abrir Serial. Si sigue: prueba otro puerto USB (USB 2.0 suele ir mejor).")
 
     # Estrategia 2: esptool (fallback cuando arduino-cli falla)
     # Reintentar reset bootloader antes de esptool

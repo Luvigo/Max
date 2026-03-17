@@ -2188,12 +2188,10 @@ async function uploadCode() {
         }
     }
     
-    // Desconectar Serial Monitor si está conectado (para liberar el puerto)
-    if (isSerialConnected) {
-        logToConsole('[UPLOAD-AGENT] Desconectando Serial Monitor...', 'info');
-        await disconnectSerial();
-        await new Promise(r => setTimeout(r, 500));
-    }
+    // Siempre liberar el puerto antes de subir (Serial Monitor puede dejarlo bloqueado)
+    if (isSerialConnected) logToConsole('[UPLOAD-AGENT] Desconectando Serial Monitor...', 'info');
+    await disconnectSerial();
+    await new Promise(r => setTimeout(r, 1500));
     
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
