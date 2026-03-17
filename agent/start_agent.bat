@@ -130,7 +130,7 @@ arduino-cli core list 2>nul | findstr "arduino:avr" >nul
 if errorlevel 1 goto INSTALL_AVR
 echo       [OK] Core arduino:avr encontrado
 echo.
-goto CHECK_LIBS
+goto CHECK_ESP32
 
 :INSTALL_AVR
 echo       Instalando core arduino:avr...
@@ -141,7 +141,7 @@ arduino-cli core install arduino:avr
 if errorlevel 1 goto AVR_ERROR
 echo       [OK] Core arduino:avr instalado
 echo.
-goto CHECK_LIBS
+goto CHECK_ESP32
 
 :AVR_ERROR
 echo       ERROR: No se pudo instalar el core arduino:avr.
