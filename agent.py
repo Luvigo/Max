@@ -518,6 +518,14 @@ def compile_code():
         with open(sketch_file, 'w', encoding='utf-8') as f:
             f.write(code)
         
+        if 'esp32' in fqbn:
+            build_opt = os.path.join(sketch_dir, 'build_opt.h')
+            try:
+                with open(build_opt, 'w', encoding='utf-8') as f:
+                    f.write('-DSOC_LEDC_TIMER_BIT_WIDE_NUM=SOC_LEDC_TIMER_BIT_WIDTH\n')
+            except Exception:
+                pass
+        
         log(f"Sketch creado: {len(code)} caracteres")
         
         # Compilar

@@ -45,6 +45,22 @@ def _store_upload_job(build_dir, family, fqbn):
     return job_id
 
 
+# Fix para librería Servo en ESP32: versiones antiguas usan SOC_LEDC_TIMER_BIT_WIDE_NUM
+# que fue renombrado a SOC_LEDC_TIMER_BIT_WIDTH en ESP32 Arduino core 3.x.
+# build_opt.h en el sketch evita que el estudiante tenga que tocar nada.
+BUILD_OPT_ESP32_SERVO = '-DSOC_LEDC_TIMER_BIT_WIDE_NUM=SOC_LEDC_TIMER_BIT_WIDTH'
+
+
+def _ensure_esp32_build_opt(sketch_dir):
+    """Crea build_opt.h en el sketch para compatibilidad Servo en ESP32."""
+    opt_path = os.path.join(sketch_dir, 'build_opt.h')
+    try:
+        with open(opt_path, 'w', encoding='utf-8') as f:
+            f.write(BUILD_OPT_ESP32_SERVO + '\n')
+    except Exception:
+        pass
+
+
 def _get_upload_job(job_id):
     """Obtiene un job. Retorna dict o None si no existe/expirado."""
     job = _upload_job_store.get(job_id)
@@ -1181,6 +1197,9 @@ def compile_code():
                 f.write(code if code else 'void setup() {} void loop() {}')
             log(f"Sketch creado: {len(code)} caracteres")
         
+        if family == 'esp32':
+            _ensure_esp32_build_opt(sketch_dir)
+        
         build_dir = os.path.join(temp_dir, 'build')
         os.makedirs(build_dir)
         
@@ -1583,6 +1602,7 @@ def _resolve_bin_for_upload_esp32(data, temp_dir, log_func):
         os.makedirs(sketch_dir)
         with open(os.path.join(sketch_dir, 'sketch_esp32.ino'), 'w', encoding='utf-8') as f:
             f.write(code)
+        _ensure_esp32_build_opt(sketch_dir)
         build_dir = os.path.join(temp_dir, 'build_esp32')
         os.makedirs(build_dir)
         try:
