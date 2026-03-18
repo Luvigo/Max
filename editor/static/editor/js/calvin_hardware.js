@@ -1,13 +1,13 @@
 /**
  * Calvin Hardware - Capa de abstracción centralizada
- * Proximidad, Buzzer, RGB, Motores. NO mezcla con max_*
+ * BotFlow original: ESP32 + L298N. Fallback: Arduino + Servo.
+ * Proximidad, Buzzer, RGB, Motores, Sensores línea.
  */
 (function() {
     'use strict';
 
-    // Pines por defecto (configurables si el bloque los especifica)
-    // RGB en 5,6,11 para no chocar con motores 9,10
-    const CALVIN_PINS = {
+    // Pines Arduino (AVR) - Servo, tone, analogWrite
+    const CALVIN_PINS_AVR = {
         PROX_TRIG: 6,
         PROX_ECHO: 7,
         BUZZER: 3,
@@ -21,28 +21,59 @@
         LINEA_DER: 2
     };
 
-    // Notas musicales: [octava][nota] -> frecuencia Hz
+    // Pines original BotFlow (ESP32) - L298N, ledc, digital
+    const CALVIN_PINS_ESP32 = {
+        IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,
+        PROX_TRIG: 18, PROX_ECHO: 36,
+        BUZZER: 27,
+        RGB_R: 23, RGB_G: 22, RGB_B: 21,
+        LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 36  // ADC pins (evitar 32,33,25,26 L298N)
+    };
+
+    const CALVIN_PINS = CALVIN_PINS_AVR;
+
+    // Notas musicales: [octava 0-5] -> frecuencia Hz
     const NOTAS = {
-        DO: [131, 262, 523],
-        RE: [147, 294, 587],
-        MI: [165, 330, 659],
-        FA: [175, 349, 698],
-        SOL: [196, 392, 784],
-        LA: [220, 440, 880],
-        SI: [247, 494, 988]
+        DO: [33, 65, 131, 262, 523, 1047],
+        RE: [37, 73, 147, 294, 587, 1175],
+        MI: [41, 82, 165, 330, 659, 1319],
+        FA: [44, 87, 175, 349, 698, 1397],
+        SOL: [49, 98, 196, 392, 784, 1568],
+        LA: [55, 110, 220, 440, 880, 1760],
+        SI: [62, 123, 247, 494, 988, 1976]
     };
 
     function getNoteFreq(nota, octava) {
         const arr = NOTAS[nota] || NOTAS.DO;
-        const oct = Math.max(0, Math.min(2, (octava | 0) - 3));
+        const oct = Math.max(0, Math.min(5, octava | 0));
         return arr[oct] || 262;
     }
 
     window.CalvinHardware = {
         PINS: CALVIN_PINS,
+        PINS_ESP32: CALVIN_PINS_ESP32,
         getNoteFreq: getNoteFreq,
 
-        getProximityCode: function(pinTrig, pinEcho) {
+        getProximityCode: function(pinTrig, pinEcho, isEsp32) {
+            if (isEsp32) {
+                const t = pinTrig || CALVIN_PINS_ESP32.PROX_TRIG;
+                const e = pinEcho || CALVIN_PINS_ESP32.PROX_ECHO;
+                return {
+                    defines: `#define trigPin ${t}\n#define echoPin ${e}\n#define SOUND_SPEED 0.034f`,
+                    vars: 'long duration;\nfloat distanceCm;\nfloat distanceCmlast;',
+                    func: `float calvin_distancia_cm(void) {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(5);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  duration = pulseIn(echoPin, HIGH);
+  distanceCm = duration * SOUND_SPEED / 2.0f;
+  return distanceCm;
+}`,
+                    setup: '  pinMode(trigPin, OUTPUT);\n  pinMode(echoPin, INPUT);'
+                };
+            }
             const t = pinTrig || CALVIN_PINS.PROX_TRIG;
             const e = pinEcho || CALVIN_PINS.PROX_ECHO;
             return {
@@ -62,25 +93,66 @@
             };
         },
 
-        getBuzzerCode: function(pin) {
+        getBuzzerCode: function(pin, isEsp32) {
+            if (isEsp32) {
+                const p = pin || CALVIN_PINS_ESP32.BUZZER;
+                return {
+                    defines: `#define buzzerPin ${p}`,
+                    vars: 'const int channelPWM_5 = 8;\nconst int resolutionNM = 10;\nint frequencyNM = 1000;',
+                    func: `void calvin_tocar_nota(int freq, int duracion_ms) {
+  ledcWriteTone(channelPWM_5, freq);
+  if (duracion_ms > 0) {
+    delay(duracion_ms);
+    ledcWrite(channelPWM_5, 0);
+  }
+}`,
+                    setup: '  ledcSetup(channelPWM_5, frequencyNM, resolutionNM);\n  ledcAttachPin(buzzerPin, channelPWM_5);'
+                };
+            }
             const p = pin || CALVIN_PINS.BUZZER;
             return {
                 defines: `#define CALVIN_BUZZER ${p}`,
                 func: `void calvin_tocar_nota(int freq, int duracion_ms) {
-  tone(CALVIN_BUZZER, freq, duracion_ms);
-  delay(duracion_ms);
-  noTone(CALVIN_BUZZER);
-  delay(50);
+  tone(CALVIN_BUZZER, freq, duracion_ms > 0 ? duracion_ms : 0);
+  if (duracion_ms > 0) {
+    delay(duracion_ms);
+    noTone(CALVIN_BUZZER);
+    delay(50);
+  }
 }`,
                 setup: '  pinMode(CALVIN_BUZZER, OUTPUT);'
             };
         },
 
-        getRgbCode: function(pinR, pinG, pinB, tipo) {
+        getRgbCode: function(pinR, pinG, pinB, tipo, isEsp32) {
+            if (isEsp32) {
+                const r = pinR || CALVIN_PINS_ESP32.RGB_R;
+                const g = pinG || CALVIN_PINS_ESP32.RGB_G;
+                const b = pinB || CALVIN_PINS_ESP32.RGB_B;
+                const invert = (tipo === 'A');
+                return {
+                    defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
+                    func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
+  int vR = (r > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
+  int vG = (g > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
+  int vB = (b > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
+  digitalWrite(Rojo, vR);
+  digitalWrite(Verde, vG);
+  digitalWrite(Azul, vB);
+  if (duracion_ms > 0) {
+    delay(duracion_ms);
+    digitalWrite(Rojo, CALVIN_RGB_ANODO ? 1 : 0);
+    digitalWrite(Verde, CALVIN_RGB_ANODO ? 1 : 0);
+    digitalWrite(Azul, CALVIN_RGB_ANODO ? 1 : 0);
+  }
+}`,
+                    setup: '  pinMode(Rojo, OUTPUT);\n  pinMode(Verde, OUTPUT);\n  pinMode(Azul, OUTPUT);\n  digitalWrite(Rojo, CALVIN_RGB_ANODO);\n  digitalWrite(Verde, CALVIN_RGB_ANODO);\n  digitalWrite(Azul, CALVIN_RGB_ANODO);'
+                };
+            }
             const r = pinR || CALVIN_PINS.RGB_R;
             const g = pinG || CALVIN_PINS.RGB_G;
             const b = pinB || CALVIN_PINS.RGB_B;
-            const invert = (tipo === 'A'); // Common Anode = invertir
+            const invert = (tipo === 'A');
             return {
                 defines: `#define CALVIN_RGB_R ${r}\n#define CALVIN_RGB_G ${g}\n#define CALVIN_RGB_B ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
                 func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
@@ -97,22 +169,96 @@
             };
         },
 
-        getMotorsCode: function(pinIzq, pinDer, pwmDefault) {
+        getMotorsCode: function(pinIzq, pinDer, pwmDefault, isEsp32) {
+            if (isEsp32) {
+                const in1 = 32, in2 = 33, in3 = 25, in4 = 26;
+                const speedCar = Math.min(255, Math.max(0, pwmDefault !== undefined && pwmDefault !== null ? pwmDefault : 220));
+                return {
+                    includes: '',
+                    defines: `#define IN_1 ${in1}\n#define IN_2 ${in2}\n#define IN_3 ${in3}\n#define IN_4 ${in4}\n#define speedCar ${speedCar}`,
+                    vars: `const int channelPWM_1 = 0, channelPWM_2 = 2, channelPWM_3 = 4, channelPWM_4 = 6;
+const int resolution = 8;
+int frequency = 8000;
+
+void calvin_mover(int modo, float duracion) {
+  if (modo == 0) {
+    ledcWrite(channelPWM_1, 0);
+    ledcWrite(channelPWM_2, 0);
+    ledcWrite(channelPWM_3, 0);
+    ledcWrite(channelPWM_4, 0);
+  } else if (modo == 1) {
+    ledcWrite(channelPWM_1, 0);
+    ledcWrite(channelPWM_2, speedCar);
+    ledcWrite(channelPWM_3, speedCar);
+    ledcWrite(channelPWM_4, 0);
+  } else if (modo == 2) {
+    ledcWrite(channelPWM_1, speedCar);
+    ledcWrite(channelPWM_2, 0);
+    ledcWrite(channelPWM_3, 0);
+    ledcWrite(channelPWM_4, speedCar);
+  } else if (modo == 3) {
+    ledcWrite(channelPWM_1, speedCar);
+    ledcWrite(channelPWM_2, 0);
+    ledcWrite(channelPWM_3, speedCar);
+    ledcWrite(channelPWM_4, 0);
+  } else if (modo == 4) {
+    ledcWrite(channelPWM_1, 0);
+    ledcWrite(channelPWM_2, speedCar);
+    ledcWrite(channelPWM_3, 0);
+    ledcWrite(channelPWM_4, speedCar);
+  } else if (modo == 6) {
+    ledcWrite(channelPWM_3, speedCar);
+    ledcWrite(channelPWM_4, 0);
+  } else if (modo == 7) {
+    ledcWrite(channelPWM_3, 0);
+    ledcWrite(channelPWM_4, speedCar);
+  } else if (modo == 8) {
+    ledcWrite(channelPWM_1, speedCar);
+    ledcWrite(channelPWM_2, 0);
+  } else if (modo == 9) {
+    ledcWrite(channelPWM_1, 0);
+    ledcWrite(channelPWM_2, speedCar);
+  }
+  if (duracion > 0.0f) {
+    delay((int)(duracion * 1000));
+    ledcWrite(channelPWM_1, 0);
+    ledcWrite(channelPWM_2, 0);
+    ledcWrite(channelPWM_3, 0);
+    ledcWrite(channelPWM_4, 0);
+  }
+}
+
+void calvin_motor_adelante(float seg) { calvin_mover(1, seg); }
+void calvin_motor_girar(int lado, int sentido, float seg) {
+  int modo = (lado == 0) ? (sentido == 0 ? 8 : 9) : (sentido == 0 ? 6 : 7);
+  calvin_mover(modo, seg);
+}`,
+                    setup: `  ledcSetup(channelPWM_1, frequency, resolution);
+  ledcSetup(channelPWM_2, frequency, resolution);
+  ledcSetup(channelPWM_3, frequency, resolution);
+  ledcSetup(channelPWM_4, frequency, resolution);
+  ledcAttachPin(IN_1, channelPWM_1);
+  ledcAttachPin(IN_2, channelPWM_2);
+  ledcAttachPin(IN_3, channelPWM_3);
+  ledcAttachPin(IN_4, channelPWM_4);`
+                };
+            }
             const izq = pinIzq || CALVIN_PINS.MOTOR_IZQ;
             const der = pinDer || CALVIN_PINS.MOTOR_DER;
-            const pwm = pwmDefault || 30;
+            const pwm255 = pwmDefault !== undefined && pwmDefault !== null ? pwmDefault : 220;
+            const pwm = Math.round(Math.min(255, Math.max(0, pwm255)) * 90 / 255);
             return {
                 includes: '#include <Servo.h>',
                 defines: `#define CALVIN_MOTOR_IZQ ${izq}\n#define CALVIN_MOTOR_DER ${der}\n#define CALVIN_PWM_DEFAULT ${pwm}`,
                 vars: 'Servo calvin_servoIzq;\nServo calvin_servoDer;',
-                func: `void calvin_motor_adelante(int seg) {
+                func: `void calvin_motor_adelante(float seg) {
   calvin_servoIzq.write(90 - CALVIN_PWM_DEFAULT);
   calvin_servoDer.write(90 + CALVIN_PWM_DEFAULT);
   delay(seg * 1000);
   calvin_servoIzq.write(90);
   calvin_servoDer.write(90);
 }
-void calvin_motor_girar(int lado, int sentido, int seg) {
+void calvin_motor_girar(int lado, int sentido, float seg) {
   int v = CALVIN_PWM_DEFAULT;
   if (lado == 0) {
     calvin_servoIzq.write(sentido == 0 ? 90+v : 90-v);
@@ -129,7 +275,42 @@ void calvin_motor_girar(int lado, int sentido, int seg) {
             };
         },
 
-        getLineSensorsCode: function(pinIzq, pinCent, pinDer) {
+        getLineSensorsCode: function(pinIzq, pinCent, pinDer, isEsp32) {
+            if (isEsp32) {
+                const izq = pinIzq !== undefined && pinIzq !== null ? pinIzq : CALVIN_PINS_ESP32.LINEA_IZQ;
+                const cent = pinCent !== undefined && pinCent !== null ? pinCent : CALVIN_PINS_ESP32.LINEA_CENT;
+                const der = pinDer !== undefined && pinDer !== null ? pinDer : CALVIN_PINS_ESP32.LINEA_DER;
+                return {
+                    defines: `#define sensorIzq ${izq}\n#define sensorCen ${cent}\n#define sensorDer ${der}`,
+                    vars: `int umbralIzq = 512, umbralCen = 512, umbralDer = 512;
+int umbralIzqAnt = 1023, umbralCenAnt = 1023, umbralDerAnt = 1023;`,
+                    func: `int calvin_linea_valor(int lado) {
+  if (lado == 0) return analogRead(sensorIzq);
+  if (lado == 1) return analogRead(sensorCen);
+  return analogRead(sensorDer);
+}
+int calvin_linea_umbral(int lado) {
+  if (lado == 0) return umbralIzq;
+  if (lado == 1) return umbralCen;
+  return umbralDer;
+}
+void calvin_linea_calibrar(int n) {
+  for (int i = 0; i < n; i++) {
+    int readIzq = analogRead(sensorIzq);
+    int readCen = analogRead(sensorCen);
+    int readDer = analogRead(sensorDer);
+    if (readIzq < umbralIzqAnt) umbralIzq = readIzq + 15;
+    if (readCen < umbralCenAnt) umbralCen = readCen + 15;
+    if (readDer < umbralDerAnt) umbralDer = readDer + 15;
+    umbralIzqAnt = readIzq;
+    umbralCenAnt = readCen;
+    umbralDerAnt = readDer;
+    delay(200);
+  }
+}`,
+                    setup: '  pinMode(sensorIzq, INPUT);\n  pinMode(sensorCen, INPUT);\n  pinMode(sensorDer, INPUT);'
+                };
+            }
             const izq = pinIzq !== undefined && pinIzq !== null ? pinIzq : CALVIN_PINS.LINEA_IZQ;
             const cent = pinCent !== undefined && pinCent !== null ? pinCent : CALVIN_PINS.LINEA_CENT;
             const der = pinDer !== undefined && pinDer !== null ? pinDer : CALVIN_PINS.LINEA_DER;

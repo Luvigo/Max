@@ -451,10 +451,14 @@
     // calvin_botflow1_* - BotFlow Nivel 1 (CalvinHardware)
     // ============================================
 
+    function isCalvinEsp32() {
+        return (arduinoGenerator.boardFqbn || '').includes('esp32');
+    }
+
     function ensureCalvinProximity(pinTrig, pinEcho) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
-        const c = hw.getProximityCode(pinTrig, pinEcho);
+        const c = hw.getProximityCode(pinTrig, pinEcho, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_proximidad']) {
             arduinoGenerator.variables_['calvin_proximidad'] = c.defines + '\n' + c.vars + '\n' + c.func;
         }
@@ -466,7 +470,7 @@
     function ensureCalvinBuzzer(pin) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
-        const c = hw.getBuzzerCode(pin);
+        const c = hw.getBuzzerCode(pin, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_buzzer']) {
             arduinoGenerator.variables_['calvin_buzzer'] = c.defines + '\n' + c.func;
         }
@@ -478,7 +482,7 @@
     function ensureCalvinRgb(pinR, pinG, pinB, tipo) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
-        const c = hw.getRgbCode(pinR, pinG, pinB, tipo);
+        const c = hw.getRgbCode(pinR, pinG, pinB, tipo, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_rgb']) {
             arduinoGenerator.variables_['calvin_rgb'] = c.defines + '\n' + c.func;
         }
@@ -490,8 +494,8 @@
     function ensureCalvinMotors(pinIzq, pinDer, pwm) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
-        const c = hw.getMotorsCode(pinIzq, pinDer, pwm);
-        if (!arduinoGenerator.includes_['calvin_servo']) {
+        const c = hw.getMotorsCode(pinIzq, pinDer, pwm, isCalvinEsp32());
+        if (c.includes && !arduinoGenerator.includes_['calvin_servo']) {
             arduinoGenerator.includes_['calvin_servo'] = c.includes;
         }
         if (!arduinoGenerator.variables_['calvin_motores']) {
@@ -518,8 +522,9 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_proximidad'] = function(block) {
-        const trig = block.getFieldValue('TRIG') || 6;
-        const echo = block.getFieldValue('ECHO') || 7;
+        const esp = isCalvinEsp32();
+        const trig = esp ? 18 : (block.getFieldValue('TRIG') || 6);
+        const echo = esp ? 36 : (block.getFieldValue('ECHO') || 7);
         ensureCalvinProximity(trig, echo);
         return '';
     };
@@ -530,7 +535,7 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_nota'] = function(block) {
-        const pin = block.getFieldValue('PIN') || 3;
+        const pin = isCalvinEsp32() ? 27 : (block.getFieldValue('PIN') || 3);
         ensureCalvinBuzzer(pin);
         return '';
     };
@@ -538,20 +543,18 @@
     arduinoGenerator.forBlock['calvin_botflow1_nota_octava'] = function(block) {
         ensureCalvinBuzzer();
         const nota = block.getFieldValue('NOTA') || 'DO';
-        const octava = block.getFieldValue('OCTAVA') || 4;
-        const dur = arduinoGenerator.valueToCode(block, 'DURACION', arduinoGenerator.ORDER_ATOMIC) || '1';
+        const octava = block.getFieldValue('OCTAVA') || 0;
+        const durField = block.getFieldValue('DURACION') || '1';
+        const durMs = (durField === 'inf') ? '0' : `(int)((${durField}) * 1000)`;
         const freq = typeof CalvinHardware !== 'undefined' && CalvinHardware.getNoteFreq
             ? CalvinHardware.getNoteFreq(nota, octava) : 262;
-        const durMs = `(int)((${dur}) * 1000)`;
         return `  calvin_tocar_nota(${freq}, ${durMs});\n`;
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_rgb'] = function(block) {
         const tipo = block.getFieldValue('TIPO') || 'A';
-        const r = block.getFieldValue('R') || 9;
-        const g = block.getFieldValue('G') || 10;
-        const b = block.getFieldValue('B') || 11;
-        ensureCalvinRgb(r, g, b, tipo);
+        const esp = isCalvinEsp32();
+        ensureCalvinRgb(esp ? 23 : 5, esp ? 22 : 6, esp ? 21 : 11, tipo);
         return '';
     };
 
@@ -559,13 +562,13 @@
         ensureCalvinRgb();
         const color = block.getFieldValue('COLOR') || 'rojo';
         const rgb = RGB_COLORS[color] || RGB_COLORS.rojo;
-        const dur = arduinoGenerator.valueToCode(block, 'DURACION', arduinoGenerator.ORDER_ATOMIC) || '1';
-        const durMs = `(int)((${dur}) * 1000)`;
+        const durField = block.getFieldValue('DURACION') || '1';
+        const durMs = (durField === 'inf') ? '0' : `(int)((${durField}) * 1000)`;
         return `  calvin_rgb_encender(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${durMs});\n`;
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_motores'] = function(block) {
-        const pwm = block.getFieldValue('PWM') || 30;
+        const pwm = block.getFieldValue('PWM') || 220;
         const izq = block.getFieldValue('IZQ') || 9;
         const der = block.getFieldValue('DER') || 10;
         ensureCalvinMotors(izq, der, pwm);
@@ -593,7 +596,7 @@
     function ensureCalvinLineas(pinIzq, pinCent, pinDer) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
-        const c = hw.getLineSensorsCode(pinIzq, pinCent, pinDer);
+        const c = hw.getLineSensorsCode(pinIzq, pinCent, pinDer, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_lineas']) {
             arduinoGenerator.variables_['calvin_lineas'] = c.defines + '\n' + c.vars + '\n' + c.func;
         }
@@ -609,9 +612,10 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_init_lineas'] = function(block) {
-        const izq = block.getFieldValue('IZQ') || 0;
-        const cent = block.getFieldValue('CENT') || 1;
-        const der = block.getFieldValue('DER') || 2;
+        const esp = isCalvinEsp32();
+        const izq = esp ? 34 : (block.getFieldValue('IZQ') || 0);
+        const cent = esp ? 35 : (block.getFieldValue('CENT') || 1);
+        const der = esp ? 36 : (block.getFieldValue('DER') || 2);
         ensureCalvinLineas(izq, cent, der);
         return '';
     };

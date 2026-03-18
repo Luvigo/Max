@@ -1749,6 +1749,8 @@ function initEventListeners() {
 function updateCode() {
     try {
         if (!workspace || typeof arduinoGenerator === 'undefined') return;
+        arduinoGenerator.init(workspace);
+        arduinoGenerator.boardFqbn = (typeof currentBoard !== 'undefined' ? currentBoard : null) || 'arduino:avr:uno';
         const code = arduinoGenerator.workspaceToCode(workspace);
         const displayCode = code || getEmptyCode();
         const codeEl = document.getElementById('codeOutput');
@@ -1818,7 +1820,9 @@ function getCodeForCompile() {
     } catch (e) {
         if (window.IDE_DEBUG) console.debug('[getCodeForCompile] init:', e);
     }
-    // 2) Actualizar panel y generar código desde Blockly
+    // 2) Pasar placa para Calvin (BotFlow ESP32 vs Arduino)
+    arduinoGenerator.boardFqbn = (typeof currentBoard !== 'undefined' ? currentBoard : null) || 'arduino:avr:uno';
+    // 3) Actualizar panel y generar código desde Blockly
     updateCode();
     let code = '';
     try {

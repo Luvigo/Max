@@ -739,87 +739,82 @@
         }
     };
 
-    // 4) Nota [nota] octava [n] durante [duración] seg
+    // 4) Nota [nota] octava [n] durante [duración] seg (como original: octava 0, inf)
     Blockly.Blocks['calvin_botflow1_nota_octava'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Nota")
                 .appendField(new Blockly.FieldDropdown([
-                    ["DO", "DO"], ["RE", "RE"], ["MI", "MI"], ["FA", "FA"],
-                    ["SOL", "SOL"], ["LA", "LA"], ["SI", "SI"]
+                    ["Do", "DO"], ["Re", "RE"], ["Mi", "MI"], ["Fa", "FA"],
+                    ["Sol", "SOL"], ["La", "LA"], ["Si", "SI"]
                 ]), "NOTA")
                 .appendField("octava")
-                .appendField(new Blockly.FieldNumber(4, 3, 5), "OCTAVA")
+                .appendField(new Blockly.FieldNumber(0, 0, 5), "OCTAVA")
                 .appendField("durante");
-            this.appendValueInput("DURACION")
-                .setCheck("Number")
-                .appendField("");
-            this.appendDummyInput().appendField("seg");
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([
+                    ["0.5 seg", "0.5"], ["1 seg", "1"], ["2 seg", "2"], ["5 seg", "5"],
+                    ["inf seg", "inf"]
+                ]), "DURACION");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Reproduce una nota musical durante X segundos");
+            this.setTooltip("Reproduce una nota musical durante X segundos (inf = hasta siguiente bloque)");
         }
     };
 
-    // 5) Inicializar led RGB tipo [A]
+    // 5) Inicializar led RGB tipo [A] (como original: solo tipo, pines por defecto)
     Blockly.Blocks['calvin_botflow1_init_rgb'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Inicializar led RGB tipo");
-            this.appendDummyInput()
+                .appendField("Inicializar led RGB tipo")
                 .appendField(new Blockly.FieldDropdown([
-                    ["Ánodo común (A)", "A"],
-                    ["Cátodo común (C)", "C"]
+                    ["A", "A"],
+                    ["C", "C"]
                 ]), "TIPO");
-            this.appendDummyInput()
-                .appendField("R")
-                .appendField(new Blockly.FieldNumber(5, 0, 255), "R")
-                .appendField("G")
-                .appendField(new Blockly.FieldNumber(6, 0, 255), "G")
-                .appendField("B")
-                .appendField(new Blockly.FieldNumber(11, 0, 255), "B");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura LED RGB (Ánodo común = invertir lógica)");
+            this.setTooltip("Configura LED RGB tipo A (ánodo común) o C (cátodo común). Pines R=5, G=6, B=11");
         }
     };
 
-    // 6) Encender led [color] durante [duración] seg
+    // 6) Encender led [color] durante [duración] seg (como original: Rojo, inf)
     Blockly.Blocks['calvin_botflow1_led_color'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Encender led");
             this.appendDummyInput()
                 .appendField(new Blockly.FieldDropdown([
-                    ["rojo", "rojo"],
-                    ["verde", "verde"],
-                    ["azul", "azul"],
-                    ["amarillo", "amarillo"],
-                    ["cyan", "cyan"],
-                    ["magenta", "magenta"],
-                    ["blanco", "blanco"]
+                    ["Rojo", "rojo"],
+                    ["Verde", "verde"],
+                    ["Azul", "azul"],
+                    ["Amarillo", "amarillo"],
+                    ["Cyan", "cyan"],
+                    ["Magenta", "magenta"],
+                    ["Blanco", "blanco"]
                 ]), "COLOR");
-            this.appendValueInput("DURACION")
-                .setCheck("Number")
-                .appendField("durante");
+            this.appendDummyInput()
+                .appendField("durante")
+                .appendField(new Blockly.FieldDropdown([
+                    ["0.5 seg", "0.5"], ["1 seg", "1"], ["2 seg", "2"], ["5 seg", "5"],
+                    ["inf", "inf"]
+                ]), "DURACION");
             this.appendDummyInput().appendField("seg");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Enciende el LED RGB con un color durante X segundos");
+            this.setTooltip("Enciende el LED RGB durante X segundos (inf = hasta siguiente bloque)");
         }
     };
 
-    // 7) Inicializar Motores [PWM]
+    // 7) Inicializar Motores 220 PWM (como original BotFlow)
     Blockly.Blocks['calvin_botflow1_init_motores'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Inicializar Motores");
-            this.appendDummyInput()
-                .appendField("velocidad")
-                .appendField(new Blockly.FieldNumber(30, 0, 90), "PWM");
+                .appendField("Inicializar Motores")
+                .appendField(new Blockly.FieldNumber(220, 0, 255), "PWM")
+                .appendField("PWM");
             this.appendDummyInput()
                 .appendField("izq")
                 .appendField(new Blockly.FieldNumber(9, 0, 255), "IZQ")
@@ -828,7 +823,7 @@
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura los motores del robot (Servo)");
+            this.setTooltip("Configura motores del robot. PWM 0-255 (220 por defecto como original). Pines izq=9, der=10");
         }
     };
 
@@ -848,16 +843,16 @@
         }
     };
 
-    // 9) Girar Motor [lado] en sentido [Horario/Antihorario] durante [seg]
+    // 9) Girar Motor [izquierdo/derecho] en sentido [Horario/Antihorario] (como original)
     Blockly.Blocks['calvin_botflow1_girar_motor'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Girar Motor")
                 .appendField(new Blockly.FieldDropdown([
-                    ["izquierda", "0"],
-                    ["derecha", "1"]
+                    ["izquierdo", "0"],
+                    ["derecho", "1"]
                 ]), "LADO")
-                .appendField("sentido")
+                .appendField("en sentido")
                 .appendField(new Blockly.FieldDropdown([
                     ["Horario", "0"],
                     ["Antihorario", "1"]
@@ -890,9 +885,9 @@
     };
 
     const LADO_OPTIONS = [
-        ["izquierdo", "0"],
-        ["centro", "1"],
-        ["derecho", "2"]
+        ["Izquierdo", "0"],
+        ["Centro", "1"],
+        ["Derecho", "2"]
     ];
 
     // 1) Inicializar sensores de línea
