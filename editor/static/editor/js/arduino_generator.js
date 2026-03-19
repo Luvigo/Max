@@ -60,25 +60,25 @@ arduinoGenerator.finish = function(code) {
     // Generar includes
     let includes = '';
     for (let name in arduinoGenerator.includes_) {
-        includes += arduinoGenerator.includes_[name] + '\n';
+        includes += (arduinoGenerator.includes_[name] || '') + '\n';
     }
     
     // Generar variables globales
     let variables = '';
     for (let name in arduinoGenerator.variables_) {
-        variables += arduinoGenerator.variables_[name] + '\n';
+        variables += (arduinoGenerator.variables_[name] || '') + '\n';
     }
     
     // Generar funciones Calvin (definiciones)
     let functions = '';
     for (let name in arduinoGenerator.functions_) {
-        functions += arduinoGenerator.functions_[name] + '\n';
+        functions += (arduinoGenerator.functions_[name] || '') + '\n';
     }
     
     // Generar setups adicionales
     let setups = '';
     for (let name in arduinoGenerator.setups_) {
-        setups += '  ' + arduinoGenerator.setups_[name] + '\n';
+        setups += '  ' + (arduinoGenerator.setups_[name] || '') + '\n';
     }
     
     let finalCode = '';
@@ -92,7 +92,10 @@ arduinoGenerator.finish = function(code) {
         code = code.replace('void setup() {\n', 'void setup() {\n  // Auto-inicialización de componentes MAX\n' + setups);
     }
     
-    finalCode += code;
+    finalCode += (code != null && code !== undefined ? code : '');
+    
+    // Eliminar "undefined" que pueda colarse por bloques sin generador o retorno implícito
+    finalCode = String(finalCode || '').replace(/(\r?\n)undefined(\r?\n)/g, '$1$2').replace(/^undefined\n?|\n?undefined$/g, '');
     
     return finalCode;
 };
@@ -104,8 +107,8 @@ arduinoGenerator.scrubNakedValue = function(line) {
 
 arduinoGenerator.scrub_ = function(block, code, opt_thisOnly) {
     const nextBlock = block.nextConnection && block.nextConnection.targetBlock();
-    const nextCode = opt_thisOnly ? '' : arduinoGenerator.blockToCode(nextBlock);
-    return code + nextCode;
+    const nextCode = opt_thisOnly ? '' : (arduinoGenerator.blockToCode(nextBlock) || '');
+    return (code || '') + (nextCode || '');
 };
 
 // ============================================

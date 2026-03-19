@@ -516,7 +516,8 @@
         }
     }
 
-    function ensureCalvinMotors(pinIzq, pinDer, pwm) {
+    /** @param {boolean} [addSetup=true] Si true, añade setup (ledcSetup, etc). Solo init_motores debe pasar true. */
+    function ensureCalvinMotors(pinIzq, pinDer, pwm, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
         const c = hw.getMotorsCode(pinIzq, pinDer, pwm, isCalvinEsp32());
@@ -526,7 +527,8 @@
         if (!arduinoGenerator.variables_['calvin_motores']) {
             arduinoGenerator.variables_['calvin_motores'] = c.defines + '\n' + c.vars + '\n' + c.func;
         }
-        if (!arduinoGenerator.setups_['calvin_motores']) {
+        // Solo añadir setup cuando existe el bloque Inicializar Motores (código refleja bloques)
+        if (addSetup && !arduinoGenerator.setups_['calvin_motores']) {
             arduinoGenerator.setups_['calvin_motores'] = c.setup;
         }
     }
@@ -596,18 +598,18 @@
         const pwm = block.getFieldValue('PWM') || 220;
         const izq = block.getFieldValue('IZQ') || 9;
         const der = block.getFieldValue('DER') || 10;
-        ensureCalvinMotors(izq, der, pwm);
+        ensureCalvinMotors(izq, der, pwm, true);  // Solo init añade setup
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_adelante'] = function(block) {
-        ensureCalvinMotors();
+        ensureCalvinMotors(undefined, undefined, undefined, false);  // No añadir setup sin init
         const seg = arduinoGenerator.valueToCode(block, 'SEG', arduinoGenerator.ORDER_ATOMIC) || '1';
         return `  calvin_motor_adelante(${seg});\n`;
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_girar_motor'] = function(block) {
-        ensureCalvinMotors();
+        ensureCalvinMotors(undefined, undefined, undefined, false);  // No añadir setup sin init
         const lado = block.getFieldValue('LADO') || '0';
         const sentido = block.getFieldValue('SENTIDO') || '0';
         const seg = arduinoGenerator.valueToCode(block, 'SEG', arduinoGenerator.ORDER_ATOMIC) || '1';
