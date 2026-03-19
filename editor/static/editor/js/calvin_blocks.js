@@ -895,9 +895,9 @@
                 .appendField("Inicializar sensor de proximidad");
             this.appendDummyInput()
                 .appendField("TRIG")
-                .appendField(new Blockly.FieldNumber(6, 0, 255), "TRIG")
+                .appendField(new Blockly.FieldNumber(18, 0, 255), "TRIG")
                 .appendField("ECHO")
-                .appendField(new Blockly.FieldNumber(7, 0, 255), "ECHO");
+                .appendField(new Blockly.FieldNumber(36, 0, 255), "ECHO");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);

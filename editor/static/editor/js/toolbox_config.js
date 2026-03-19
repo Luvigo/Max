@@ -520,8 +520,8 @@
             <category name="Calvin BotFlow Nivel 1" colour="100">
                 <block type="calvin_botflow1_step"></block>
                 <block type="calvin_botflow1_init_proximidad">
-                    <field name="TRIG">6</field>
-                    <field name="ECHO">7</field>
+                    <field name="TRIG">18</field>
+                    <field name="ECHO">36</field>
                 </block>
                 <block type="calvin_botflow1_distancia"></block>
                 <block type="calvin_botflow1_init_nota">
