@@ -471,22 +471,22 @@
             </category>
             <category name="Calvin Funciones" colour="290">
                 <block type="calvin_func_defnoreturn">
-                    <field name="NAME">miFuncion</field>
+                    <field name="NAME">do something</field>
                 </block>
                 <block type="calvin_func_defreturn">
-                    <field name="NAME">calcular</field>
+                    <field name="NAME">do something2</field>
                     <field name="RETURN_TYPE">int</field>
                     <value name="RETURN"><block type="arduino_number"><field name="NUM">0</field></block></value>
                 </block>
                 <block type="calvin_func_ifreturn">
-                    <value name="CONDITION"><block type="arduino_true"></block></value>
+                    <value name="CONDITION"><block type="arduino_false"></block></value>
                     <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
                 </block>
                 <block type="calvin_func_call">
-                    <field name="NAME">miFuncion</field>
+                    <field name="NAME">do something</field>
                 </block>
                 <block type="calvin_func_call_return">
-                    <field name="NAME">calcular</field>
+                    <field name="NAME">do something2</field>
                 </block>
             </category>
             <category name="Calvin Variables" colour="290">
@@ -529,21 +529,18 @@
                 </block>
                 <block type="calvin_botflow1_nota_octava">
                     <field name="NOTA">DO</field>
-                    <field name="OCTAVA">4</field>
-                    <value name="DURACION"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
+                    <field name="OCTAVA">0</field>
+                    <field name="DURACION">inf</field>
                 </block>
                 <block type="calvin_botflow1_init_rgb">
                     <field name="TIPO">A</field>
-                    <field name="R">5</field>
-                    <field name="G">6</field>
-                    <field name="B">11</field>
                 </block>
                 <block type="calvin_botflow1_led_color">
                     <field name="COLOR">rojo</field>
-                    <value name="DURACION"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
+                    <field name="DURACION">inf</field>
                 </block>
                 <block type="calvin_botflow1_init_motores">
-                    <field name="PWM">30</field>
+                    <field name="PWM">220</field>
                     <field name="IZQ">9</field>
                     <field name="DER">10</field>
                 </block>
@@ -566,13 +563,13 @@
                     <field name="DER">2</field>
                 </block>
                 <block type="calvin_botflow2_calibrar_lineas">
-                    <value name="N"><block type="calvin_operator_number"><field name="NUM">50</field></block></value>
+                    <value name="N"><block type="calvin_operator_number"><field name="NUM">30</field></block></value>
                 </block>
                 <block type="calvin_botflow2_linea_valor">
-                    <field name="LADO">1</field>
+                    <field name="LADO">0</field>
                 </block>
                 <block type="calvin_botflow2_linea_umbral">
-                    <field name="LADO">1</field>
+                    <field name="LADO">0</field>
                 </block>
             </category>
         </category>`;

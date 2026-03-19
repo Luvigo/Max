@@ -391,12 +391,21 @@
     // calvin_func_* - Funciones
     // ============================================
 
-    // 1) Función sin retorno -> void name() { ... }
+    function getCalvinFuncParams(block) {
+        const p = block.paramNames_;
+        return Array.isArray(p) ? p : [];
+    }
+
+    // 1) Función sin retorno -> void name(int x, ...) { ... }
     arduinoGenerator.forBlock['calvin_func_defnoreturn'] = function(block) {
-        const name = (block.getFieldValue('NAME') || 'miFuncion').replace(/[^a-zA-Z0-9_]/g, '_') || 'miFuncion';
+        const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
+        const params = getCalvinFuncParams(block);
+        const sig = params.length > 0
+            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STUFF') || '';
         const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
-        const fn = `void ${name}(void) {\n${bodyIndent}\n}`;
+        const fn = `void ${name}(${sig}) {\n${bodyIndent}\n}`;
         const key = 'calvin_fn_' + name;
         if (!arduinoGenerator.functions_[key]) {
             arduinoGenerator.functions_[key] = fn;
@@ -406,12 +415,16 @@
 
     // 2) Función con retorno
     arduinoGenerator.forBlock['calvin_func_defreturn'] = function(block) {
-        const name = (block.getFieldValue('NAME') || 'calcular').replace(/[^a-zA-Z0-9_]/g, '_') || 'calcular';
+        const name = (block.getFieldValue('NAME') || 'do something2').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something2';
         const type = block.getFieldValue('RETURN_TYPE') || 'int';
+        const params = getCalvinFuncParams(block);
+        const sig = params.length > 0
+            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STUFF') || '';
         const ret = arduinoGenerator.valueToCode(block, 'RETURN', arduinoGenerator.ORDER_ATOMIC) || ('int' === type ? '0' : 'float' === type ? '0.0' : '""');
         const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
-        const fn = `${type} ${name}(void) {\n${bodyIndent}\n  return ${ret};\n}`;
+        const fn = `${type} ${name}(${sig}) {\n${bodyIndent}\n  return ${ret};\n}`;
         const key = 'calvin_fn_' + name;
         if (!arduinoGenerator.functions_[key]) {
             arduinoGenerator.functions_[key] = fn;
@@ -428,14 +441,26 @@
 
     // Llamar función sin retorno
     arduinoGenerator.forBlock['calvin_func_call'] = function(block) {
-        const name = (block.getFieldValue('NAME') || 'miFuncion').replace(/[^a-zA-Z0-9_]/g, '_') || 'miFuncion';
-        return `  ${name}();\n`;
+        const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
+        const n = block.argCount_ | 0;
+        let args = '';
+        for (let i = 0; i < n; i++) {
+            const v = arduinoGenerator.valueToCode(block, 'ARG' + i, arduinoGenerator.ORDER_ATOMIC) || '0';
+            args += (i > 0 ? ', ' : '') + v;
+        }
+        return `  ${name}(${args});\n`;
     };
 
     // Llamar función con retorno
     arduinoGenerator.forBlock['calvin_func_call_return'] = function(block) {
-        const name = (block.getFieldValue('NAME') || 'calcular').replace(/[^a-zA-Z0-9_]/g, '_') || 'calcular';
-        return [name + '()', arduinoGenerator.ORDER_ATOMIC];
+        const name = (block.getFieldValue('NAME') || 'do something2').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something2';
+        const n = block.argCount_ | 0;
+        let args = '';
+        for (let i = 0; i < n; i++) {
+            const v = arduinoGenerator.valueToCode(block, 'ARG' + i, arduinoGenerator.ORDER_ATOMIC) || '0';
+            args += (i > 0 ? ', ' : '') + v;
+        }
+        return [name + '(' + args + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 
     // ============================================

@@ -579,30 +579,139 @@
     };
 
     // ============================================
-    // calvin_func_* - Funciones
+    // calvin_func_* - Funciones (con mutador: input name, allow statements)
     // ============================================
 
-    // 1) Función sin retorno (void)
+    // Bloques para el mutador (solo aparecen en el popup de la tuerca)
+    Blockly.Blocks['calvin_func_mutatorarg'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField("input name:")
+                .appendField(new Blockly.FieldTextInput("x"), "NAME");
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip("Parámetro de la función. Arrastra aquí para añadir.");
+        }
+    };
+
+    Blockly.Blocks['calvin_func_mutator'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldCheckbox(true), "ALLOW_STATEMENTS")
+                .appendField("allow statements");
+            this.appendStatementInput("INPUTS")
+                .appendField("inputs");
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip("Configuración de la función");
+        }
+    };
+
+    const CALVIN_FUNC_MUTATOR = {
+        paramNames_: [],
+        allowStatements_: true,
+
+        saveExtraState: function() {
+            return {
+                paramNames: this.paramNames_,
+                allowStatements: this.allowStatements_
+            };
+        },
+        loadExtraState: function(state) {
+            this.paramNames_ = state && state.paramNames ? state.paramNames : [];
+            this.allowStatements_ = state && state.allowStatements !== undefined ? state.allowStatements : true;
+            this.updateShape_();
+        },
+        mutationToDom: function() {
+            const container = Blockly.utils.xml.createElement('mutation');
+            container.setAttribute('allowstatements', this.allowStatements_ ? '1' : '0');
+            this.paramNames_.forEach(function(name) {
+                const arg = Blockly.utils.xml.createElement('arg');
+                arg.setAttribute('name', name);
+                container.appendChild(arg);
+            });
+            return container;
+        },
+        domToMutation: function(xmlElement) {
+            this.allowStatements_ = xmlElement.getAttribute('allowstatements') !== '0';
+            this.paramNames_ = [];
+            const args = xmlElement.getElementsByTagName('arg');
+            for (let i = 0; i < args.length; i++) {
+                this.paramNames_.push(args[i].getAttribute('name') || 'x');
+            }
+            this.updateShape_();
+        },
+        decompose: function(workspace) {
+            const container = workspace.newBlock('calvin_func_mutator');
+            container.initSvg();
+            let connection = container.getInput('INPUTS').connection;
+            for (let i = 0; i < this.paramNames_.length; i++) {
+                const argBlock = workspace.newBlock('calvin_func_mutatorarg');
+                argBlock.setFieldValue(this.paramNames_[i] || 'x', 'NAME');
+                argBlock.initSvg();
+                connection.connect(argBlock.previousConnection);
+                connection = argBlock.nextConnection;
+            }
+            container.setFieldValue(this.allowStatements_, 'ALLOW_STATEMENTS');
+            return container;
+        },
+        compose: function(containerBlock) {
+            this.allowStatements_ = containerBlock.getFieldValue('ALLOW_STATEMENTS');
+            this.paramNames_ = [];
+            let argBlock = containerBlock.getInputTargetBlock('INPUTS');
+            while (argBlock && !argBlock.isInsertionMarker()) {
+                this.paramNames_.push(argBlock.getFieldValue('NAME') || 'x');
+                argBlock = argBlock.getNextBlock();
+            }
+            this.updateShape_();
+        },
+        saveConnections: function() {},
+        updateShape_: function() {
+            if (this.getInput('PARAMS_LABEL')) {
+                this.removeInput('PARAMS_LABEL');
+            }
+            if (this.paramNames_.length > 0) {
+                this.appendDummyInput('PARAMS_LABEL')
+                    .appendField('with:')
+                    .appendField(this.paramNames_.join(', '));
+                this.moveInputBefore('PARAMS_LABEL', 'STUFF');
+            }
+            if (this.getInput('STUFF')) {
+                this.getInput('STUFF').setVisible(this.allowStatements_);
+            }
+        }
+    };
+
+    const calvinFuncMutatorHelper = function() {
+        if (this.paramNames_ === undefined) this.paramNames_ = [];
+        if (this.allowStatements_ === undefined) this.allowStatements_ = true;
+    };
+    Blockly.Extensions.registerMutator('calvin_func_mutator', CALVIN_FUNC_MUTATOR, calvinFuncMutatorHelper, ['calvin_func_mutatorarg']);
+
+    // 1) Función sin retorno (void) - como original "to [do something]" con mutador
     Blockly.Blocks['calvin_func_defnoreturn'] = {
+        hasReturnType: false,
         init: function() {
             this.appendDummyInput()
                 .appendField("función")
-                .appendField(new Blockly.FieldTextInput("miFuncion"), "NAME");
+                .appendField(new Blockly.FieldTextInput("do something"), "NAME");
             this.appendStatementInput("STUFF")
                 .appendField("hacer");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Define una función sin valor de retorno");
+            this.setTooltip("Define una función. Usa la tuerca para añadir parámetros.");
         }
     };
+    Blockly.Blocks['calvin_func_defnoreturn'].mutator = 'calvin_func_mutator';
 
-    // 2) Función con retorno
+    // 2) Función con retorno - como original "to [do something2]" con return y mutador
     Blockly.Blocks['calvin_func_defreturn'] = {
+        hasReturnType: true,
         init: function() {
             this.appendDummyInput()
                 .appendField("función")
-                .appendField(new Blockly.FieldTextInput("calcular"), "NAME")
+                .appendField(new Blockly.FieldTextInput("do something2"), "NAME")
                 .appendField("retorna")
                 .appendField(new Blockly.FieldDropdown([
                     ["número (int)", "int"],
@@ -617,9 +726,10 @@
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Define una función que devuelve un valor");
+            this.setTooltip("Define una función que devuelve un valor. Usa la tuerca para parámetros.");
         }
     };
+    Blockly.Blocks['calvin_func_defreturn'].mutator = 'calvin_func_mutator';
 
     // 3) Si [condición] return [valor] - early return (usar dentro de función con retorno)
     Blockly.Blocks['calvin_func_ifreturn'] = {
@@ -637,30 +747,113 @@
         }
     };
 
-    // Llamar función (sin retorno)
-    Blockly.Blocks['calvin_func_call'] = {
+    // Mutador para bloques de llamada (argumentos)
+    Blockly.Blocks['calvin_func_call_mutatorarg'] = {
         init: function() {
-            this.appendDummyInput()
-                .appendField("📦 Llamar función")
-                .appendField(new Blockly.FieldTextInput("miFuncion"), "NAME");
+            this.appendDummyInput().appendField("arg");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Llama a una función definida");
         }
     };
 
-    // Llamar función con retorno (valor)
+    Blockly.Blocks['calvin_func_call_mutator'] = {
+        init: function() {
+            this.appendStatementInput("INPUTS").appendField("args");
+            this.setColour(COLOUR_FUNC);
+        }
+    };
+
+    const CALVIN_FUNC_CALL_MUTATOR = {
+        argCount_: 0,
+        saveExtraState: function() { return { argCount: this.argCount_ }; },
+        loadExtraState: function(s) { this.argCount_ = (s && s.argCount) | 0; this.updateShape_(); },
+        mutationToDom: function() {
+            const m = Blockly.utils.xml.createElement('mutation');
+            m.setAttribute('argcount', this.argCount_);
+            return m;
+        },
+        domToMutation: function(x) { this.argCount_ = parseInt(x.getAttribute('argcount'), 10) || 0; this.updateShape_(); },
+        decompose: function(ws) {
+            const c = ws.newBlock('calvin_func_call_mutator');
+            c.initSvg();
+            let conn = c.getInput('INPUTS').connection;
+            for (let i = 0; i < this.argCount_; i++) {
+                const b = ws.newBlock('calvin_func_call_mutatorarg');
+                b.initSvg();
+                conn.connect(b.previousConnection);
+                conn = b.nextConnection;
+            }
+            return c;
+        },
+        compose: function(top) {
+            let n = 0;
+            let b = top.getInputTargetBlock('INPUTS');
+            while (b && !b.isInsertionMarker()) { n++; b = b.getNextBlock(); }
+            const conns = [];
+            b = top.getInputTargetBlock('INPUTS');
+            while (b && !b.isInsertionMarker()) {
+                conns.push(b.argConnection_);
+                b = b.getNextBlock();
+            }
+            for (let i = 0; i < this.argCount_; i++) {
+                const c = this.getInput('ARG' + i) && this.getInput('ARG' + i).connection.targetConnection;
+                if (c && conns.indexOf(c) === -1) c.disconnect();
+            }
+            this.argCount_ = n;
+            this.updateShape_();
+            for (let i = 0; i < n; i++) {
+                if (conns[i]) conns[i].reconnect(this, 'ARG' + i);
+            }
+        },
+        saveConnections: function(top) {
+            let i = 0;
+            let b = top.getInputTargetBlock('INPUTS');
+            while (b && !b.isInsertionMarker()) {
+                const inp = this.getInput('ARG' + i);
+                b.argConnection_ = inp && inp.connection.targetConnection;
+                i++;
+                b = b.getNextBlock();
+            }
+        },
+        updateShape_: function() {
+            let i = 0;
+            while (this.getInput('ARG' + i)) this.removeInput('ARG' + i), i++;
+            for (i = 0; i < this.argCount_; i++) {
+                this.appendValueInput('ARG' + i).appendField('arg' + (i + 1));
+            }
+        }
+    };
+
+    const calvinCallMutatorHelper = function() {
+        if (this.argCount_ === undefined) this.argCount_ = 0;
+    };
+    Blockly.Extensions.registerMutator('calvin_func_call_mutator', CALVIN_FUNC_CALL_MUTATOR, calvinCallMutatorHelper, ['calvin_func_call_mutatorarg']);
+
+    // Llamar función (sin retorno) - con mutador para argumentos
+    Blockly.Blocks['calvin_func_call'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldTextInput("do something"), "NAME");
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip("Llama a una función. Usa la tuerca para añadir argumentos.");
+        }
+    };
+    Blockly.Blocks['calvin_func_call'].mutator = 'calvin_func_call_mutator';
+
+    // Llamar función con retorno - con mutador para argumentos
     Blockly.Blocks['calvin_func_call_return'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("llamar")
-                .appendField(new Blockly.FieldTextInput("calcular"), "NAME");
+                .appendField(new Blockly.FieldTextInput("do something2"), "NAME");
             this.setOutput(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Llama a una función y usa el valor devuelto");
+            this.setTooltip("Llama a una función y usa el valor. Usa la tuerca para argumentos.");
         }
     };
+    Blockly.Blocks['calvin_func_call_return'].mutator = 'calvin_func_call_mutator';
 
     // ============================================
     // calvin_var_* - Variables (reutiliza arduino_get/set, añade labels tipo)
