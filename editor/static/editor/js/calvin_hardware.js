@@ -98,15 +98,15 @@
                 const p = pin || CALVIN_PINS_ESP32.BUZZER;
                 return {
                     defines: `#define buzzerPin ${p}`,
-                    vars: 'const int channelPWM_5 = 8;\nconst int resolutionNM = 10;\nint frequencyNM = 1000;',
+                    vars: '',
                     func: `void calvin_tocar_nota(int freq, int duracion_ms) {
-  ledcWriteTone(channelPWM_5, freq);
+  ledcWriteTone(buzzerPin, freq);
   if (duracion_ms > 0) {
     delay(duracion_ms);
-    ledcWrite(channelPWM_5, 0);
+    ledcWriteTone(buzzerPin, 0);
   }
 }`,
-                    setup: '  ledcSetup(channelPWM_5, frequencyNM, resolutionNM);\n  ledcAttachPin(buzzerPin, channelPWM_5);'
+                    setup: '  ledcAttach(buzzerPin, 1000, 10);'
                 };
             }
             const p = pin || CALVIN_PINS.BUZZER;
@@ -176,55 +176,54 @@
                 return {
                     includes: '',
                     defines: `#define IN_1 ${in1}\n#define IN_2 ${in2}\n#define IN_3 ${in3}\n#define IN_4 ${in4}\n#define speedCar ${speedCar}`,
-                    vars: `const int channelPWM_1 = 0, channelPWM_2 = 2, channelPWM_3 = 4, channelPWM_4 = 6;
-const int resolution = 8;
-int frequency = 8000;
+                    vars: `const int resolution = 8;
+const int frequency = 8000;
 
 void calvin_mover(int modo, float duracion) {
   if (modo == 0) {
-    ledcWrite(channelPWM_1, 0);
-    ledcWrite(channelPWM_2, 0);
-    ledcWrite(channelPWM_3, 0);
-    ledcWrite(channelPWM_4, 0);
+    ledcWrite(IN_1, 0);
+    ledcWrite(IN_2, 0);
+    ledcWrite(IN_3, 0);
+    ledcWrite(IN_4, 0);
   } else if (modo == 1) {
-    ledcWrite(channelPWM_1, 0);
-    ledcWrite(channelPWM_2, speedCar);
-    ledcWrite(channelPWM_3, speedCar);
-    ledcWrite(channelPWM_4, 0);
+    ledcWrite(IN_1, 0);
+    ledcWrite(IN_2, speedCar);
+    ledcWrite(IN_3, speedCar);
+    ledcWrite(IN_4, 0);
   } else if (modo == 2) {
-    ledcWrite(channelPWM_1, speedCar);
-    ledcWrite(channelPWM_2, 0);
-    ledcWrite(channelPWM_3, 0);
-    ledcWrite(channelPWM_4, speedCar);
+    ledcWrite(IN_1, speedCar);
+    ledcWrite(IN_2, 0);
+    ledcWrite(IN_3, 0);
+    ledcWrite(IN_4, speedCar);
   } else if (modo == 3) {
-    ledcWrite(channelPWM_1, speedCar);
-    ledcWrite(channelPWM_2, 0);
-    ledcWrite(channelPWM_3, speedCar);
-    ledcWrite(channelPWM_4, 0);
+    ledcWrite(IN_1, speedCar);
+    ledcWrite(IN_2, 0);
+    ledcWrite(IN_3, speedCar);
+    ledcWrite(IN_4, 0);
   } else if (modo == 4) {
-    ledcWrite(channelPWM_1, 0);
-    ledcWrite(channelPWM_2, speedCar);
-    ledcWrite(channelPWM_3, 0);
-    ledcWrite(channelPWM_4, speedCar);
+    ledcWrite(IN_1, 0);
+    ledcWrite(IN_2, speedCar);
+    ledcWrite(IN_3, 0);
+    ledcWrite(IN_4, speedCar);
   } else if (modo == 6) {
-    ledcWrite(channelPWM_3, speedCar);
-    ledcWrite(channelPWM_4, 0);
+    ledcWrite(IN_3, speedCar);
+    ledcWrite(IN_4, 0);
   } else if (modo == 7) {
-    ledcWrite(channelPWM_3, 0);
-    ledcWrite(channelPWM_4, speedCar);
+    ledcWrite(IN_3, 0);
+    ledcWrite(IN_4, speedCar);
   } else if (modo == 8) {
-    ledcWrite(channelPWM_1, speedCar);
-    ledcWrite(channelPWM_2, 0);
+    ledcWrite(IN_1, speedCar);
+    ledcWrite(IN_2, 0);
   } else if (modo == 9) {
-    ledcWrite(channelPWM_1, 0);
-    ledcWrite(channelPWM_2, speedCar);
+    ledcWrite(IN_1, 0);
+    ledcWrite(IN_2, speedCar);
   }
   if (duracion > 0.0f) {
     delay((int)(duracion * 1000));
-    ledcWrite(channelPWM_1, 0);
-    ledcWrite(channelPWM_2, 0);
-    ledcWrite(channelPWM_3, 0);
-    ledcWrite(channelPWM_4, 0);
+    ledcWrite(IN_1, 0);
+    ledcWrite(IN_2, 0);
+    ledcWrite(IN_3, 0);
+    ledcWrite(IN_4, 0);
   }
 }
 
@@ -233,14 +232,10 @@ void calvin_motor_girar(int lado, int sentido, float seg) {
   int modo = (lado == 0) ? (sentido == 0 ? 8 : 9) : (sentido == 0 ? 6 : 7);
   calvin_mover(modo, seg);
 }`,
-                    setup: `  ledcSetup(channelPWM_1, frequency, resolution);
-  ledcSetup(channelPWM_2, frequency, resolution);
-  ledcSetup(channelPWM_3, frequency, resolution);
-  ledcSetup(channelPWM_4, frequency, resolution);
-  ledcAttachPin(IN_1, channelPWM_1);
-  ledcAttachPin(IN_2, channelPWM_2);
-  ledcAttachPin(IN_3, channelPWM_3);
-  ledcAttachPin(IN_4, channelPWM_4);`
+                    setup: `  ledcAttach(IN_1, frequency, resolution);
+  ledcAttach(IN_2, frequency, resolution);
+  ledcAttach(IN_3, frequency, resolution);
+  ledcAttach(IN_4, frequency, resolution);`
                 };
             }
             const izq = pinIzq || CALVIN_PINS.MOTOR_IZQ;

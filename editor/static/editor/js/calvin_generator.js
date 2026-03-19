@@ -480,43 +480,55 @@
         return (arduinoGenerator.boardFqbn || '').includes('esp32');
     }
 
-    function ensureCalvinProximity(pinTrig, pinEcho) {
+    /** Indica si el bloque está dentro de arduino_setup (no en loop ni suelto). */
+    function isBlockInSetup(block) {
+        if (!block) return false;
+        let b = block;
+        while (b) {
+            if (b.type === 'arduino_setup') return true;
+            if (b.type === 'arduino_loop') return false;
+            b = b.getParent && b.getParent();
+        }
+        return false;
+    }
+
+    function ensureCalvinProximity(pinTrig, pinEcho, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
         const c = hw.getProximityCode(pinTrig, pinEcho, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_proximidad']) {
             arduinoGenerator.variables_['calvin_proximidad'] = c.defines + '\n' + c.vars + '\n' + c.func;
         }
-        if (!arduinoGenerator.setups_['calvin_proximidad']) {
+        if (addSetup && !arduinoGenerator.setups_['calvin_proximidad']) {
             arduinoGenerator.setups_['calvin_proximidad'] = c.setup;
         }
     }
 
-    function ensureCalvinBuzzer(pin) {
+    function ensureCalvinBuzzer(pin, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
         const c = hw.getBuzzerCode(pin, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_buzzer']) {
             arduinoGenerator.variables_['calvin_buzzer'] = c.defines + '\n' + c.func;
         }
-        if (!arduinoGenerator.setups_['calvin_buzzer']) {
+        if (addSetup && !arduinoGenerator.setups_['calvin_buzzer']) {
             arduinoGenerator.setups_['calvin_buzzer'] = c.setup;
         }
     }
 
-    function ensureCalvinRgb(pinR, pinG, pinB, tipo) {
+    function ensureCalvinRgb(pinR, pinG, pinB, tipo, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
         const c = hw.getRgbCode(pinR, pinG, pinB, tipo, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_rgb']) {
             arduinoGenerator.variables_['calvin_rgb'] = c.defines + '\n' + c.func;
         }
-        if (!arduinoGenerator.setups_['calvin_rgb']) {
+        if (addSetup && !arduinoGenerator.setups_['calvin_rgb']) {
             arduinoGenerator.setups_['calvin_rgb'] = c.setup;
         }
     }
 
-    /** @param {boolean} [addSetup=true] Si true, añade setup (ledcSetup, etc). Solo init_motores debe pasar true. */
+    /** @param {boolean} [addSetup] Si true, añade setup. Solo cuando el bloque init está dentro de arduino_setup. */
     function ensureCalvinMotors(pinIzq, pinDer, pwm, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
@@ -552,23 +564,23 @@
         const esp = isCalvinEsp32();
         const trig = esp ? 18 : (block.getFieldValue('TRIG') || 6);
         const echo = esp ? 36 : (block.getFieldValue('ECHO') || 7);
-        ensureCalvinProximity(trig, echo);
+        ensureCalvinProximity(trig, echo, isBlockInSetup(block));
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_distancia'] = function(block) {
-        ensureCalvinProximity();
+        ensureCalvinProximity(undefined, undefined, false);
         return ['calvin_distancia_cm()', arduinoGenerator.ORDER_ATOMIC];
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_nota'] = function(block) {
         const pin = isCalvinEsp32() ? 27 : (block.getFieldValue('PIN') || 3);
-        ensureCalvinBuzzer(pin);
+        ensureCalvinBuzzer(pin, isBlockInSetup(block));
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_nota_octava'] = function(block) {
-        ensureCalvinBuzzer();
+        ensureCalvinBuzzer(undefined, false);
         const nota = block.getFieldValue('NOTA') || 'DO';
         const octava = block.getFieldValue('OCTAVA') || 0;
         const durField = block.getFieldValue('DURACION') || '1';
@@ -581,12 +593,12 @@
     arduinoGenerator.forBlock['calvin_botflow1_init_rgb'] = function(block) {
         const tipo = block.getFieldValue('TIPO') || 'A';
         const esp = isCalvinEsp32();
-        ensureCalvinRgb(esp ? 23 : 5, esp ? 22 : 6, esp ? 21 : 11, tipo);
+        ensureCalvinRgb(esp ? 23 : 5, esp ? 22 : 6, esp ? 21 : 11, tipo, isBlockInSetup(block));
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_led_color'] = function(block) {
-        ensureCalvinRgb();
+        ensureCalvinRgb(undefined, undefined, undefined, undefined, false);
         const color = block.getFieldValue('COLOR') || 'rojo';
         const rgb = RGB_COLORS[color] || RGB_COLORS.rojo;
         const durField = block.getFieldValue('DURACION') || '1';
@@ -598,7 +610,7 @@
         const pwm = block.getFieldValue('PWM') || 220;
         const izq = block.getFieldValue('IZQ') || 9;
         const der = block.getFieldValue('DER') || 10;
-        ensureCalvinMotors(izq, der, pwm, true);  // Solo init añade setup
+        ensureCalvinMotors(izq, der, pwm, isBlockInSetup(block));  // Solo añade setup si está dentro de arduino_setup
         return '';
     };
 
@@ -620,14 +632,14 @@
     // calvin_botflow2_* - Sensores de línea
     // ============================================
 
-    function ensureCalvinLineas(pinIzq, pinCent, pinDer) {
+    function ensureCalvinLineas(pinIzq, pinCent, pinDer, addSetup) {
         const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
         if (!hw) return;
         const c = hw.getLineSensorsCode(pinIzq, pinCent, pinDer, isCalvinEsp32());
         if (!arduinoGenerator.variables_['calvin_lineas']) {
             arduinoGenerator.variables_['calvin_lineas'] = c.defines + '\n' + c.vars + '\n' + c.func;
         }
-        if (!arduinoGenerator.setups_['calvin_lineas']) {
+        if (addSetup && !arduinoGenerator.setups_['calvin_lineas']) {
             arduinoGenerator.setups_['calvin_lineas'] = c.setup;
         }
     }
@@ -643,24 +655,24 @@
         const izq = esp ? 34 : (block.getFieldValue('IZQ') || 0);
         const cent = esp ? 35 : (block.getFieldValue('CENT') || 1);
         const der = esp ? 36 : (block.getFieldValue('DER') || 2);
-        ensureCalvinLineas(izq, cent, der);
+        ensureCalvinLineas(izq, cent, der, isBlockInSetup(block));
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_calibrar_lineas'] = function(block) {
-        ensureCalvinLineas();
+        ensureCalvinLineas(undefined, undefined, undefined, false);
         const n = arduinoGenerator.valueToCode(block, 'N', arduinoGenerator.ORDER_ATOMIC) || '50';
         return `  calvin_linea_calibrar(${n});\n`;
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_linea_valor'] = function(block) {
-        ensureCalvinLineas();
+        ensureCalvinLineas(undefined, undefined, undefined, false);
         const lado = block.getFieldValue('LADO') || '0';
         return ['calvin_linea_valor(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_linea_umbral'] = function(block) {
-        ensureCalvinLineas();
+        ensureCalvinLineas(undefined, undefined, undefined, false);
         const lado = block.getFieldValue('LADO') || '0';
         return ['calvin_linea_umbral(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
