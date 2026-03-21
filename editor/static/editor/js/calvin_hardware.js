@@ -1,33 +1,34 @@
 /**
- * Calvin Hardware - Capa de abstracción centralizada
- * BotFlow original: ESP32 + L298N. Fallback: Arduino + Servo.
- * Proximidad, Buzzer, RGB, Motores, Sensores línea.
+ * Calvin Hardware - Configuración centralizada de pines del carro Calvin.
+ *
+ * ÚNICA FUENTE DE VERDAD para pines Calvin. Los bloques y el generador deben
+ * usar CalvinHardware.PINS (AVR) o CalvinHardware.PINS_ESP32 (ESP32).
+ *
+ * ESP32 (BotFlow real): L298N motores, sensor ultrasónico 18/36, buzzer 27,
+ * RGB 23/22/21, sensores línea 34/35/36. AVR: Servo motores, prox 6/7, etc.
+ *
+ * Conservado: Valores verificados con carro Calvin funcionando.
+ * No cambiar pines sin confirmar hardware real.
  */
 (function() {
     'use strict';
 
-    // Pines Arduino (AVR) - Servo, tone, analogWrite
+    // Pines Arduino (AVR) - Servo motores, tone, analogWrite, sensores
     const CALVIN_PINS_AVR = {
-        PROX_TRIG: 6,
-        PROX_ECHO: 7,
-        BUZZER: 3,
-        RGB_R: 5,
-        RGB_G: 6,
-        RGB_B: 11,
-        MOTOR_IZQ: 9,
-        MOTOR_DER: 10,
-        LINEA_IZQ: 0,
-        LINEA_CENT: 1,
-        LINEA_DER: 2
+        PROX_TRIG: 6, PROX_ECHO: 7,      // Sensor ultrasónico HC-SR04
+        BUZZER: 3,                        // Buzzer/tone
+        RGB_R: 5, RGB_G: 6, RGB_B: 11,   // LED RGB
+        MOTOR_IZQ: 9, MOTOR_DER: 10,     // Servos (adelante/girar)
+        LINEA_IZQ: 0, LINEA_CENT: 1, LINEA_DER: 2  // A0, A1, A2 sensores de línea
     };
 
-    // Pines original BotFlow (ESP32) - L298N, ledc, digital
+    // Pines ESP32 (BotFlow) - L298N IN1-4, ledc, ADC. Evitar 32,33,25,26 para líneas
     const CALVIN_PINS_ESP32 = {
-        IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,
-        PROX_TRIG: 18, PROX_ECHO: 36,
-        BUZZER: 27,
-        RGB_R: 23, RGB_G: 22, RGB_B: 21,
-        LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 36  // ADC pins (evitar 32,33,25,26 L298N)
+        IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,   // L298N driver motores
+        PROX_TRIG: 18, PROX_ECHO: 36,             // Sensor ultrasónico
+        BUZZER: 27,                               // ledcWriteTone
+        RGB_R: 23, RGB_G: 22, RGB_B: 21,          // LED RGB
+        LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 36  // ADC
     };
 
     const CALVIN_PINS = CALVIN_PINS_AVR;
@@ -171,7 +172,8 @@
 
         getMotorsCode: function(pinIzq, pinDer, pwmDefault, isEsp32) {
             if (isEsp32) {
-                const in1 = 32, in2 = 33, in3 = 25, in4 = 26;
+                const in1 = CALVIN_PINS_ESP32.IN_1, in2 = CALVIN_PINS_ESP32.IN_2;
+                const in3 = CALVIN_PINS_ESP32.IN_3, in4 = CALVIN_PINS_ESP32.IN_4;
                 const speedCar = Math.min(255, Math.max(0, pwmDefault !== undefined && pwmDefault !== null ? pwmDefault : 220));
                 return {
                     includes: '',
@@ -344,4 +346,9 @@ void calvin_linea_calibrar(int n) {
             };
         }
     };
+
+    // === Documentación de consolidación ===
+    // CONSERVADO: Pines verificados con carro Calvin/BotFlow funcionando.
+    // CORREGIDO: getMotorsCode ESP32 ahora usa CALVIN_PINS_ESP32.IN_1..4 en lugar de literales.
+    // CORREGIDO: calvin_generator obtiene todos los pines desde CalvinHardware (antes hardcodeados).
 })();

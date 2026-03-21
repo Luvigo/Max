@@ -242,10 +242,9 @@
         return String(name || 'cmd').replace(/[^a-zA-Z0-9_]/g, '_').replace(/^_+|_+$/g, '') || 'cmd';
     }
 
-    // 1) Inicializar BLE
+    // 1) Inicializar BLE (BotFlow: NOMBRE value, onConectado, onDesconectado)
     arduinoGenerator.forBlock['calvin_ble_init'] = function(block) {
-        const name = block.getFieldValue('NAME') || 'CalvinBot';
-        const nameEsc = String(name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const nameCode = arduinoGenerator.valueToCode(block, 'NOMBRE', arduinoGenerator.ORDER_ATOMIC) || '"CalvinBot"';
         if (!isBleEsp32()) {
             return `  // BLE: Solo compatible con ESP32. Placa actual no soporta BLE.\n`;
         }
@@ -256,8 +255,8 @@
             arduinoGenerator.variables_['ble_globals'] =
                 'BLEServer *pServer = nullptr;\nString _ble_last_value;';
         }
-        const connectedCode = (arduinoGenerator.statementToCode(block, 'CONNECTED') || '').trim();
-        const disconnectedCode = (arduinoGenerator.statementToCode(block, 'DISCONNECTED') || '').trim();
+        const connectedCode = (arduinoGenerator.statementToCode(block, 'onConectado') || arduinoGenerator.statementToCode(block, 'CONNECTED') || '').trim();
+        const disconnectedCode = (arduinoGenerator.statementToCode(block, 'onDesconectado') || arduinoGenerator.statementToCode(block, 'DISCONNECTED') || '').trim();
         const connBody = connectedCode ? '\n  ' + connectedCode.replace(/\n/g, '\n  ') : '';
         const discBody = disconnectedCode ? '\n  ' + disconnectedCode.replace(/\n/g, '\n  ') : '';
         if (!arduinoGenerator.variables_['ble_server_callbacks']) {
@@ -269,7 +268,7 @@
         }
         arduinoGenerator.bleChars_ = arduinoGenerator.bleChars_ || {};
         arduinoGenerator.bleSvcIndex = 0;
-        let code = `  BLEDevice::init("${nameEsc}");\n`;
+        let code = `  BLEDevice::init(${nameCode});\n`;
         code += `  pServer = BLEDevice::createServer();\n`;
         code += `  pServer->setCallbacks(new BLE_ServerCallbacks());\n`;
         code += arduinoGenerator.statementToCode(block, 'SERVICES') || '';
@@ -290,13 +289,13 @@
         return code;
     };
 
-    // 3) Característica [UUID] ... Hacer ...
+    // 3) Característica [NOMBRE] [UUID] onWrite (BotFlow)
     arduinoGenerator.forBlock['calvin_ble_characteristic'] = function(block) {
         if (!isBleEsp32()) return '';
         const uuid = block.getFieldValue('UUID') || 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-        const rawName = block.getFieldValue('NAME') || 'cmd';
+        const rawName = block.getFieldValue('NOMBRE') || block.getFieldValue('NAME') || 'cmd';
         const name = sanitizeBleName(rawName);
-        const doCode = arduinoGenerator.statementToCode(block, 'DO') || '';
+        const doCode = arduinoGenerator.statementToCode(block, 'onWrite') || arduinoGenerator.statementToCode(block, 'DO') || '';
         const cbIdx = (arduinoGenerator.bleCbIndex = (arduinoGenerator.bleCbIndex || 0) + 1) - 1;
         arduinoGenerator.bleChars_ = arduinoGenerator.bleChars_ || {};
         arduinoGenerator.bleChars_[rawName] = name;
@@ -562,8 +561,10 @@
 
     arduinoGenerator.forBlock['calvin_botflow1_init_proximidad'] = function(block) {
         const esp = isCalvinEsp32();
-        const trig = esp ? 18 : (block.getFieldValue('TRIG') || 6);
-        const echo = esp ? 36 : (block.getFieldValue('ECHO') || 7);
+        const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
+        const pins = hw ? (esp ? hw.PINS_ESP32 : hw.PINS) : null;
+        const trig = pins ? pins.PROX_TRIG : (esp ? 18 : 6);
+        const echo = pins ? pins.PROX_ECHO : (esp ? 36 : 7);
         ensureCalvinProximity(trig, echo, isBlockInSetup(block));
         return '';
     };
@@ -574,7 +575,11 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_nota'] = function(block) {
-        const pin = isCalvinEsp32() ? 27 : (block.getFieldValue('PIN') || 3);
+        const esp = isCalvinEsp32();
+        const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
+        const pins = hw ? (esp ? hw.PINS_ESP32 : hw.PINS) : null;
+        const cfgPin = pins ? pins.BUZZER : (esp ? 27 : 3);
+        const pin = esp ? cfgPin : (block.getFieldValue('PIN') || cfgPin);
         ensureCalvinBuzzer(pin, isBlockInSetup(block));
         return '';
     };
@@ -593,7 +598,12 @@
     arduinoGenerator.forBlock['calvin_botflow1_init_rgb'] = function(block) {
         const tipo = block.getFieldValue('TIPO') || 'A';
         const esp = isCalvinEsp32();
-        ensureCalvinRgb(esp ? 23 : 5, esp ? 22 : 6, esp ? 21 : 11, tipo, isBlockInSetup(block));
+        const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
+        const pins = hw ? (esp ? hw.PINS_ESP32 : hw.PINS) : null;
+        const r = pins ? pins.RGB_R : (esp ? 23 : 5);
+        const g = pins ? pins.RGB_G : (esp ? 22 : 6);
+        const b = pins ? pins.RGB_B : (esp ? 21 : 11);
+        ensureCalvinRgb(r, g, b, tipo, isBlockInSetup(block));
         return '';
     };
 
@@ -607,10 +617,8 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_init_motores'] = function(block) {
-        const pwm = block.getFieldValue('PWM') || 220;
-        const izq = block.getFieldValue('IZQ') || 9;
-        const der = block.getFieldValue('DER') || 10;
-        ensureCalvinMotors(izq, der, pwm, isBlockInSetup(block));  // Solo añade setup si está dentro de arduino_setup
+        const pwm = block.getFieldValue('pwmvalue') || block.getFieldValue('PWM') || 220;
+        ensureCalvinMotors(undefined, undefined, pwm, isBlockInSetup(block));
         return '';
     };
 
@@ -621,11 +629,13 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_girar_motor'] = function(block) {
-        ensureCalvinMotors(undefined, undefined, undefined, false);  // No añadir setup sin init
-        const lado = block.getFieldValue('LADO') || '0';
-        const sentido = block.getFieldValue('SENTIDO') || '0';
-        const seg = arduinoGenerator.valueToCode(block, 'SEG', arduinoGenerator.ORDER_ATOMIC) || '1';
-        return `  calvin_motor_girar(${lado}, ${sentido}, ${seg});\n`;
+        ensureCalvinMotors(undefined, undefined, undefined, false);
+        const motor = block.getFieldValue('motor') ?? block.getFieldValue('LADO') ?? '0';
+        const sentidoBotFlow = block.getFieldValue('sentido') ?? block.getFieldValue('SENTIDO') ?? '0';
+        const tiempo = arduinoGenerator.valueToCode(block, 'TIEMPO', arduinoGenerator.ORDER_ATOMIC) ||
+            arduinoGenerator.valueToCode(block, 'SEG', arduinoGenerator.ORDER_ATOMIC) || '1';
+        const sentido = (sentidoBotFlow === '1') ? '0' : '1';
+        return `  calvin_motor_girar(${motor}, ${sentido}, ${tiempo});\n`;
     };
 
     // ============================================
@@ -652,28 +662,40 @@
 
     arduinoGenerator.forBlock['calvin_botflow2_init_lineas'] = function(block) {
         const esp = isCalvinEsp32();
-        const izq = esp ? 34 : (block.getFieldValue('IZQ') || 0);
-        const cent = esp ? 35 : (block.getFieldValue('CENT') || 1);
-        const der = esp ? 36 : (block.getFieldValue('DER') || 2);
+        const hw = typeof CalvinHardware !== 'undefined' ? CalvinHardware : null;
+        const pins = hw ? (esp ? hw.PINS_ESP32 : hw.PINS) : null;
+        const izq = pins ? pins.LINEA_IZQ : (esp ? 34 : 0);
+        const cent = pins ? pins.LINEA_CENT : (esp ? 35 : 1);
+        const der = pins ? pins.LINEA_DER : (esp ? 36 : 2);
         ensureCalvinLineas(izq, cent, der, isBlockInSetup(block));
         return '';
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_calibrar_lineas'] = function(block) {
         ensureCalvinLineas(undefined, undefined, undefined, false);
-        const n = arduinoGenerator.valueToCode(block, 'N', arduinoGenerator.ORDER_ATOMIC) || '50';
-        return `  calvin_linea_calibrar(${n});\n`;
+        const ciclos = block.getFieldValue('ciclos') || '30';
+        return `  calvin_linea_calibrar(${ciclos});\n`;
     };
+
+    /** Mapea sensor BotFlow (s_izquierdo/s_centro/s_derecho) o LADO (0/1/2) al índice C. */
+    function sensorLineaToLado(val) {
+        if (val === 's_izquierdo' || val === '0') return '0';
+        if (val === 's_centro' || val === '1') return '1';
+        if (val === 's_derecho' || val === '2') return '2';
+        return '0';
+    }
 
     arduinoGenerator.forBlock['calvin_botflow2_linea_valor'] = function(block) {
         ensureCalvinLineas(undefined, undefined, undefined, false);
-        const lado = block.getFieldValue('LADO') || '0';
+        const sensor = block.getFieldValue('sensor') || block.getFieldValue('LADO') || 's_izquierdo';
+        const lado = sensorLineaToLado(sensor);
         return ['calvin_linea_valor(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 
     arduinoGenerator.forBlock['calvin_botflow2_linea_umbral'] = function(block) {
         ensureCalvinLineas(undefined, undefined, undefined, false);
-        const lado = block.getFieldValue('LADO') || '0';
+        const sensor = block.getFieldValue('umbralSensor') || block.getFieldValue('LADO') || 's_izquierdo';
+        const lado = sensorLineaToLado(sensor);
         return ['calvin_linea_umbral(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 

@@ -418,15 +418,17 @@
     // calvin_ble_* - Bluetooth Low Energy (solo ESP32)
     // ============================================
 
-    // 1) Inicializar BLE - Nombre, Conectado, Desconectado, Servicios
+    // 1) Inicializar BLE (BotFlow: ble_init - NOMBRE, onConectado, onDesconectado, SERVICES)
     Blockly.Blocks['calvin_ble_init'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("📶 Inicializar BLE")
-                .appendField(new Blockly.FieldTextInput("CalvinBot"), "NAME");
-            this.appendStatementInput("CONNECTED")
+                .appendField("Inicializar BLE");
+            this.appendValueInput("NOMBRE")
+                .setCheck("String")
+                .appendField("Nombre");
+            this.appendStatementInput("onConectado")
                 .appendField("Conectado");
-            this.appendStatementInput("DISCONNECTED")
+            this.appendStatementInput("onDesconectado")
                 .appendField("Desconectado");
             this.appendStatementInput("SERVICES")
                 .appendField("Servicios");
@@ -437,11 +439,13 @@
         }
     };
 
-    // 2) Servicio [UUID] ... Características ... (anidar dentro de Inicializar BLE)
+    // 2) Servicio [NOMBRE] UUID [UUID] (BotFlow: ble_service)
     Blockly.Blocks['calvin_ble_service'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Servicio")
+                .appendField(new Blockly.FieldTextInput("servicio"), "NOMBRE")
+                .appendField("UUID")
                 .appendField(new Blockly.FieldTextInput("4fafc201-1fb5-459e-8fcc-c5c9c331914b"), "UUID");
             this.appendStatementInput("CHARACTERISTICS")
                 .appendField("Características");
@@ -452,16 +456,16 @@
         }
     };
 
-    // 3) Característica [UUID] ... Hacer ... (anidar dentro de Servicio)
+    // 3) Caracteristica [NOMBRE] UUID [UUID] Hacer (BotFlow: ble_characteristic)
     Blockly.Blocks['calvin_ble_characteristic'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Característica")
-                .appendField(new Blockly.FieldTextInput("beb5483e-36e1-4688-b7f5-ea07361b26a8"), "UUID")
-                .appendField("id")
-                .appendField(new Blockly.FieldTextInput("cmd"), "NAME");
-            this.appendStatementInput("DO")
-                .appendField("cuando escriben, hacer");
+                .appendField("Caracteristica")
+                .appendField(new Blockly.FieldTextInput("cmd"), "NOMBRE")
+                .appendField("UUID")
+                .appendField(new Blockly.FieldTextInput("beb5483e-36e1-4688-b7f5-ea07361b26a8"), "UUID");
+            this.appendStatementInput("onWrite")
+                .appendField("Hacer");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BLE);
@@ -888,29 +892,23 @@
         }
     };
 
-    // 1) Inicializar sensor de proximidad
+    // 1) Inicializar sensor de proximidad (BotFlow: inicializar_sensor_distancia, sin fields)
     Blockly.Blocks['calvin_botflow1_init_proximidad'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Inicializar sensor de proximidad");
-            this.appendDummyInput()
-                .appendField("TRIG")
-                .appendField(new Blockly.FieldNumber(18, 0, 255), "TRIG")
-                .appendField("ECHO")
-                .appendField(new Blockly.FieldNumber(36, 0, 255), "ECHO");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura el sensor ultrasónico de proximidad");
+            this.setTooltip("Inicializa el sensor de proximidad. Pines TRIG/ECHO desde calvin_hardware (ESP32: 18/36).");
         }
     };
 
-    // 2) distancia [cm]
+    // 2) distancia [cm] (BotFlow: leer_sensor_distancia)
     Blockly.Blocks['calvin_botflow1_distancia'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("distancia")
-                .appendField("cm");
+                .appendField("distancia [cm]");
             this.setOutput(true, "Number");
             this.setColour(COLOUR_BOTFLOW1);
             this.setTooltip("Devuelve la distancia al obstáculo en centímetros");
@@ -1001,22 +999,17 @@
         }
     };
 
-    // 7) Inicializar Motores 220 PWM (como original BotFlow)
+    // 7) Inicializar Motores (BotFlow: field pwmvalue; pines desde calvin_hardware)
     Blockly.Blocks['calvin_botflow1_init_motores'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Inicializar Motores")
-                .appendField(new Blockly.FieldNumber(220, 0, 255), "PWM")
+                .appendField(new Blockly.FieldNumber(220, 0, 255), "pwmvalue")
                 .appendField("PWM");
-            this.appendDummyInput()
-                .appendField("izq")
-                .appendField(new Blockly.FieldNumber(9, 0, 255), "IZQ")
-                .appendField("der")
-                .appendField(new Blockly.FieldNumber(10, 0, 255), "DER");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura motores del robot. PWM 0-255 (220 por defecto como original). Pines izq=9, der=10");
+            this.setTooltip("Configura motores del robot. PWM 0-255 (220 por defecto). Pines desde calvin_hardware.");
         }
     };
 
@@ -1036,7 +1029,7 @@
         }
     };
 
-    // 9) Girar Motor [izquierdo/derecho] en sentido [Horario/Antihorario] (como original)
+    // 9) Girar Motor [motor] en sentido [sentido] durante [TIEMPO] (BotFlow)
     Blockly.Blocks['calvin_botflow1_girar_motor'] = {
         init: function() {
             this.appendDummyInput()
@@ -1044,14 +1037,14 @@
                 .appendField(new Blockly.FieldDropdown([
                     ["izquierdo", "0"],
                     ["derecho", "1"]
-                ]), "LADO")
+                ]), "motor")
                 .appendField("en sentido")
                 .appendField(new Blockly.FieldDropdown([
-                    ["Horario", "0"],
-                    ["Antihorario", "1"]
-                ]), "SENTIDO")
+                    ["Horario", "1"],
+                    ["Antihorario", "0"]
+                ]), "sentido")
                 .appendField("durante");
-            this.appendValueInput("SEG")
+            this.appendValueInput("TIEMPO")
                 .setCheck("Number")
                 .appendField("");
             this.appendDummyInput().appendField("seg");
@@ -1077,40 +1070,32 @@
         }
     };
 
-    const LADO_OPTIONS = [
-        ["Izquierdo", "0"],
-        ["Centro", "1"],
-        ["Derecho", "2"]
+    // BotFlow: sensor/umbralSensor con values s_izquierdo, s_centro, s_derecho (mapeados a 0,1,2 en C)
+    const SENSOR_LINEA_OPTIONS = [
+        ["Izquierdo", "s_izquierdo"],
+        ["Centro", "s_centro"],
+        ["Derecho", "s_derecho"]
     ];
 
-    // 1) Inicializar sensores de línea
+    // 1) Inicializar sensores de línea (BotFlow: inicializar_sensor_linea, sin fields)
     Blockly.Blocks['calvin_botflow2_init_lineas'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Inicializar sensores de línea");
-            this.appendDummyInput()
-                .appendField("izq A")
-                .appendField(new Blockly.FieldNumber(0, 0, 7), "IZQ")
-                .appendField("centro A")
-                .appendField(new Blockly.FieldNumber(1, 0, 7), "CENT")
-                .appendField("der A")
-                .appendField(new Blockly.FieldNumber(2, 0, 7), "DER");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW2);
-            this.setTooltip("Configura los sensores de línea (pines analógicos A0-A7)");
+            this.setTooltip("Configura los sensores de línea. Pines desde calvin_hardware (ESP32: 34,35,36).");
         }
     };
 
-    // 2) Calibrar sensores de línea durante [n] lecturas
+    // 2) Calibrar sensores de línea durante [ciclos] lecturas (BotFlow: calibrar_sensores_linea)
     Blockly.Blocks['calvin_botflow2_calibrar_lineas'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Calibrar sensores de línea durante");
-            this.appendValueInput("N")
-                .setCheck("Number")
-                .appendField("");
-            this.appendDummyInput().appendField("lecturas");
+                .appendField("Calibrar sensores de línea durante")
+                .appendField(new Blockly.FieldNumber(30, 1, 999), "ciclos")
+                .appendField("lecturas");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW2);
@@ -1118,27 +1103,27 @@
         }
     };
 
-    // 3) Valor sensor de línea [lado]
+    // 3) Valor sensor de linea [sensor] (BotFlow: leer_sensores_linea)
     Blockly.Blocks['calvin_botflow2_linea_valor'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Valor sensor de línea")
-                .appendField(new Blockly.FieldDropdown(LADO_OPTIONS), "LADO");
+                .appendField("Valor sensor de linea")
+                .appendField(new Blockly.FieldDropdown(SENSOR_LINEA_OPTIONS), "sensor");
             this.setOutput(true, "Number");
             this.setColour(COLOUR_BOTFLOW2);
             this.setTooltip("Devuelve el valor analógico (0-1023) del sensor");
         }
     };
 
-    // 4) Valor umbral sensor de línea [lado]
+    // 4) Valor umbral sensor de linea [sensor] (BotFlow: umbral_sensor)
     Blockly.Blocks['calvin_botflow2_linea_umbral'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Valor umbral sensor de línea")
-                .appendField(new Blockly.FieldDropdown(LADO_OPTIONS), "LADO");
+                .appendField("Valor umbral sensor de linea")
+                .appendField(new Blockly.FieldDropdown(SENSOR_LINEA_OPTIONS), "umbralSensor");
             this.setOutput(true, "Number");
             this.setColour(COLOUR_BOTFLOW2);
-            this.setTooltip("Devuelve el umbral calibrado (min+max)/2 del sensor");
+            this.setTooltip("Devuelve el umbral calibrado del sensor");
         }
     };
 
