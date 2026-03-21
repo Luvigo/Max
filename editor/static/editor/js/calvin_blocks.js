@@ -417,7 +417,7 @@
     // calvin_ble_* - Bluetooth Low Energy (solo ESP32)
     // ============================================
 
-    // 1) Inicializar BLE (BotFlow: ble_init - NOMBRE, onConectado, onDesconectado, SERVICES)
+    // 1) Inicializar BLE (BotFlow: ble_init - layout visual más parecido al original)
     Blockly.Blocks['calvin_ble_init'] = {
         init: function() {
             this.appendDummyInput()
@@ -430,11 +430,11 @@
             this.appendStatementInput("onDesconectado")
                 .appendField("Desconectado");
             this.appendStatementInput("SERVICES")
-                .appendField("Servicios");
+                .appendField("▸");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BLE);
-            this.setTooltip("Inicializa BLE con nombre. Solo compatible con ESP32.");
+            this.setTooltip("Inicializa BLE con nombre. Conectado/Desconectado: callbacks. Zona inferior: añade servicios BLE.");
         }
     };
 

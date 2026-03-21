@@ -67,6 +67,12 @@ const AgentConfig = {
     }
 };
 
+// Placas por defecto para cada robot (MAX: Arduino Nano Old Bootloader, Calvin: ESP32)
+const ROBOT_DEFAULT_BOARDS = {
+    MAX: 'arduino:avr:nano:cpu=atmega328old',
+    Calvin: 'esp32:esp32:esp32'
+};
+
 // Board registry: fuente única agent/boards_registry.json, copia en /static/editor/json/boards.json
 // Fallback embebido para cuando Agent y static no están disponibles
 const BOARDS_FALLBACK = [
@@ -173,7 +179,24 @@ async function loadBoardsRegistry() {
 }
 
 /**
+ * Establece la placa por defecto según el robot (MAX → Nano Old Bootloader, Calvin → ESP32).
+ * El usuario puede cambiarla manualmente después.
+ */
+function setBoardForRobot(robot) {
+    const fqbn = ROBOT_DEFAULT_BOARDS[robot];
+    if (!fqbn || !boardsRegistry.some(b => b.fqbn === fqbn)) return;
+    const sel = document.getElementById('boardSelect');
+    if (!sel) return;
+    sel.value = fqbn;
+    currentBoard = fqbn;
+    const boardInfo = document.getElementById('boardInfo');
+    if (boardInfo) boardInfo.innerHTML = `<span>🎯</span><span>${getBoardLabel(currentBoard)}</span>`;
+    updateBoardHint(currentBoard);
+}
+
+/**
  * Pobla el selector de placas desde el registry. Retrocompatible con el HTML actual.
+ * Si hay robot MAX/Calvin guardado, usa la placa por defecto de ese robot.
  */
 function populateBoardSelect() {
     const sel = document.getElementById('boardSelect');
@@ -186,8 +209,10 @@ function populateBoardSelect() {
         opt.textContent = b.label;
         sel.appendChild(opt);
     });
-    // Restaurar selección si sigue existiendo
-    if (boardsRegistry.some(b => b.fqbn === prevVal)) {
+    const robot = (typeof ToolboxConfig !== 'undefined' && ToolboxConfig.getStoredRobot) ? ToolboxConfig.getStoredRobot() : null;
+    if (robot === 'MAX' || robot === 'Calvin') {
+        setBoardForRobot(robot);
+    } else if (boardsRegistry.some(b => b.fqbn === prevVal)) {
         sel.value = prevVal;
         currentBoard = prevVal;
     } else {
@@ -1140,6 +1165,8 @@ function switchRobot(robot) {
 
     ToolboxConfig.setStoredRobot(robot);
 
+    setBoardForRobot(robot);
+
     const toolboxEl = document.getElementById('toolbox');
     if (toolboxEl) {
         ToolboxConfig.buildToolboxElement(robot, toolboxEl);
@@ -1860,7 +1887,8 @@ function getCodeForCompile() {
 
 /**
  * Solicita acceso a un puerto serial usando Web Serial API
- * Abre el diálogo nativo del navegador para seleccionar puerto
+ * Abre el diálogo nativo del navegador para seleccionar puerto.
+ * Al seleccionar, refresca la lista y selecciona automáticamente el puerto en el dropdown.
  */
 async function requestSerialPort() {
     // Verificar soporte de Web Serial API
@@ -1878,16 +1906,18 @@ async function requestSerialPort() {
         // Solicitar puerto al usuario (abre diálogo nativo)
         const port = await navigator.serial.requestPort();
         
-        // Obtener información del puerto
+        // Obtener información del puerto (VID/PID para identificar en el dropdown)
         const info = port.getInfo();
-        const vendorId = info.usbVendorId ? `0x${info.usbVendorId.toString(16)}` : 'N/A';
-        const productId = info.usbProductId ? `0x${info.usbProductId.toString(16)}` : 'N/A';
+        const vendorId = info.usbVendorId;
+        const productId = info.usbProductId;
+        const vidStr = vendorId ? `0x${vendorId.toString(16)}` : 'N/A';
+        const pidStr = productId ? `0x${productId.toString(16)}` : 'N/A';
         
-        logToConsole(`[SERIAL] ✓ Puerto seleccionado (VID: ${vendorId}, PID: ${productId})`, 'success');
-        showToast('Puerto agregado. Ahora refresca la lista.', 'success');
+        logToConsole(`[SERIAL] ✓ Puerto seleccionado (VID: ${vidStr}, PID: ${pidStr})`, 'success');
+        showToast('Puerto seleccionado', 'success');
         
-        // Refrescar la lista de puertos del Agent para que aparezca
-        await refreshPorts();
+        // Refrescar y auto-seleccionar el puerto elegido en el dropdown
+        await refreshPorts({ preferredVid: vendorId, preferredPid: productId });
         
     } catch (error) {
         if (error.name === 'NotFoundError') {
@@ -1905,8 +1935,11 @@ async function requestSerialPort() {
 
 /**
  * Refresca la lista de puertos desde el Agent local
+ * @param {Object} [options] - Opciones opcionales
+ * @param {number} [options.preferredVid] - VID del puerto seleccionado vía Web Serial (para auto-seleccionar)
+ * @param {number} [options.preferredPid] - PID del puerto seleccionado vía Web Serial
  */
-async function refreshPorts() {
+async function refreshPorts(options = {}) {
     const select = document.getElementById('portSelect');
     const serialSelect = document.getElementById('serialPortSelect');
     const btn = document.getElementById('btnRefreshPorts');
@@ -1950,8 +1983,21 @@ async function refreshPorts() {
                     showToast('💡 CH340 detectado: usa "Nano (Old Bootloader)" para clones', 'info');
                 }
                 
-                // Auto-seleccionar si solo hay uno
-                if (ports.length === 1) {
+                // Auto-seleccionar: por VID/PID (Web Serial) o si solo hay uno
+                let selected = false;
+                const { preferredVid, preferredPid } = options;
+                if (preferredVid != null && preferredPid != null) {
+                    const match = ports.find(p => p.vid === preferredVid && p.pid === preferredPid);
+                    if (match) {
+                        const device = match.device || match.address || match;
+                        select.value = device;
+                        if (serialSelect) serialSelect.value = device;
+                        currentPort = device;
+                        updateConnectionStatus();
+                        selected = true;
+                    }
+                }
+                if (!selected && ports.length === 1) {
                     const device = ports[0].device || ports[0].address || ports[0];
                     select.value = device;
                     if (serialSelect) serialSelect.value = device;

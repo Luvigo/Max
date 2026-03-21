@@ -78,13 +78,14 @@ body {
     padding: 0 16px;
     gap: 12px;
     flex-shrink: 0;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
 }
 
 .logo {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .logo-icon {
@@ -122,13 +123,13 @@ body {
 .header-controls {
     display: flex;
     align-items: center;
+    align-content: center;
     gap: 10px;
-    flex: 1;
+    flex: 1 1 auto;
     justify-content: flex-end;
     min-width: 0;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     flex-shrink: 1;
-    overflow-x: auto;
 }
 
 .control-group {
@@ -141,6 +142,7 @@ body {
     border: 1px solid var(--border-color);
     flex-shrink: 1;
     min-width: 0;
+    flex: 0 1 auto;
 }
 
 .control-group label {
@@ -150,6 +152,7 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .control-group select {
@@ -161,8 +164,9 @@ body {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
     cursor: pointer;
-    min-width: 120px;
+    min-width: 80px;
     max-width: 180px;
+    flex: 1 1 auto;
 }
 
 .control-group select:focus {
@@ -206,6 +210,7 @@ body {
 .btn-icon-only {
     padding: 10px;
     min-width: 40px;
+    flex-shrink: 0;
 }
 
 .btn-sm {
@@ -264,13 +269,20 @@ body {
     flex-shrink: 0;
 }
 
-/* En pantallas pequeñas permitir wrap del header para no cortar controles */
-@media (max-width: 900px) {
-    .header {
-        flex-wrap: wrap;
+/* Laptop y pantallas medianas: ajustar controles para que no se salgan */
+@media (max-width: 1100px) {
+    .control-group select {
+        min-width: 70px;
+        max-width: 140px;
     }
-    .header-controls {
-        flex-wrap: wrap;
+    .control-group.projects-dropdown .btn {
+        max-width: 200px;
+    }
+    .control-group.projects-dropdown .btn span:nth-child(2) {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
 
@@ -310,12 +322,12 @@ body {
         padding: 6px 10px;
     }
     .control-group select {
-        min-width: 90px;
-        max-width: 130px;
+        min-width: 65px;
+        max-width: 120px;
         font-size: 0.75rem;
     }
     .projects-dropdown .btn span:nth-child(2) {
-        max-width: 100px;
+        max-width: 90px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
