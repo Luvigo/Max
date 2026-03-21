@@ -248,13 +248,30 @@ void calvin_motor_girar(int lado, int sentido, float seg) {
                 includes: '#include <Servo.h>',
                 defines: `#define CALVIN_MOTOR_IZQ ${izq}\n#define CALVIN_MOTOR_DER ${der}\n#define CALVIN_PWM_DEFAULT ${pwm}`,
                 vars: 'Servo calvin_servoIzq;\nServo calvin_servoDer;',
-                func: `void calvin_motor_adelante(float seg) {
-  calvin_servoIzq.write(90 - CALVIN_PWM_DEFAULT);
-  calvin_servoDer.write(90 + CALVIN_PWM_DEFAULT);
+                func: `void calvin_mover(int modo, float seg) {
+  int v = CALVIN_PWM_DEFAULT;
+  if (modo == 1) {
+    calvin_servoIzq.write(90 - v);
+    calvin_servoDer.write(90 + v);
+  } else if (modo == 2) {
+    calvin_servoIzq.write(90 + v);
+    calvin_servoDer.write(90 - v);
+  } else if (modo == 3) {
+    calvin_servoIzq.write(90 + v);
+    calvin_servoDer.write(90 + v);
+  } else if (modo == 4) {
+    calvin_servoIzq.write(90 - v);
+    calvin_servoDer.write(90 - v);
+  } else {
+    calvin_servoIzq.write(90);
+    calvin_servoDer.write(90);
+    return;
+  }
   delay(seg * 1000);
   calvin_servoIzq.write(90);
   calvin_servoDer.write(90);
 }
+void calvin_motor_adelante(float seg) { calvin_mover(1, seg); }
 void calvin_motor_girar(int lado, int sentido, float seg) {
   int v = CALVIN_PWM_DEFAULT;
   if (lado == 0) {

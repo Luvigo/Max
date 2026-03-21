@@ -306,6 +306,15 @@
             </category>
         </category>`;
 
+    // Base mínima para Calvin: solo Estructura (setup/loop). Calvin ya aporta Control, Serial,
+    // Operadores/Matemáticas/Lógica, Variables, Texto, I/O (Digital/Analógico), Componentes (BotFlow).
+    const TOOLBOX_BASE_CALVIN = `
+        <category name="⚙️ Estructura" colour="60">
+            <block type="arduino_setup"></block>
+            <block type="arduino_loop"></block>
+        </category>
+        `;
+
     // Categorías Calvin - solo visibles en modo Calvin
     const TOOLBOX_CALVIN = `
         <category name="🤖 Calvin" colour="100" expanded="true">
@@ -407,38 +416,41 @@
             <category name="Calvin Serial" colour="20">
                 <block type="calvin_serial_begin"></block>
                 <block type="calvin_serial_set_timeout">
-                    <value name="MS"><block type="calvin_operator_number"><field name="NUM">1000</field></block></value>
+                    <value name="TIMEOUT"><block type="calvin_operator_number"><field name="NUM">10</field></block></value>
                 </block>
                 <block type="calvin_serial_print">
-                    <value name="VALUE"><block type="calvin_text_string"><field name="TEXT">Hola</field></block></value>
+                    <value name="CONTENT"><block type="calvin_text_string"><field name="TEXT"></field></block></value>
                 </block>
                 <block type="calvin_serial_has_data"></block>
                 <block type="calvin_serial_read_string"></block>
             </category>
             <category name="Calvin BLE (ESP32)" colour="280">
                 <block type="calvin_ble_init">
-                    <field name="NAME">CalvinBot</field>
+                    <value name="NOMBRE"><block type="calvin_text_string"><field name="TEXT">CalvinBot</field></block></value>
                     <statement name="SERVICES">
                         <block type="calvin_ble_service">
+                            <field name="NOMBRE">servicio</field>
                             <field name="UUID">4fafc201-1fb5-459e-8fcc-c5c9c331914b</field>
                             <statement name="CHARACTERISTICS">
                                 <block type="calvin_ble_characteristic">
+                                    <field name="NOMBRE">cmd</field>
                                     <field name="UUID">beb5483e-36e1-4688-b7f5-ea07361b26a8</field>
-                                    <field name="NAME">cmd</field>
                                 </block>
                             </statement>
                         </block>
                     </statement>
                 </block>
                 <block type="calvin_ble_service">
+                    <field name="NOMBRE">servicio</field>
                     <field name="UUID">4fafc201-1fb5-459e-8fcc-c5c9c331914b</field>
                 </block>
                 <block type="calvin_ble_characteristic">
+                    <field name="NOMBRE">cmd</field>
                     <field name="UUID">beb5483e-36e1-4688-b7f5-ea07361b26a8</field>
-                    <field name="NAME">cmd</field>
                 </block>
                 <block type="calvin_ble_write">
-                    <field name="CHAR">cmd</field>
+                    <field name="SERVICIO">servicio</field>
+                    <field name="CARACTERISTICA">cmd</field>
                     <value name="VALUE"><block type="calvin_text_string"><field name="TEXT">Hola</field></block></value>
                 </block>
                 <block type="calvin_ble_char_value_number"></block>
@@ -518,58 +530,45 @@
                 </block>
             </category>
             <category name="Calvin BotFlow Nivel 1" colour="100">
-                <block type="calvin_botflow1_step"></block>
-                <block type="calvin_botflow1_init_proximidad">
-                    <field name="TRIG">18</field>
-                    <field name="ECHO">36</field>
-                </block>
+                <block type="calvin_botflow1_init_proximidad"></block>
                 <block type="calvin_botflow1_distancia"></block>
-                <block type="calvin_botflow1_init_nota">
-                    <field name="PIN">3</field>
-                </block>
+                <block type="calvin_botflow1_init_nota"></block>
                 <block type="calvin_botflow1_nota_octava">
-                    <field name="NOTA">DO</field>
-                    <field name="OCTAVA">0</field>
-                    <field name="DURACION">inf</field>
+                    <field name="nota">NOTE_C</field>
+                    <field name="octava">0</field>
+                    <field name="durnota">inf</field>
                 </block>
                 <block type="calvin_botflow1_init_rgb">
-                    <field name="TIPO">A</field>
+                    <field name="tipoLED">A</field>
                 </block>
                 <block type="calvin_botflow1_led_color">
-                    <field name="COLOR">rojo</field>
-                    <field name="DURACION">inf</field>
+                    <field name="estado">true</field>
+                    <field name="color">rojo</field>
+                    <field name="durled">inf</field>
                 </block>
                 <block type="calvin_botflow1_init_motores">
-                    <field name="PWM">220</field>
-                    <field name="IZQ">9</field>
-                    <field name="DER">10</field>
+                    <field name="pwmvalue">220</field>
                 </block>
-                <block type="calvin_botflow1_adelante">
-                    <value name="SEG"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
+                <block type="calvin_botflow1_mover">
+                    <field name="movimiento">1</field>
+                    <value name="TIEMPO"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
                 </block>
                 <block type="calvin_botflow1_girar_motor">
-                    <field name="LADO">0</field>
-                    <field name="SENTIDO">0</field>
-                    <value name="SEG"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
+                    <field name="motor">0</field>
+                    <field name="sentido">1</field>
+                    <value name="TIEMPO"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
                 </block>
             </category>
             <category name="Calvin BotFlow Nivel 2" colour="120">
-                <block type="calvin_botflow2_condition">
-                    <value name="COND"><block type="arduino_true"></block></value>
-                </block>
-                <block type="calvin_botflow2_init_lineas">
-                    <field name="IZQ">0</field>
-                    <field name="CENT">1</field>
-                    <field name="DER">2</field>
-                </block>
+                <block type="calvin_botflow2_init_lineas"></block>
                 <block type="calvin_botflow2_calibrar_lineas">
-                    <value name="N"><block type="calvin_operator_number"><field name="NUM">30</field></block></value>
+                    <field name="ciclos">30</field>
                 </block>
                 <block type="calvin_botflow2_linea_valor">
-                    <field name="LADO">0</field>
+                    <field name="sensor">s_izquierdo</field>
                 </block>
                 <block type="calvin_botflow2_linea_umbral">
-                    <field name="LADO">0</field>
+                    <field name="umbralSensor">s_izquierdo</field>
                 </block>
             </category>
         </category>`;
@@ -612,7 +611,8 @@
      */
     function getToolboxXml(robot) {
         const robotCat = (robot === 'Calvin') ? TOOLBOX_CALVIN : TOOLBOX_MAX;
-        return TOOLBOX_BASE + robotCat + TOOLBOX_AVANZADO;
+        const base = (robot === 'Calvin') ? TOOLBOX_BASE_CALVIN : TOOLBOX_BASE;
+        return base + robotCat + TOOLBOX_AVANZADO;
     }
 
     /**

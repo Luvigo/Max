@@ -111,20 +111,20 @@ class CalvinGeneratorStructureTest(TestCase):
             'calvin_botflow1_led_color',
             'calvin_botflow1_init_motores',
             'calvin_botflow1_adelante',
+            'calvin_botflow1_mover',
             'calvin_botflow1_girar_motor',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
 
     def test_botflow2_handlers_registered(self):
-        """BotFlow 2: init_lineas, calibrar, linea_valor, linea_umbral, condition."""
+        """BotFlow 2: init_lineas, calibrar, linea_valor, linea_umbral."""
         handlers = _extract_for_block_handlers(self.content)
         expected = [
             'calvin_botflow2_init_lineas',
             'calvin_botflow2_calibrar_lineas',
             'calvin_botflow2_linea_valor',
             'calvin_botflow2_linea_umbral',
-            'calvin_botflow2_condition',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
@@ -286,6 +286,7 @@ class MaxBlocksStillWorkTest(TestCase):
 
 _CALVIN_UPDATED_BLOCKS = [
     ('calvin_botflow1_init_motores', 'inicializar_motores', ['pwmvalue']),
+    ('calvin_botflow1_mover', 'mover', ['movimiento', 'TIEMPO']),
     ('calvin_botflow1_girar_motor', 'girar_motor', ['motor', 'sentido', 'TIEMPO']),
     ('calvin_botflow1_init_proximidad', 'inicializar_sensor_distancia', []),
     ('calvin_botflow1_distancia', 'leer_sensor_distancia', []),
@@ -354,6 +355,7 @@ class CalvinBlocksUpdatedTest(TestCase):
         """El generador debe producir código para cada bloque (patrones esperados)."""
         expected_outputs = [
             ('calvin_botflow1_init_motores', r'ensureCalvinMotors|calvin_motor'),
+            ('calvin_botflow1_mover', r'calvin_mover\('),
             ('calvin_botflow1_girar_motor', r'calvin_motor_girar\('),
             ('calvin_botflow1_init_proximidad', r'ensureCalvinProximity|calvin_proximidad'),
             ('calvin_botflow1_distancia', r"calvin_distancia_cm\(\)"),
@@ -401,3 +403,115 @@ class CalvinBlocksUpdatedTest(TestCase):
         self.assertIn('arduinoGenerator.forBlock', self.generator_content)
         handlers = _extract_for_block_handlers(self.generator_content)
         self.assertGreater(len(handlers), 10, 'Debe haber múltiples handlers Calvin')
+
+
+# =============================================================================
+# CalvinSecondBatchBlocksTest - Tests mínimos para segunda tanda bloques Calvin
+# Cobertura: mover, inicializar_led, led_RGB, inicializar_notas, notas_musicales,
+# ble_characteristic_write, ble_characteristic_value, ble_characteristic_value_str,
+# serial_timeout, serial_print.
+# Valida: block types, fields/inputs, generador código no vacío, helpers sin duplicar.
+# =============================================================================
+
+_CALVIN_SECOND_BATCH_BLOCKS = [
+    ('calvin_botflow1_mover', 'mover', ['movimiento', 'TIEMPO']),
+    ('calvin_botflow1_init_rgb', 'inicializar_led', ['tipoLED']),
+    ('calvin_botflow1_led_color', 'led_RGB', ['estado', 'color', 'durled']),
+    ('calvin_botflow1_init_nota', 'inicializar_notas', []),
+    ('calvin_botflow1_nota_octava', 'notas_musicales', ['nota', 'octava', 'durnota']),
+    ('calvin_ble_write', 'ble_characteristic_write', ['SERVICIO', 'CARACTERISTICA', 'VALUE']),
+    ('calvin_ble_char_value_number', 'ble_characteristic_value', []),
+    ('calvin_ble_char_value_string', 'ble_characteristic_value_str', []),
+    ('calvin_serial_set_timeout', 'serial_timeout', ['TIMEOUT']),
+    ('calvin_serial_print', 'serial_print', ['CONTENT']),
+]
+
+_SECOND_BATCH_GENERATOR_PATTERNS = [
+    ('calvin_botflow1_mover', r'calvin_mover\('),
+    ('calvin_botflow1_init_rgb', r'tipoLED|TIPO|ensureCalvinRgb|getRgbCode'),
+    ('calvin_botflow1_led_color', r'calvin_rgb_encender\('),
+    ('calvin_botflow1_init_nota', r'ensureCalvinBuzzer|BUZZER'),
+    ('calvin_botflow1_nota_octava', r'calvin_tocar_nota\('),
+    ('calvin_ble_write', r'setValue|notify|pChar_'),
+    ('calvin_ble_char_value_number', r'_ble_last_value\.toInt\(\)'),
+    ('calvin_ble_char_value_string', r'_ble_last_value'),
+    ('calvin_serial_set_timeout', r'Serial\.setTimeout\('),
+    ('calvin_serial_print', r'Serial\.println\('),
+]
+
+
+class CalvinSecondBatchBlocksTest(TestCase):
+    """Tests mínimos para segunda tanda de bloques Calvin. No testea hardware real."""
+
+    def setUp(self):
+        self.blocks_path = _get_blocks_path()
+        self.generator_path = _get_generator_path()
+        self.assertTrue(self.blocks_path.exists(), f'No existe {self.blocks_path}')
+        self.assertTrue(self.generator_path.exists(), f'No existe {self.generator_path}')
+        self.blocks_content = self.blocks_path.read_text(encoding='utf-8', errors='replace')
+        self.generator_content = self.generator_path.read_text(encoding='utf-8', errors='replace')
+
+    def test_second_batch_block_types_exist(self):
+        """Todos los block types de la segunda tanda deben existir en calvin_blocks.js."""
+        for block_type, _alias, _fields in _CALVIN_SECOND_BATCH_BLOCKS:
+            with self.subTest(block=block_type):
+                pattern = re.escape(f"Blockly.Blocks['{block_type}']")
+                self.assertTrue(
+                    _has_pattern(self.blocks_content, pattern),
+                    f'Bloque {block_type} debe estar definido en calvin_blocks.js'
+                )
+
+    def test_second_batch_have_generator_handlers(self):
+        """Todos los block types de la segunda tanda deben tener handler en calvin_generator.js."""
+        for block_type, _alias, _fields in _CALVIN_SECOND_BATCH_BLOCKS:
+            with self.subTest(block=block_type):
+                pattern = re.escape(f"arduinoGenerator.forBlock['{block_type}']")
+                self.assertTrue(
+                    _has_pattern(self.generator_content, pattern),
+                    f'Handler para {block_type} debe existir en calvin_generator.js'
+                )
+
+    def test_second_batch_fields_and_inputs_exist(self):
+        """Los campos/inputs correctos deben aparecer en las definiciones de bloque."""
+        for block_type, _alias, fields in _CALVIN_SECOND_BATCH_BLOCKS:
+            if not fields:
+                continue
+            marker = f"Blockly.Blocks['{block_type}']"
+            pos = self.blocks_content.find(marker)
+            self.assertNotEqual(pos, -1, f'Bloque {block_type} no encontrado')
+            chunk = self.blocks_content[pos:pos + 1500]
+            for field in fields:
+                with self.subTest(block=block_type, field=field):
+                    self.assertTrue(
+                        f'"{field}"' in chunk or f"'{field}'" in chunk or field in chunk,
+                        f'Campo/input {field} debe existir en bloque {block_type}',
+                    )
+
+    def test_second_batch_generator_produces_non_empty_code(self):
+        """El generador debe producir código no vacío para cada bloque de la segunda tanda."""
+        for block_type, pattern in _SECOND_BATCH_GENERATOR_PATTERNS:
+            with self.subTest(block=block_type):
+                self.assertTrue(
+                    _has_pattern(self.generator_content, pattern),
+                    f'Generador para {block_type} debe producir código con patrón {pattern}',
+                )
+
+    def test_ble_helpers_dont_duplicate(self):
+        """BLE variables/includes deben registrarse condicionalmente (sin duplicar)."""
+        self.assertTrue(
+            _has_pattern(self.generator_content, r"!arduinoGenerator\.(includes_|variables_)\['ble"),
+            'BLE includes/variables deben registrarse con guard (!...ble)',
+        )
+
+    def test_second_batch_serial_uses_timout_and_content(self):
+        """Serial timeout y print deben usar TIMEOUT y CONTENT (BotFlow)."""
+        self.assertIn('TIMEOUT', self.generator_content)
+        self.assertIn('CONTENT', self.generator_content)
+        self.assertTrue(
+            _has_pattern(self.generator_content, r"valueToCode\([^)]*['\"]TIMEOUT['\"]"),
+            'Serial timeout debe leer input TIMEOUT',
+        )
+        self.assertTrue(
+            _has_pattern(self.generator_content, r"valueToCode\([^)]*['\"]CONTENT['\"]"),
+            'Serial print debe leer input CONTENT',
+        )

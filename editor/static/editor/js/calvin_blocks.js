@@ -365,30 +365,29 @@
         }
     };
 
-    // 2) Serial tiempo de espera [n]
+    // 2) serial_timeout (BotFlow: Serial tiempo de espera [TIMEOUT])
     Blockly.Blocks['calvin_serial_set_timeout'] = {
         init: function() {
-            this.appendValueInput("MS")
+            this.appendValueInput("TIMEOUT")
                 .setCheck("Number")
                 .appendField("Serial tiempo de espera");
-            this.appendDummyInput().appendField("ms");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Establece el tiempo de espera para lectura serial (ms)");
+            this.setTooltip("Serial.setTimeout(ms). Tiempo de espera para lectura.");
         }
     };
 
-    // 3) Serial Print [valor]
+    // 3) serial_print (BotFlow: Serial Print [CONTENT])
     Blockly.Blocks['calvin_serial_print'] = {
         init: function() {
-            this.appendValueInput("VALUE")
+            this.appendValueInput("CONTENT")
                 .setCheck(null)
                 .appendField("Serial Print");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Imprime un valor en el monitor serial");
+            this.setTooltip("Serial Print [CONTENT]");
         }
     };
 
@@ -473,41 +472,48 @@
         }
     };
 
-    // 4) ble write [característica] [valor]
+    // 4) ble_characteristic_write (BotFlow: ble write [SERVICIO] [CARACTERISTICA] to [VALUE])
     Blockly.Blocks['calvin_ble_write'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("📶 BLE escribir característica")
-                .appendField(new Blockly.FieldTextInput("cmd"), "CHAR");
+                .appendField("ble write")
+                .appendField(new Blockly.FieldDropdown([
+                    ["Seleccione", "nothing_selected"],
+                    ["servicio", "servicio"]
+                ]), "SERVICIO")
+                .appendField(new Blockly.FieldDropdown([
+                    ["Seleccione", "nothing_selected"],
+                    ["cmd", "cmd"]
+                ]), "CARACTERISTICA");
             this.appendValueInput("VALUE")
                 .setCheck(null)
-                .appendField("valor");
+                .appendField("to");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BLE);
-            this.setTooltip("Escribe un valor en la característica BLE (envía al cliente). Solo ESP32.");
+            this.setTooltip("ble write [SERVICIO] [CARACTERISTICA] to [VALUE]. Solo ESP32.");
         }
     };
 
-    // 5) Valor numérico de esta característica (usar dentro del callback de característica)
+    // 5) ble_characteristic_value (BotFlow: Valor numérico de esta caracteristica)
     Blockly.Blocks['calvin_ble_char_value_number'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("valor numérico de esta característica");
+                .appendField("Valor numérico de esta caracteristica");
             this.setOutput(true, "Number");
             this.setColour(COLOUR_BLE);
-            this.setTooltip("Devuelve el valor numérico que el cliente escribió en esta característica.");
+            this.setTooltip("Valor numérico de la característica (contexto onWrite). Solo ESP32.");
         }
     };
 
-    // 6) Valor string de esta característica
+    // 6) ble_characteristic_value_str (BotFlow: Valor string de esta caracteristica)
     Blockly.Blocks['calvin_ble_char_value_string'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("valor string de esta característica");
+                .appendField("Valor string de esta caracteristica");
             this.setOutput(true, "String");
             this.setColour(COLOUR_BLE);
-            this.setTooltip("Devuelve el valor texto que el cliente escribió en esta característica.");
+            this.setTooltip("Valor string de la característica (contexto onWrite). Solo ESP32.");
         }
     };
 
@@ -879,19 +885,6 @@
     // calvin_botflow1_* - BotFlow Nivel 1 (Hardware Calvin)
     // ============================================
 
-    Blockly.Blocks['calvin_botflow1_step'] = {
-        init: function() {
-            this.appendDummyInput()
-                .appendField("🤖 BotFlow1 - Paso")
-                .appendField(new Blockly.FieldNumber(1, 0, 99), "STEP");
-            this.appendStatementInput("DO").setCheck(null).appendField("hacer");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Paso de secuencia BotFlow Nivel 1");
-        }
-    };
-
     // 1) Inicializar sensor de proximidad (BotFlow: inicializar_sensor_distancia, sin fields)
     Blockly.Blocks['calvin_botflow1_init_proximidad'] = {
         init: function() {
@@ -915,46 +908,44 @@
         }
     };
 
-    // 3) Inicializar Nota Musical
+    // 3) inicializar_notas (BotFlow: type inicializar_notas, sin fields, setup)
     Blockly.Blocks['calvin_botflow1_init_nota'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Inicializar Nota Musical");
-            this.appendDummyInput()
-                .appendField("pin")
-                .appendField(new Blockly.FieldNumber(3, 0, 255), "PIN");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura el buzzer para notas musicales");
+            this.setTooltip("Configura el buzzer para notas musicales. Pines desde calvin_hardware.");
         }
     };
 
-    // 4) Nota [nota] octava [n] durante [duración] seg (como original: octava 0, inf)
+    // 4) notas_musicales (BotFlow: type notas_musicales, fields nota, octava, durnota)
     Blockly.Blocks['calvin_botflow1_nota_octava'] = {
         init: function() {
             this.appendDummyInput()
                 .appendField("Nota")
                 .appendField(new Blockly.FieldDropdown([
-                    ["Do", "DO"], ["Re", "RE"], ["Mi", "MI"], ["Fa", "FA"],
-                    ["Sol", "SOL"], ["La", "LA"], ["Si", "SI"]
-                ]), "NOTA")
+                    ["Do", "NOTE_C"], ["Re", "NOTE_D"], ["Mi", "NOTE_E"], ["Fa", "NOTE_F"],
+                    ["Sol", "NOTE_G"], ["La", "NOTE_A"], ["Si", "NOTE_B"]
+                ]), "nota")
                 .appendField("octava")
-                .appendField(new Blockly.FieldNumber(0, 0, 5), "OCTAVA")
+                .appendField(new Blockly.FieldNumber(0, 0, 5), "octava")
                 .appendField("durante");
             this.appendDummyInput()
                 .appendField(new Blockly.FieldDropdown([
                     ["0.5 seg", "0.5"], ["1 seg", "1"], ["2 seg", "2"], ["5 seg", "5"],
-                    ["inf seg", "inf"]
-                ]), "DURACION");
+                    ["inf", "inf"]
+                ]), "durnota")
+                .appendField("seg");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Reproduce una nota musical durante X segundos (inf = hasta siguiente bloque)");
+            this.setTooltip("Nota [nota] octava [octava] durante [durnota] seg. inf = hasta siguiente bloque");
         }
     };
 
-    // 5) Inicializar led RGB tipo [A] (como original: solo tipo, pines por defecto)
+    // 5) inicializar_led (BotFlow: type inicializar_led, field tipoLED)
     Blockly.Blocks['calvin_botflow1_init_rgb'] = {
         init: function() {
             this.appendDummyInput()
@@ -962,19 +953,23 @@
                 .appendField(new Blockly.FieldDropdown([
                     ["A", "A"],
                     ["C", "C"]
-                ]), "TIPO");
+                ]), "tipoLED");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Configura LED RGB tipo A (ánodo común) o C (cátodo común). Pines R=5, G=6, B=11");
+            this.setTooltip("Configura LED RGB tipo A (ánodo común) o C (cátodo común). Pines desde calvin_hardware.");
         }
     };
 
-    // 6) Encender led [color] durante [duración] seg (como original: Rojo, inf)
+    // 6) led_RGB (BotFlow: type led_RGB, fields estado, color, durled)
     Blockly.Blocks['calvin_botflow1_led_color'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("Encender led");
+                .appendField(new Blockly.FieldDropdown([
+                    ["Encender", "true"],
+                    ["Apagar", "false"]
+                ]), "estado")
+                .appendField("led");
             this.appendDummyInput()
                 .appendField(new Blockly.FieldDropdown([
                     ["Rojo", "rojo"],
@@ -984,18 +979,18 @@
                     ["Cyan", "cyan"],
                     ["Magenta", "magenta"],
                     ["Blanco", "blanco"]
-                ]), "COLOR");
+                ]), "color");
             this.appendDummyInput()
                 .appendField("durante")
                 .appendField(new Blockly.FieldDropdown([
                     ["0.5 seg", "0.5"], ["1 seg", "1"], ["2 seg", "2"], ["5 seg", "5"],
                     ["inf", "inf"]
-                ]), "DURACION");
-            this.appendDummyInput().appendField("seg");
+                ]), "durled")
+                .appendField("seg");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Enciende el LED RGB durante X segundos (inf = hasta siguiente bloque)");
+            this.setTooltip("[estado] led [color] durante [durled] seg. inf = hasta siguiente bloque");
         }
     };
 
@@ -1013,19 +1008,26 @@
         }
     };
 
-    // 8) ir Adelante durante [seg]
-    Blockly.Blocks['calvin_botflow1_adelante'] = {
+    // 8) ir [movimiento] durante [TIEMPO] seg (BotFlow: mover)
+    Blockly.Blocks['calvin_botflow1_mover'] = {
         init: function() {
             this.appendDummyInput()
-                .appendField("ir Adelante durante");
-            this.appendValueInput("SEG")
+                .appendField("ir")
+                .appendField(new Blockly.FieldDropdown([
+                    ["Adelante", "1"],
+                    ["Atrás", "2"],
+                    ["Izquierda", "3"],
+                    ["Derecha", "4"]
+                ]), "movimiento")
+                .appendField("durante");
+            this.appendValueInput("TIEMPO")
                 .setCheck("Number")
                 .appendField("");
             this.appendDummyInput().appendField("seg");
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW1);
-            this.setTooltip("Avanza durante X segundos");
+            this.setTooltip("Mueve el robot en la dirección indicada durante X segundos");
         }
     };
 
@@ -1058,17 +1060,6 @@
     // ============================================
     // calvin_botflow2_* - BotFlow Nivel 2 (sensores de línea)
     // ============================================
-
-    Blockly.Blocks['calvin_botflow2_condition'] = {
-        init: function() {
-            this.appendValueInput("COND").setCheck("Boolean").appendField("🤖 BotFlow2 - Si");
-            this.appendStatementInput("DO").setCheck(null).appendField("entonces");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW2);
-            this.setTooltip("Condición BotFlow Nivel 2");
-        }
-    };
 
     // BotFlow: sensor/umbralSensor con values s_izquierdo, s_centro, s_derecho (mapeados a 0,1,2 en C)
     const SENSOR_LINEA_OPTIONS = [
