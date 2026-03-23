@@ -5,7 +5,7 @@
  * usar CalvinHardware.PINS (AVR) o CalvinHardware.PINS_ESP32 (ESP32).
  *
  * ESP32 (BotFlow real): L298N motores, sensor ultrasónico 18/36, buzzer 27,
- * RGB 23/22/21, sensores línea 34/35/36. AVR: Servo motores, prox 6/7, etc.
+ * RGB 22/23/21 (R/G/B), sensores línea 34/35/39 (36 reservado para eco prox). AVR: prox 6/7, etc.
  *
  * Conservado: Valores verificados con carro Calvin funcionando.
  * No cambiar pines sin confirmar hardware real.
@@ -22,13 +22,13 @@
         LINEA_IZQ: 0, LINEA_CENT: 1, LINEA_DER: 2  // A0, A1, A2 sensores de línea
     };
 
-    // Pines ESP32 (BotFlow) - L298N IN1-4, ledc, ADC. Evitar 32,33,25,26 para líneas
+    // Pines ESP32 (BotFlow) - L298N IN1-4, ledc, ADC. PROX_ECHO usa 36; línea der usa 39 (evitar conflicto)
     const CALVIN_PINS_ESP32 = {
         IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,   // L298N driver motores
-        PROX_TRIG: 18, PROX_ECHO: 36,             // Sensor ultrasónico
+        PROX_TRIG: 18, PROX_ECHO: 36,             // Sensor ultrasónico HC-SR04
         BUZZER: 27,                               // ledcWriteTone
-        RGB_R: 23, RGB_G: 22, RGB_B: 21,          // LED RGB
-        LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 36  // ADC
+        RGB_R: 22, RGB_G: 23, RGB_B: 21,          // LED RGB (22=R, 23=G, 21=B según PCB Calvin)
+        LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 39  // ADC (36 reservado para PROX_ECHO)
     };
 
     const CALVIN_PINS = CALVIN_PINS_AVR;
