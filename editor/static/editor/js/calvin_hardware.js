@@ -5,7 +5,7 @@
  * usar CalvinHardware.PINS (AVR) o CalvinHardware.PINS_ESP32 (ESP32).
  *
  * ESP32 (BotFlow real): L298N motores, sensor ultrasónico 18/36, buzzer 27,
- * RGB 22/23/21 (R/G/B), sensores línea 34/35/39 (36 reservado para eco prox). AVR: prox 6/7, etc.
+ * RGB 23/22/21 (R/G/B), sensores línea 34/35/39. AVR: prox 6/7, etc.
  *
  * Conservado: Valores verificados con carro Calvin funcionando.
  * No cambiar pines sin confirmar hardware real.
@@ -27,7 +27,7 @@
         IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,   // L298N driver motores
         PROX_TRIG: 18, PROX_ECHO: 36,             // Sensor ultrasónico HC-SR04
         BUZZER: 27,                               // ledcWriteTone
-        RGB_R: 22, RGB_G: 23, RGB_B: 21,          // LED RGB (22=R, 23=G, 21=B según PCB Calvin)
+        RGB_R: 23, RGB_G: 22, RGB_B: 21,          // LED RGB (orden original Calvin)
         LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 39  // ADC (36 reservado para PROX_ECHO)
     };
 
@@ -68,7 +68,8 @@
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
+  duration = pulseIn(echoPin, HIGH, 30000);
+  if (duration == 0) return 999.0f;
   distanceCm = duration * SOUND_SPEED / 2.0f;
   return distanceCm;
 }`,
@@ -126,11 +127,12 @@
         },
 
         getRgbCode: function(pinR, pinG, pinB, tipo, isEsp32) {
+            const t = (tipo === undefined || tipo === null || tipo === '') ? 'A' : tipo;
             if (isEsp32) {
                 const r = pinR || CALVIN_PINS_ESP32.RGB_R;
                 const g = pinG || CALVIN_PINS_ESP32.RGB_G;
                 const b = pinB || CALVIN_PINS_ESP32.RGB_B;
-                const invert = (tipo === 'A');
+                const invert = (String(t).toUpperCase() === 'A');
                 return {
                     defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
                     func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
@@ -153,8 +155,8 @@
             const r = pinR || CALVIN_PINS.RGB_R;
             const g = pinG || CALVIN_PINS.RGB_G;
             const b = pinB || CALVIN_PINS.RGB_B;
-            const invert = (tipo === 'A');
-            return {
+            const invert = (String(t).toUpperCase() === 'A');
+                return {
                 defines: `#define CALVIN_RGB_R ${r}\n#define CALVIN_RGB_G ${g}\n#define CALVIN_RGB_B ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
                 func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
   if (CALVIN_RGB_ANODO) { r=255-r; g=255-g; b=255-b; }
