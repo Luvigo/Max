@@ -63,15 +63,20 @@
                     defines: `#define trigPin ${t}\n#define echoPin ${e}\n#define SOUND_SPEED 0.034f`,
                     vars: 'long duration;\nfloat distanceCm;\nfloat distanceCmlast;',
                     func: `float calvin_distancia_cm(void) {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(5);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH, 30000);
-  if (duration == 0) return 999.0f;
-  distanceCm = duration * SOUND_SPEED / 2.0f;
-  return distanceCm;
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(5);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    duration = pulseIn(echoPin, HIGH, 60000);
+    if (duration > 0) {
+      distanceCm = duration * SOUND_SPEED / 2.0f;
+      return distanceCm;
+    }
+    delay(5);
+  }
+  return 999.0f;
 }`,
                     setup: '  pinMode(trigPin, OUTPUT);\n  pinMode(echoPin, INPUT);'
                 };
