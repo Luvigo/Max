@@ -133,8 +133,9 @@
                 const g = pinG || CALVIN_PINS_ESP32.RGB_G;
                 const b = pinB || CALVIN_PINS_ESP32.RGB_B;
                 const invert = (String(t).toUpperCase() === 'A');
+                const useAnodo = invert ? 0 : 1;
                 return {
-                    defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
+                    defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${useAnodo}`,
                     func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
   int vR = (r > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
   int vG = (g > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
