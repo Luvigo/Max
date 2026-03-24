@@ -705,4 +705,14 @@
         return ['calvin_linea_umbral(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 
+    // Apagar LED al inicio de cada iteración cuando se usa RGB (evita estado residual/verde)
+    arduinoGenerator.forBlock['arduino_loop'] = function(block) {
+        const statements = arduinoGenerator.statementToCode(block, 'LOOP_CODE');
+        let prefix = '';
+        if (arduinoGenerator.variables_ && arduinoGenerator.variables_['calvin_rgb']) {
+            prefix = '  calvin_rgb_encender(0, 0, 0, 0);\n';
+        }
+        return 'void loop() {\n' + prefix + statements + '}\n';
+    };
+
 })();
