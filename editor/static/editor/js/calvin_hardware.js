@@ -68,7 +68,7 @@
   digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
   digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH, 30000UL);
+  duration = pulseIn(echoPin, HIGH);
   if (duration == 0) return 999.0f;
   distanceCm = duration * SOUND_SPEED / 2.0f;
   return distanceCm;
