@@ -27,7 +27,7 @@
         IN_1: 32, IN_2: 33, IN_3: 25, IN_4: 26,   // L298N driver motores
         PROX_TRIG: 18, PROX_ECHO: 36,             // Sensor ultrasónico HC-SR04
         BUZZER: 27,                               // ledcWriteTone
-        RGB_R: 23, RGB_G: 21, RGB_B: 22,          // LED RGB (23=R, 21=G, 22=B en Calvin)
+        RGB_R: 23, RGB_G: 22, RGB_B: 21,          // LED RGB: original BotFlow (23=R, 22=G, 21=B)
         LINEA_IZQ: 34, LINEA_CENT: 35, LINEA_DER: 39  // ADC (36 reservado para PROX_ECHO)
     };
 
@@ -137,9 +137,10 @@
                 const r = pinR || CALVIN_PINS_ESP32.RGB_R;
                 const g = pinG || CALVIN_PINS_ESP32.RGB_G;
                 const b = pinB || CALVIN_PINS_ESP32.RGB_B;
-                const invert = (String(t).toUpperCase() === 'A');
+                // En Calvin tipo "A" = cátodo común (HIGH=ON), tipo "C" = ánodo común (LOW=ON)
+                const useAnodo = (String(t).toUpperCase() === 'A') ? 0 : 1;
                 return {
-                    defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${invert ? 1 : 0}`,
+                    defines: `#define Rojo ${r}\n#define Verde ${g}\n#define Azul ${b}\n#define CALVIN_RGB_ANODO ${useAnodo}`,
                     func: `void calvin_rgb_encender(int r, int g, int b, int duracion_ms) {
   int vR = (r > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
   int vG = (g > 0) ? (CALVIN_RGB_ANODO ? 0 : 1) : (CALVIN_RGB_ANODO ? 1 : 0);
