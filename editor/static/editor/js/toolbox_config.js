@@ -414,6 +414,23 @@
                 </block>
             </category>
             <category name="Calvin Serial" colour="20">
+                <block type="serial_init">
+                    <value name="BADURATE">
+                        <shadow type="math_number"><field name="NUM">115200</field></shadow>
+                    </value>
+                </block>
+                <block type="serial_timeout">
+                    <value name="TIMEOUT">
+                        <shadow type="math_number"><field name="NUM">10</field></shadow>
+                    </value>
+                </block>
+                <block type="serial_print">
+                    <value name="CONTENT">
+                        <shadow type="text"><field name="TEXT"></field></shadow>
+                    </value>
+                </block>
+                <block type="serial_disponible"></block>
+                <block type="serial_read"></block>
                 <block type="calvin_serial_begin"></block>
                 <block type="calvin_serial_set_timeout">
                     <value name="TIMEOUT"><block type="calvin_operator_number"><field name="NUM">10</field></block></value>

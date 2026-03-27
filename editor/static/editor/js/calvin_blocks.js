@@ -345,6 +345,93 @@
     // calvin_serial_* - Serial
     // ============================================
 
+    // BotFlow: serial_init — valor BADURATE (nombre original con typo), sombra math_number
+    Blockly.Blocks['serial_init'] = {
+        init: function() {
+            this.appendValueInput('BADURATE')
+                .setCheck('Number')
+                .appendField('Inicializar Serial');
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_SERIAL);
+            this.setTooltip('Serial.begin(baudios). Compatible con XML Botflow (BADURATE).');
+        }
+    };
+
+    // BotFlow: serial_timeout — Serial.setTimeout(ms), entrada TIMEOUT
+    Blockly.Blocks['serial_timeout'] = {
+        init: function() {
+            this.appendValueInput('TIMEOUT')
+                .setCheck('Number')
+                .appendField('Serial tiempo de espera');
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_SERIAL);
+            this.setTooltip('Serial.setTimeout(ms). Compatible con XML Botflow.');
+        }
+    };
+
+    // BotFlow: serial_print — entrada CONTENT, sombra type "text"
+    Blockly.Blocks['serial_print'] = {
+        init: function() {
+            this.appendValueInput('CONTENT')
+                .setCheck(null)
+                .appendField('Serial Print');
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_SERIAL);
+            this.setTooltip('Serial.println(CONTENIDO). Compatible con XML Botflow.');
+        }
+    };
+
+    // BotFlow: serial_disponible — booleano (misma semántica que calvin_serial_has_data)
+    Blockly.Blocks['serial_disponible'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('Hay datos en el puerto serial');
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_SERIAL);
+            this.setTooltip('Serial.available() > 0. Compatible con XML Botflow.');
+        }
+    };
+
+    // BotFlow: serial_read — string (misma semántica que calvin_serial_read_string)
+    Blockly.Blocks['serial_read'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('Datos del puerto serial');
+            this.setOutput(true, 'String');
+            this.setColour(COLOUR_SERIAL);
+            this.setTooltip('Serial.readString(). Compatible con XML Botflow.');
+        }
+    };
+
+    // Sombra estándar Blockly usada por Botflow; MAX usa calvin_operator_number en toolbox
+    if (typeof Blockly.Blocks['math_number'] === 'undefined') {
+        Blockly.Blocks['math_number'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField(new Blockly.FieldNumber(115200, 0, 2000000, 0), 'NUM');
+                this.setOutput(true, 'Number');
+                this.setColour(COLOUR_OPERATOR);
+                this.setTooltip('Número (compat. importación Botflow / Blockly)');
+            }
+        };
+    }
+
+    // Texto literal Blockly/Botflow (shadow "text", field TEXT)
+    if (typeof Blockly.Blocks['text'] === 'undefined') {
+        Blockly.Blocks['text'] = {
+            init: function() {
+                this.appendDummyInput()
+                    .appendField(new Blockly.FieldTextInput(''), 'TEXT');
+                this.setOutput(true, 'String');
+                this.setColour(COLOUR_TEXT);
+                this.setTooltip('Texto (compat. importación Botflow / Blockly)');
+            }
+        };
+    }
+
     // 1) Inicializar Serial [baud]
     Blockly.Blocks['calvin_serial_begin'] = {
         init: function() {
@@ -1115,6 +1202,34 @@
             this.setOutput(true, "Number");
             this.setColour(COLOUR_BOTFLOW2);
             this.setTooltip("Devuelve el umbral calibrado del sensor");
+        }
+    };
+
+    // ============================================
+    // BotFlow: contenedores setup / loop (XML import)
+    // ============================================
+
+    Blockly.Blocks['setup'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('Inicializar');
+            this.appendStatementInput('setup');
+            this.setColour(COLOUR_CONTROL);
+            this.setTooltip('void setup() { … } (Botflow)');
+            this.setDeletable(false);
+            this.setMovable(false);
+        }
+    };
+
+    Blockly.Blocks['loop'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('Bucle');
+            this.appendStatementInput('loop');
+            this.setColour(COLOUR_CONTROL);
+            this.setTooltip('void loop() { … } (Botflow)');
+            this.setDeletable(false);
+            this.setMovable(false);
         }
     };
 

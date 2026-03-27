@@ -194,8 +194,53 @@
     };
 
     // ============================================
-    // calvin_serial_*
+    // calvin_serial_* + BotFlow serial_init
     // ============================================
+
+    // BotFlow: serial_init (entrada BADURATE) -> Serial.begin(...)
+    arduinoGenerator.forBlock['serial_init'] = function(block) {
+        const baud = arduinoGenerator.valueToCode(block, 'BADURATE', arduinoGenerator.ORDER_ATOMIC) || '115200';
+        return `  Serial.begin(${baud});\n`;
+    };
+
+    // BotFlow: serial_timeout -> Serial.setTimeout(ms) (igual que calvin_serial_set_timeout)
+    arduinoGenerator.forBlock['serial_timeout'] = function(block) {
+        const ms = arduinoGenerator.valueToCode(block, 'TIMEOUT', arduinoGenerator.ORDER_ATOMIC) ||
+            arduinoGenerator.valueToCode(block, 'MS', arduinoGenerator.ORDER_ATOMIC) || '10';
+        return `  Serial.setTimeout(${ms});\n`;
+    };
+
+    // BotFlow: serial_print -> Serial.println (igual que calvin_serial_print)
+    arduinoGenerator.forBlock['serial_print'] = function(block) {
+        const val = arduinoGenerator.valueToCode(block, 'CONTENT', arduinoGenerator.ORDER_NONE) ||
+            arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_NONE) || '""';
+        return `  Serial.println(${val});\n`;
+    };
+
+    // BotFlow: serial_disponible -> Serial.available() > 0
+    arduinoGenerator.forBlock['serial_disponible'] = function(block) {
+        return ['(Serial.available() > 0)', arduinoGenerator.ORDER_RELATIONAL];
+    };
+
+    // BotFlow: serial_read -> Serial.readString()
+    arduinoGenerator.forBlock['serial_read'] = function(block) {
+        return ['Serial.readString()', arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    if (typeof arduinoGenerator.forBlock['math_number'] === 'undefined') {
+        arduinoGenerator.forBlock['math_number'] = function(block) {
+            const num = block.getFieldValue('NUM');
+            return [String(num), arduinoGenerator.ORDER_ATOMIC];
+        };
+    }
+
+    if (typeof arduinoGenerator.forBlock['text'] === 'undefined') {
+        arduinoGenerator.forBlock['text'] = function(block) {
+            const raw = block.getFieldValue('TEXT') || '';
+            const escaped = String(raw).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+            return [`"${escaped}"`, arduinoGenerator.ORDER_ATOMIC];
+        };
+    }
 
     // 1) Inicializar Serial [baud] -> Serial.begin(baud)
     arduinoGenerator.forBlock['calvin_serial_begin'] = function(block) {
@@ -705,5 +750,18 @@
         return ['calvin_linea_umbral(' + lado + ')', arduinoGenerator.ORDER_ATOMIC];
     };
 
+    // ============================================
+    // BotFlow: setup / loop (void setup / void loop)
+    // ============================================
+
+    arduinoGenerator.forBlock['setup'] = function(block) {
+        const statements = arduinoGenerator.statementToCode(block, 'setup');
+        return 'void setup() {\n' + statements + '}\n\n';
+    };
+
+    arduinoGenerator.forBlock['loop'] = function(block) {
+        const statements = arduinoGenerator.statementToCode(block, 'loop');
+        return 'void loop() {\n' + statements + '}\n';
+    };
 
 })();
