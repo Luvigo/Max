@@ -74,14 +74,14 @@ class CalvinGeneratorStructureTest(TestCase):
             self.assertIn(h, handlers, f'Falta handler: {h}')
 
     def test_serial_handlers_registered(self):
-        """Serial: begin, print, has_data, read_string, set_timeout."""
+        """Serial (Botflow): serial_init, serial_timeout, serial_print, serial_disponible, serial_read."""
         handlers = _extract_for_block_handlers(self.content)
         expected = [
-            'calvin_serial_begin',
-            'calvin_serial_print',
-            'calvin_serial_has_data',
-            'calvin_serial_read_string',
-            'calvin_serial_set_timeout',
+            'serial_init',
+            'serial_timeout',
+            'serial_print',
+            'serial_disponible',
+            'serial_read',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
@@ -160,11 +160,11 @@ class CalvinGeneratorOutputPatternsTest(TestCase):
         self.assertTrue(_has_pattern(self.content, r"if \(\$\{cond\}\)"))
 
     def test_serial_begin_generates_serial_begin(self):
-        """calvin_serial_begin debe producir Serial.begin(baud)."""
+        """serial_init debe producir Serial.begin(baud)."""
         self.assertTrue(_has_pattern(self.content, r"Serial\.begin\(\$\{baud\}\)"))
 
     def test_serial_print_generates_println(self):
-        """calvin_serial_print debe producir Serial.println(...)."""
+        """serial_print debe producir Serial.println(...)."""
         self.assertTrue(_has_pattern(self.content, r"Serial\.println\("))
 
     def test_io_digital_write_generates_digital_write(self):
@@ -409,7 +409,7 @@ class CalvinBlocksUpdatedTest(TestCase):
 # CalvinSecondBatchBlocksTest - Tests mínimos para segunda tanda bloques Calvin
 # Cobertura: mover, inicializar_led, led_RGB, inicializar_notas, notas_musicales,
 # ble_characteristic_write, ble_characteristic_value, ble_characteristic_value_str,
-# serial_timeout, serial_print.
+# serial_timeout, serial_print (tipos serial_* Botflow).
 # Valida: block types, fields/inputs, generador código no vacío, helpers sin duplicar.
 # =============================================================================
 
@@ -422,8 +422,8 @@ _CALVIN_SECOND_BATCH_BLOCKS = [
     ('calvin_ble_write', 'ble_characteristic_write', ['SERVICIO', 'CARACTERISTICA', 'VALUE']),
     ('calvin_ble_char_value_number', 'ble_characteristic_value', []),
     ('calvin_ble_char_value_string', 'ble_characteristic_value_str', []),
-    ('calvin_serial_set_timeout', 'serial_timeout', ['TIMEOUT']),
-    ('calvin_serial_print', 'serial_print', ['CONTENT']),
+    ('serial_timeout', 'serial_timeout', ['TIMEOUT']),
+    ('serial_print', 'serial_print', ['CONTENT']),
 ]
 
 _SECOND_BATCH_GENERATOR_PATTERNS = [
@@ -435,8 +435,8 @@ _SECOND_BATCH_GENERATOR_PATTERNS = [
     ('calvin_ble_write', r'setValue|notify|pChar_'),
     ('calvin_ble_char_value_number', r'_ble_last_value\.toInt\(\)'),
     ('calvin_ble_char_value_string', r'_ble_last_value'),
-    ('calvin_serial_set_timeout', r'Serial\.setTimeout\('),
-    ('calvin_serial_print', r'Serial\.println\('),
+    ('serial_timeout', r'Serial\.setTimeout\('),
+    ('serial_print', r'Serial\.println\('),
 ]
 
 

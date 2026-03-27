@@ -1,6 +1,6 @@
 /**
  * Bloques Calvin - Familia técnica separada
- * Naming: calvin_control_*, calvin_operator_*, calvin_text_*, etc.
+ * Naming: calvin_control_*, calvin_operator_*, calvin_text_*, serial_* (Serial Botflow), etc.
  * Extensión de MAX-IDE; no modifica max_* ni arduino_*
  */
 
@@ -342,7 +342,7 @@
     };
 
     // ============================================
-    // calvin_serial_* - Serial
+    // Serial (tipos Botflow: serial_*)
     // ============================================
 
     // BotFlow: serial_init — valor BADURATE (nombre original con typo), sombra math_number
@@ -384,7 +384,7 @@
         }
     };
 
-    // BotFlow: serial_disponible — booleano (misma semántica que calvin_serial_has_data)
+    // BotFlow: serial_disponible — Serial.available() > 0
     Blockly.Blocks['serial_disponible'] = {
         init: function() {
             this.appendDummyInput()
@@ -395,7 +395,7 @@
         }
     };
 
-    // BotFlow: serial_read — string (misma semántica que calvin_serial_read_string)
+    // BotFlow: serial_read — Serial.readString()
     Blockly.Blocks['serial_read'] = {
         init: function() {
             this.appendDummyInput()
@@ -431,74 +431,6 @@
             }
         };
     }
-
-    // 1) Inicializar Serial [baud]
-    Blockly.Blocks['calvin_serial_begin'] = {
-        init: function() {
-            this.appendDummyInput()
-                .appendField("Inicializar Serial")
-                .appendField(new Blockly.FieldDropdown([
-                    ["9600", "9600"],
-                    ["115200", "115200"],
-                    ["57600", "57600"],
-                    ["38400", "38400"],
-                    ["19200", "19200"],
-                    ["4800", "4800"]
-                ]), "BAUD");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Inicia la comunicación serial");
-        }
-    };
-
-    // 2) serial_timeout (BotFlow: Serial tiempo de espera [TIMEOUT])
-    Blockly.Blocks['calvin_serial_set_timeout'] = {
-        init: function() {
-            this.appendValueInput("TIMEOUT")
-                .setCheck("Number")
-                .appendField("Serial tiempo de espera");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Serial.setTimeout(ms). Tiempo de espera para lectura.");
-        }
-    };
-
-    // 3) serial_print (BotFlow: Serial Print [CONTENT])
-    Blockly.Blocks['calvin_serial_print'] = {
-        init: function() {
-            this.appendValueInput("CONTENT")
-                .setCheck(null)
-                .appendField("Serial Print");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Serial Print [CONTENT]");
-        }
-    };
-
-    // 4) Hay datos en el puerto serial (boolean)
-    Blockly.Blocks['calvin_serial_has_data'] = {
-        init: function() {
-            this.appendDummyInput()
-                .appendField("Hay datos en el puerto serial");
-            this.setOutput(true, "Boolean");
-            this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Verdadero si hay datos disponibles para leer");
-        }
-    };
-
-    // 5) Datos del puerto serial (lee string)
-    Blockly.Blocks['calvin_serial_read_string'] = {
-        init: function() {
-            this.appendDummyInput()
-                .appendField("Datos del puerto serial");
-            this.setOutput(true, "String");
-            this.setColour(COLOUR_SERIAL);
-            this.setTooltip("Lee los datos como texto desde el puerto serial");
-        }
-    };
 
     // ============================================
     // calvin_ble_* - Bluetooth Low Energy (solo ESP32)

@@ -431,15 +431,6 @@
                 </block>
                 <block type="serial_disponible"></block>
                 <block type="serial_read"></block>
-                <block type="calvin_serial_begin"></block>
-                <block type="calvin_serial_set_timeout">
-                    <value name="TIMEOUT"><block type="calvin_operator_number"><field name="NUM">10</field></block></value>
-                </block>
-                <block type="calvin_serial_print">
-                    <value name="CONTENT"><block type="calvin_text_string"><field name="TEXT"></field></block></value>
-                </block>
-                <block type="calvin_serial_has_data"></block>
-                <block type="calvin_serial_read_string"></block>
             </category>
             <category name="Calvin BLE (ESP32)" colour="280">
                 <block type="calvin_ble_init">

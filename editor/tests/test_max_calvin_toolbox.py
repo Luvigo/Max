@@ -65,7 +65,7 @@ class ToolboxMaxCalvinTest(TestCase):
         self.assertGreater(len(calvin_blocks), 0, 'TOOLBOX_CALVIN debe contener bloques calvin_*')
         self.assertIn('calvin_control_delay', block_types)
         self.assertIn('calvin_operator_add', block_types)
-        self.assertIn('calvin_serial_begin', block_types)
+        self.assertIn('serial_init', block_types)
         self.assertIn('calvin_io_digital_write', block_types)
         self.assertIn('calvin_ble_init', block_types)
         self.assertIn('calvin_botflow1_init_proximidad', block_types)
