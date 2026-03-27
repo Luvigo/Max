@@ -2490,12 +2490,9 @@ async function connectSerial() {
         // FramingError en algunos USB-UART (p. ej. CH340) al arrancar el ESP32.
         serialReadTextDecoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true });
         serialReader = serialPort.readable.getReader();
-        
-        // Configurar escritura: TextEncoderStream acepta texto, su readable envía bytes al puerto
-        // WritableStream no tiene pipeThrough; hay que usar encoder.readable.pipeTo(port.writable)
-        const encoder = new TextEncoderStream();
-        encoder.readable.pipeTo(serialPort.writable);
-        serialWriter = encoder.writable.getWriter();
+        // Escritura directa con getWriter (sin pipeTo): pipeTo(writable) junto al lector del
+        // readable ha provocado cierre inmediato del stream en algunos USB-UART (p. ej. CH340).
+        serialWriter = serialPort.writable.getWriter();
         
         isSerialConnected = true;
         readBuffer = '';
@@ -2598,7 +2595,10 @@ async function readSerialData() {
                 }
                 try { serialReader.releaseLock(); } catch (e) {}
                 serialReader = null;
-                break;
+                if (isSerialConnected) {
+                    await disconnectSerial();
+                }
+                return;
             }
             
             if (value && value.byteLength > 0 && serialReadTextDecoder) {
@@ -2638,10 +2638,6 @@ async function readSerialData() {
         logToConsole(`[SERIAL] Lectura: ${name || '?'} ${error.message || ''}`, 'warning');
         await disconnectSerial();
         showToast('Error de lectura serial', 'error');
-    } finally {
-        if (!serialReader && isSerialConnected) {
-            await disconnectSerial();
-        }
     }
 }
 
@@ -2654,7 +2650,7 @@ async function sendSerialData() {
     if (!message) return;
     
     try {
-        await serialWriter.write(message + '\n');
+        await serialWriter.write(new TextEncoder().encode(message + '\n'));
         addSerialLine(`> ${message}`, 'sent');
         input.value = '';
     } catch (error) {
