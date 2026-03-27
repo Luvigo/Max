@@ -317,11 +317,10 @@
 
     // Categorías Calvin - solo visibles en modo Calvin
     const TOOLBOX_CALVIN = `
-        <category name="🤖 Calvin" colour="100" expanded="true">
             <category name="Calvin Control" colour="210">
                 <block type="base_delay">
                     <value name="DELAY_TIME">
-                        <shadow type="math_number"><field name="NUM">500</field></shadow>
+                        <shadow type="arduino_number"><field name="NUM">500</field></shadow>
                     </value>
                 </block>
                 <block type="controls_if">
@@ -337,7 +336,6 @@
                             <value name="VALUE"><block type="arduino_number"><field name="NUM">1</field></block></value>
                         </block>
                     </statement>
-                    <statement name="DEFAULT"></statement>
                 </block>
                 <block type="case">
                     <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
@@ -347,7 +345,6 @@
                     <value name="BOOL"><block type="arduino_true"></block></value>
                 </block>
                 <block type="controls_for">
-                    <field name="VAR">i</field>
                     <value name="FROM"><block type="arduino_number"><field name="NUM">0</field></block></value>
                     <value name="TO"><block type="arduino_number"><field name="NUM">10</field></block></value>
                     <value name="BY"><block type="arduino_number"><field name="NUM">1</field></block></value>
@@ -592,8 +589,7 @@
                 <block type="calvin_botflow2_linea_umbral">
                     <field name="umbralSensor">s_izquierdo</field>
                 </block>
-            </category>
-        </category>`;
+            </category>`;
 
     // Avanzado (siempre al final)
     const TOOLBOX_AVANZADO = `

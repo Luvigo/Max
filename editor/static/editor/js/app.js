@@ -1086,6 +1086,16 @@ function initBlockly() {
         },
         renderer: 'zelos'
     });
+
+    // Recalcular geometría (toolbox + flyout) tras layout; sin esto el flyout puede quedar a tamaño 0.
+    function calvinBlocklyResize() {
+        if (workspace && typeof Blockly !== 'undefined' && Blockly.svgResize) {
+            Blockly.svgResize(workspace);
+        }
+    }
+    requestAnimationFrame(calvinBlocklyResize);
+    setTimeout(calvinBlocklyResize, 100);
+    setTimeout(calvinBlocklyResize, 400);
     
     // Listener para cambios
     workspace.addChangeListener(function(event) {
@@ -1198,6 +1208,15 @@ function switchRobot(robot) {
             move: { scrollbars: true, drag: true, wheel: true },
             renderer: 'zelos'
         });
+
+        function resizeAfterRobotSwitch() {
+            if (workspace && typeof Blockly !== 'undefined' && Blockly.svgResize) {
+                Blockly.svgResize(workspace);
+            }
+        }
+        requestAnimationFrame(resizeAfterRobotSwitch);
+        setTimeout(resizeAfterRobotSwitch, 100);
+        setTimeout(resizeAfterRobotSwitch, 400);
 
         if (xmlText) {
             const dom = Blockly.utils.xml.textToDom(xmlText);
