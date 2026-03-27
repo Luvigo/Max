@@ -40,17 +40,16 @@ class CalvinGeneratorStructureTest(TestCase):
         self.content = path.read_text(encoding='utf-8', errors='replace')
 
     def test_control_handlers_registered(self):
-        """Control: delay, if, if_else, while, for, switch, case, default."""
+        """Control Botflow: base_delay, if/ifelse, whileUntil, for, switch_case, case."""
         handlers = _extract_for_block_handlers(self.content)
         expected = [
-            'calvin_control_delay',
-            'calvin_control_if',
-            'calvin_control_if_else',
-            'calvin_control_while',
-            'calvin_control_for',
-            'calvin_control_switch',
-            'calvin_control_case',
-            'calvin_control_default',
+            'base_delay',
+            'controls_if',
+            'controls_ifelse',
+            'controls_whileUntil',
+            'controls_for',
+            'switch_case',
+            'case',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
@@ -69,6 +68,9 @@ class CalvinGeneratorStructureTest(TestCase):
             'calvin_operator_eq',
             'calvin_operator_and',
             'calvin_operator_or',
+            'logic_compare',
+            'logic_negate',
+            'logic_operation',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
@@ -152,11 +154,11 @@ class CalvinGeneratorOutputPatternsTest(TestCase):
         self.content = path.read_text(encoding='utf-8', errors='replace')
 
     def test_control_delay_generates_delay_call(self):
-        """calvin_control_delay debe producir delay(ms)."""
+        """base_delay debe producir delay(ms)."""
         self.assertTrue(_has_pattern(self.content, r"delay\(\$\{ms\}\)"))
 
     def test_control_if_generates_if_statement(self):
-        """calvin_control_if debe producir if (cond) { ... }."""
+        """controls_if debe producir if (cond) { ... }."""
         self.assertTrue(_has_pattern(self.content, r"if \(\$\{cond\}\)"))
 
     def test_serial_begin_generates_serial_begin(self):

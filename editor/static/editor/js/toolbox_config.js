@@ -319,37 +319,38 @@
     const TOOLBOX_CALVIN = `
         <category name="🤖 Calvin" colour="100" expanded="true">
             <category name="Calvin Control" colour="210">
-                <block type="calvin_control_delay">
-                    <value name="MS">
-                        <block type="arduino_number"><field name="NUM">500</field></block>
+                <block type="base_delay">
+                    <value name="DELAY_TIME">
+                        <shadow type="math_number"><field name="NUM">500</field></shadow>
                     </value>
                 </block>
-                <block type="calvin_control_if">
-                    <value name="CONDITION"><block type="calvin_operator_compare"></block></value>
+                <block type="controls_if">
+                    <value name="IF0"><block type="calvin_operator_compare"></block></value>
                 </block>
-                <block type="calvin_control_if_else">
-                    <value name="CONDITION"><block type="calvin_operator_compare"></block></value>
+                <block type="controls_ifelse">
+                    <value name="IF0"><block type="calvin_operator_compare"></block></value>
                 </block>
-                <block type="calvin_control_switch">
-                    <value name="VALUE"><block type="arduino_number"><field name="NUM">1</field></block></value>
+                <block type="switch_case">
+                    <value name="VARIABLE"><block type="arduino_number"><field name="NUM">1</field></block></value>
                     <statement name="CASES">
-                        <block type="calvin_control_case">
+                        <block type="case">
                             <value name="VALUE"><block type="arduino_number"><field name="NUM">1</field></block></value>
                         </block>
-                        <block type="calvin_control_default"></block>
                     </statement>
+                    <statement name="DEFAULT"></statement>
                 </block>
-                <block type="calvin_control_case">
+                <block type="case">
                     <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
                 </block>
-                <block type="calvin_control_default"></block>
-                <block type="calvin_control_while">
-                    <value name="CONDITION"><block type="arduino_true"></block></value>
+                <block type="controls_whileUntil">
+                    <field name="MODE">WHILE</field>
+                    <value name="BOOL"><block type="arduino_true"></block></value>
                 </block>
-                <block type="calvin_control_for">
+                <block type="controls_for">
+                    <field name="VAR">i</field>
                     <value name="FROM"><block type="arduino_number"><field name="NUM">0</field></block></value>
                     <value name="TO"><block type="arduino_number"><field name="NUM">10</field></block></value>
-                    <value name="STEP"><block type="arduino_number"><field name="NUM">1</field></block></value>
+                    <value name="BY"><block type="arduino_number"><field name="NUM">1</field></block></value>
                 </block>
             </category>
             <category name="Calvin Operadores" colour="200">
@@ -402,6 +403,19 @@
                 <block type="calvin_operator_compare">
                     <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
                     <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
+                </block>
+                <block type="logic_compare">
+                    <field name="OP">EQ</field>
+                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
+                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
+                </block>
+                <block type="logic_negate">
+                    <value name="BOOL"><block type="arduino_true"></block></value>
+                </block>
+                <block type="logic_operation">
+                    <field name="OP">AND</field>
+                    <value name="A"><block type="arduino_true"></block></value>
+                    <value name="B"><block type="arduino_false"></block></value>
                 </block>
             </category>
             <category name="Calvin Texto" colour="160">

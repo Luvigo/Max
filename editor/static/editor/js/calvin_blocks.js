@@ -1,6 +1,6 @@
 /**
  * Bloques Calvin - Familia técnica separada
- * Naming: calvin_control_*, calvin_operator_*, calvin_text_*, serial_* (Serial Botflow), etc.
+ * Naming: base_*/switch_case/case/controls_* (Botflow control), calvin_operator_*, calvin_text_*, serial_* (Botflow), etc.
  * Extensión de MAX-IDE; no modifica max_* ni arduino_*
  */
 
@@ -21,127 +21,105 @@
     const COLOUR_BOTFLOW2 = 120;
 
     // ============================================
-    // calvin_control_* - Control de flujo
+    // Control de flujo (Botflow)
     // ============================================
 
-    // 1) Esperar [n] ms
-    Blockly.Blocks['calvin_control_delay'] = {
+    // BotFlow: base_delay — Esperar [DELAY_TIME] ms.
+    Blockly.Blocks['base_delay'] = {
         init: function() {
-            this.appendValueInput("MS").setCheck("Number").appendField("Esperar");
-            this.appendDummyInput().appendField("ms");
+            this.appendDummyInput().appendField('Esperar');
+            this.appendValueInput('DELAY_TIME').setCheck('Number');
+            this.appendDummyInput().appendField('ms.');
+            this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Espera un tiempo en milisegundos");
+            this.setTooltip('delay(ms). Compatible con XML Botflow (DELAY_TIME).');
         }
     };
 
-    // 2) En caso de que [valor] ... (contiene Sea y Si nada se cumplió)
-    Blockly.Blocks['calvin_control_switch'] = {
+    // BotFlow: switch_case — VARIABLE + CASES (Sea…) + DEFAULT ("Si nada se cumple")
+    Blockly.Blocks['switch_case'] = {
         init: function() {
-            this.appendValueInput("VALUE").setCheck(null).appendField("En caso de que");
-            this.appendStatementInput("CASES").setCheck(null).appendField("hacer");
+            this.appendValueInput('VARIABLE').setCheck(null).appendField('En caso de que');
+            this.appendStatementInput('CASES').setCheck(null);
+            this.appendStatementInput('DEFAULT').setCheck(null).appendField('Si nada se cumple');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Switch/case - Añade bloques Sea y Si nada se cumplió dentro");
+            this.setTooltip('switch (VARIABLE). CASES: bloques case (Sea… Hacer…). DEFAULT: rama si no coincide ningún caso.');
         }
     };
 
-    // 3) Sea [valor] Hacer ... (caso del switch)
-    Blockly.Blocks['calvin_control_case'] = {
+    // BotFlow: case — Sea [VALUE] Hacer [DO]
+    Blockly.Blocks['case'] = {
         init: function() {
-            this.appendDummyInput().appendField("Sea");
-            this.appendValueInput("VALUE").setCheck(null).appendField("");
-            this.appendDummyInput().appendField("Hacer");
-            this.appendStatementInput("DO").setCheck(null).appendField("");
+            this.appendValueInput('VALUE').setCheck(null).appendField('Sea');
+            this.appendStatementInput('DO').setCheck(null).appendField('Hacer');
+            this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Caso del switch");
+            this.setTooltip('Caso del switch (Botflow: case).');
         }
     };
 
-    // 4) Si nada se cumplió (default del switch)
-    Blockly.Blocks['calvin_control_default'] = {
+    // BotFlow: controls_whileUntil — repetir [mientras|hasta] BOOL … hacer …
+    Blockly.Blocks['controls_whileUntil'] = {
         init: function() {
-            this.appendDummyInput().appendField("Si nada se cumplió");
-            this.appendStatementInput("DO").setCheck(null).appendField("hacer");
+            this.appendValueInput('BOOL').setCheck('Boolean')
+                .appendField('repetir')
+                .appendField(new Blockly.FieldDropdown([
+                    ['mientras', 'WHILE'],
+                    ['hasta', 'UNTIL']
+                ]), 'MODE');
+            this.appendStatementInput('DO').setCheck(null).appendField('hacer');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Bloque por defecto cuando no coincide ningún caso");
+            this.setTooltip('while / repeat-until (Botflow). MODE: WHILE o UNTIL.');
         }
     };
 
-    // 5) repetir mientras [condición] hacer ...
-    Blockly.Blocks['calvin_control_while'] = {
+    // BotFlow: controls_for — contar [VAR] de FROM a TO añadiendo BY hacer … (FieldVariable)
+    Blockly.Blocks['controls_for'] = {
         init: function() {
-            this.appendValueInput("CONDITION")
-                .setCheck("Boolean")
-                .appendField("repetir mientras");
-            this.appendStatementInput("DO")
-                .setCheck(null)
-                .appendField("hacer");
+            this.appendValueInput('FROM').setCheck('Number')
+                .appendField('contar')
+                .appendField(new Blockly.FieldVariable(null), 'VAR')
+                .appendField('de');
+            this.appendValueInput('TO').setCheck('Number').appendField('a');
+            this.appendValueInput('BY').setCheck('Number').appendField('añadiendo');
+            this.appendStatementInput('DO').setCheck(null).appendField('hacer');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Repite mientras la condición sea verdadera");
+            this.setTooltip('Bucle for con variable de Blockly (Botflow controls_for).');
         }
     };
 
-    // 6) contar [i] de [inicio] a [fin] añadiendo [paso] hacer ...
-    Blockly.Blocks['calvin_control_for'] = {
+    // BotFlow: controls_if — sí [IF0] entonces [DO0] (rama simple)
+    Blockly.Blocks['controls_if'] = {
         init: function() {
-            this.appendDummyInput()
-                .appendField("contar")
-                .appendField(new Blockly.FieldTextInput("i"), "VAR")
-                .appendField("de");
-            this.appendValueInput("FROM").setCheck("Number").appendField("");
-            this.appendDummyInput().appendField("a");
-            this.appendValueInput("TO").setCheck("Number").appendField("");
-            this.appendDummyInput().appendField("añadiendo");
-            this.appendValueInput("STEP").setCheck("Number").appendField("");
-            this.appendStatementInput("DO").setCheck(null).appendField("hacer");
+            this.appendValueInput('IF0').setCheck('Boolean').appendField('sí');
+            this.appendStatementInput('DO0').setCheck(null).appendField('entonces');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Bucle for con variable, inicio, fin y paso");
+            this.setTooltip('if (Botflow): sí condición entonces …');
         }
     };
 
-    // 7) si [condición] entonces ...
-    Blockly.Blocks['calvin_control_if'] = {
+    // BotFlow: controls_ifelse — sí IF0 entonces DO0 si no ELSE
+    Blockly.Blocks['controls_ifelse'] = {
         init: function() {
-            this.appendValueInput("CONDITION")
-                .setCheck("Boolean")
-                .appendField("si");
-            this.appendStatementInput("DO")
-                .setCheck(null)
-                .appendField("entonces");
+            this.appendValueInput('IF0').setCheck('Boolean').appendField('sí');
+            this.appendStatementInput('DO0').setCheck(null).appendField('entonces');
+            this.appendStatementInput('ELSE').setCheck(null).appendField('si no');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Ejecuta código si la condición es verdadera");
-        }
-    };
-
-    // 8) si [condición] entonces ... si no ...
-    Blockly.Blocks['calvin_control_if_else'] = {
-        init: function() {
-            this.appendValueInput("CONDITION")
-                .setCheck("Boolean")
-                .appendField("si");
-            this.appendStatementInput("DO")
-                .setCheck(null)
-                .appendField("entonces");
-            this.appendStatementInput("ELSE")
-                .setCheck(null)
-                .appendField("si no");
-            this.setPreviousStatement(true, null);
-            this.setNextStatement(true, null);
-            this.setColour(COLOUR_CONTROL);
-            this.setTooltip("Si la condición es verdadera hace una cosa, si no hace otra");
+            this.setTooltip('if / else (Botflow): sí … entonces … si no …');
         }
     };
 
@@ -311,6 +289,52 @@
             this.setOutput(true, "Boolean");
             this.setColour(COLOUR_OPERATOR);
             this.setTooltip("Compara dos valores");
+        }
+    };
+
+    // BotFlow / Blockly: logic_compare — A OP B (mismos valores OP que Blockly estándar)
+    Blockly.Blocks['logic_compare'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null).appendField('');
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([
+                    ['=', 'EQ'], ['≠', 'NEQ'], ['<', 'LT'], ['≤', 'LTE'],
+                    ['>', 'GT'], ['≥', 'GTE']
+                ]), 'OP');
+            this.appendValueInput('B').setCheck(null).appendField('');
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Comparación (Botflow logic_compare)');
+        }
+    };
+
+    // BotFlow / Blockly: logic_negate — no BOOL
+    Blockly.Blocks['logic_negate'] = {
+        init: function() {
+            this.appendValueInput('BOOL')
+                .setCheck(null)
+                .appendField('no');
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Negación lógica (Botflow logic_negate)');
+        }
+    };
+
+    // BotFlow / Blockly: logic_operation — A OP B (OP: AND | OR)
+    Blockly.Blocks['logic_operation'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null).appendField('');
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([
+                    ['y', 'AND'],
+                    ['o', 'OR']
+                ]), 'OP');
+            this.appendValueInput('B').setCheck(null).appendField('');
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('AND / OR (Botflow logic_operation)');
         }
     };
 

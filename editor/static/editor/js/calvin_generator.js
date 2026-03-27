@@ -10,73 +10,88 @@
     if (typeof arduinoGenerator === 'undefined') return;
 
     // ============================================
-    // calvin_control_*
+    // Control de flujo (Botflow)
     // ============================================
 
-    // 1) Esperar [n] ms -> delay(ms)
-    arduinoGenerator.forBlock['calvin_control_delay'] = function(block) {
-        const ms = arduinoGenerator.valueToCode(block, 'MS', arduinoGenerator.ORDER_ATOMIC) || '0';
+    // BotFlow: base_delay (entrada DELAY_TIME) -> delay(ms)
+    arduinoGenerator.forBlock['base_delay'] = function(block) {
+        const ms = arduinoGenerator.valueToCode(block, 'DELAY_TIME', arduinoGenerator.ORDER_ATOMIC) || '0';
         return `  delay(${ms});\n`;
     };
 
-    // 2) En caso de que [valor] -> switch/case
-    arduinoGenerator.forBlock['calvin_control_switch'] = function(block) {
-        const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
+    // BotFlow: switch_case — VARIABLE + CASES (solo case) + DEFAULT
+    arduinoGenerator.forBlock['switch_case'] = function(block) {
+        const value = arduinoGenerator.valueToCode(block, 'VARIABLE', arduinoGenerator.ORDER_ATOMIC) || '0';
         let casesCode = '';
         let child = block.getInputTargetBlock('CASES');
         while (child) {
-            if (child.type === 'calvin_control_case') {
+            if (child.type === 'case') {
                 const caseVal = arduinoGenerator.valueToCode(child, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
                 const doCode = arduinoGenerator.statementToCode(child, 'DO') || '';
                 const indent = doCode ? '  ' + doCode.replace(/\n/g, '\n  ') + '\n' : '';
                 casesCode += `    case ${caseVal}:\n${indent}    break;\n`;
-            } else if (child.type === 'calvin_control_default') {
-                const doCode = arduinoGenerator.statementToCode(child, 'DO') || '';
-                casesCode += `    default:\n${doCode ? '  ' + doCode.replace(/\n/g, '\n  ') : ''}\n`;
             }
             child = child.getNextBlock();
+        }
+        const defaultCode = arduinoGenerator.statementToCode(block, 'DEFAULT') || '';
+        if (defaultCode.trim()) {
+            casesCode += `    default:\n${'  ' + defaultCode.replace(/\n/g, '\n  ')}\n`;
         }
         return `  switch (${value}) {\n${casesCode}  }\n`;
     };
 
-    // 3) Sea [valor] Hacer ... (generado por switch)
-    arduinoGenerator.forBlock['calvin_control_case'] = function(block) {
+    // BotFlow: case (contenido de switch_case)
+    arduinoGenerator.forBlock['case'] = function(block) {
         return '';
     };
 
-    // 4) Si nada se cumplió (generado por switch)
-    arduinoGenerator.forBlock['calvin_control_default'] = function(block) {
-        return '';
-    };
-
-    // 5) repetir mientras -> while
-    arduinoGenerator.forBlock['calvin_control_while'] = function(block) {
-        const cond = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
+    // BotFlow: controls_whileUntil — WHILE: while (BOOL); UNTIL: while (!(BOOL))
+    arduinoGenerator.forBlock['controls_whileUntil'] = function(block) {
+        const mode = block.getFieldValue('MODE') || 'WHILE';
+        let cond = arduinoGenerator.valueToCode(block, 'BOOL', arduinoGenerator.ORDER_ATOMIC) || 'false';
+        if (mode === 'UNTIL') {
+            cond = `!(${cond})`;
+        }
         const statements = arduinoGenerator.statementToCode(block, 'DO');
         return `  while (${cond}) {\n${statements}  }\n`;
     };
 
-    // 6) contar [i] de [inicio] a [fin] añadiendo [paso] -> for
-    arduinoGenerator.forBlock['calvin_control_for'] = function(block) {
-        const variable = block.getFieldValue('VAR') || 'i';
+    // BotFlow: controls_for — VAR vía FieldVariable; FROM / TO / BY
+    arduinoGenerator.forBlock['controls_for'] = function(block) {
+        let varName = 'i';
+        try {
+            const vf = block.getField('VAR');
+            if (vf && block.workspace && typeof vf.getValue === 'function') {
+                const vid = vf.getValue();
+                if (vid) {
+                    const model = block.workspace.getVariableById(vid);
+                    if (model && model.name) {
+                        const n = String(model.name).replace(/[^a-zA-Z0-9_]/g, '_');
+                        if (/^[a-zA-Z_]/.test(n)) {
+                            varName = n;
+                        }
+                    }
+                }
+            }
+        } catch (e) { /* mantener i */ }
         const from = arduinoGenerator.valueToCode(block, 'FROM', arduinoGenerator.ORDER_ATOMIC) || '0';
         const to = arduinoGenerator.valueToCode(block, 'TO', arduinoGenerator.ORDER_ATOMIC) || '10';
-        const step = arduinoGenerator.valueToCode(block, 'STEP', arduinoGenerator.ORDER_ATOMIC) || '1';
+        const by = arduinoGenerator.valueToCode(block, 'BY', arduinoGenerator.ORDER_ATOMIC) || '1';
         const statements = arduinoGenerator.statementToCode(block, 'DO');
-        return `  for (int ${variable} = ${from}; ${variable} <= ${to}; ${variable} += ${step}) {\n${statements}  }\n`;
+        return `  for (int ${varName} = ${from}; ${varName} <= ${to}; ${varName} += ${by}) {\n${statements}  }\n`;
     };
 
-    // 7) si [condición] entonces -> if
-    arduinoGenerator.forBlock['calvin_control_if'] = function(block) {
-        const cond = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
-        const statements = arduinoGenerator.statementToCode(block, 'DO');
+    // BotFlow: controls_if — IF0 / DO0
+    arduinoGenerator.forBlock['controls_if'] = function(block) {
+        const cond = arduinoGenerator.valueToCode(block, 'IF0', arduinoGenerator.ORDER_ATOMIC) || 'false';
+        const statements = arduinoGenerator.statementToCode(block, 'DO0');
         return `  if (${cond}) {\n${statements}  }\n`;
     };
 
-    // 8) si [condición] entonces ... si no ... -> if/else
-    arduinoGenerator.forBlock['calvin_control_if_else'] = function(block) {
-        const cond = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
-        const doStatements = arduinoGenerator.statementToCode(block, 'DO');
+    // BotFlow: controls_ifelse — IF0 / DO0 / ELSE
+    arduinoGenerator.forBlock['controls_ifelse'] = function(block) {
+        const cond = arduinoGenerator.valueToCode(block, 'IF0', arduinoGenerator.ORDER_ATOMIC) || 'false';
+        const doStatements = arduinoGenerator.statementToCode(block, 'DO0');
         const elseStatements = arduinoGenerator.statementToCode(block, 'ELSE');
         return `  if (${cond}) {\n${doStatements}  } else {\n${elseStatements}  }\n`;
     };
@@ -174,6 +189,31 @@
         const op = block.getFieldValue('OP');
         const ops = { EQ: '==', NEQ: '!=', LT: '<', LTE: '<=', GT: '>', GTE: '>=' };
         return [`(${a} ${ops[op] || '=='} ${b})`, arduinoGenerator.ORDER_RELATIONAL];
+    };
+
+    // BotFlow: logic_compare (misma semántica que calvin_operator_compare)
+    arduinoGenerator.forBlock['logic_compare'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        const op = block.getFieldValue('OP');
+        const ops = { EQ: '==', NEQ: '!=', LT: '<', LTE: '<=', GT: '>', GTE: '>=' };
+        return [`(${a} ${ops[op] || '=='} ${b})`, arduinoGenerator.ORDER_RELATIONAL];
+    };
+
+    // BotFlow: logic_negate
+    arduinoGenerator.forBlock['logic_negate'] = function(block) {
+        const arg = arduinoGenerator.valueToCode(block, 'BOOL', arduinoGenerator.ORDER_UNARY_PREFIX) || 'false';
+        return [`!(${arg})`, arduinoGenerator.ORDER_UNARY_PREFIX];
+    };
+
+    // BotFlow: logic_operation (OP AND | OR, mismas entradas que Blockly estándar)
+    arduinoGenerator.forBlock['logic_operation'] = function(block) {
+        const op = block.getFieldValue('OP');
+        const order = op === 'OR' ? arduinoGenerator.ORDER_LOGICAL_OR : arduinoGenerator.ORDER_LOGICAL_AND;
+        const a = arduinoGenerator.valueToCode(block, 'A', order) || 'false';
+        const b = arduinoGenerator.valueToCode(block, 'B', order) || 'false';
+        const join = op === 'OR' ? ' || ' : ' && ';
+        return [`(${a}${join}${b})`, order];
     };
 
     // ============================================
