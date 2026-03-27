@@ -25,6 +25,8 @@ let serialPort = null;
 let serialReader = null;
 let serialWriter = null;
 let readBuffer = '';
+/** Muestra texto acumulado sin \\n (p. ej. Serial.print) tras una pausa */
+let serialReadBufferIdleTimer = null;
 
 // Proyectos
 let currentProjectId = null;
@@ -2494,6 +2496,11 @@ async function connectSerial() {
         serialWriter = encoder.writable.getWriter();
         
         isSerialConnected = true;
+        readBuffer = '';
+        if (serialReadBufferIdleTimer) {
+            clearTimeout(serialReadBufferIdleTimer);
+            serialReadBufferIdleTimer = null;
+        }
         updateSerialUI(true, 'Serial', baudrate);
         addSerialLine(`Conectado @ ${baudrate} baud`, 'system');
         updateConnectionStatus();
@@ -2541,6 +2548,11 @@ async function disconnectSerial() {
         }
         
         isSerialConnected = false;
+        if (serialReadBufferIdleTimer) {
+            clearTimeout(serialReadBufferIdleTimer);
+            serialReadBufferIdleTimer = null;
+        }
+        readBuffer = '';
         updateSerialUI(false);
         updateConnectionStatus();
         addSerialLine('Desconectado', 'system');
@@ -2552,6 +2564,19 @@ async function disconnectSerial() {
         updateSerialUI(false);
         serialPort = null;
     }
+}
+
+function scheduleSerialBufferFlush() {
+    if (serialReadBufferIdleTimer) {
+        clearTimeout(serialReadBufferIdleTimer);
+    }
+    serialReadBufferIdleTimer = setTimeout(() => {
+        serialReadBufferIdleTimer = null;
+        if (!isSerialConnected || !readBuffer.trim()) return;
+        const t = readBuffer.replace(/\r/g, '').trim();
+        if (t) addSerialLine(t, 'received');
+        readBuffer = '';
+    }, 350);
 }
 
 async function readSerialData() {
@@ -2568,15 +2593,21 @@ async function readSerialData() {
             
             if (value) {
                 readBuffer += value;
-                
-                const lines = readBuffer.split('\n');
-                readBuffer = lines.pop() || '';
-                
-                lines.forEach(line => {
+                let idx;
+                while ((idx = readBuffer.indexOf('\n')) !== -1) {
+                    let line = readBuffer.slice(0, idx);
+                    readBuffer = readBuffer.slice(idx + 1);
+                    line = line.replace(/\r/g, '');
                     if (line.trim()) {
                         addSerialLine(line.trim(), 'received');
                     }
-                });
+                }
+                if (readBuffer.trim()) {
+                    scheduleSerialBufferFlush();
+                } else if (serialReadBufferIdleTimer) {
+                    clearTimeout(serialReadBufferIdleTimer);
+                    serialReadBufferIdleTimer = null;
+                }
             }
         }
     } catch (error) {
