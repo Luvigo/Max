@@ -2484,8 +2484,8 @@ async function connectSerial() {
         // Abrir conexión
         await serialPort.open({ baudRate: baudrate });
         
-        // Configurar lectura: readable -> TextDecoderStream (bytes -> texto)
-        const decoder = new TextDecoderStream();
+        // fatal: false evita excepción con bytes inválidos (bootloader ESP32, ruido, datos binarios)
+        const decoder = new TextDecoderStream('utf-8', { fatal: false, ignoreBOM: true });
         const inputStream = serialPort.readable.pipeThrough(decoder);
         serialReader = inputStream.getReader();
         
@@ -2611,10 +2611,17 @@ async function readSerialData() {
             }
         }
     } catch (error) {
-        if (error.name !== 'NetworkError' && isSerialConnected) {
-            await disconnectSerial();
-            showToast('Error de lectura serial', 'error');
+        const name = error && error.name;
+        if (!isSerialConnected || name === 'AbortError' || name === 'NetworkError') {
+            return;
         }
+        if (name === 'InvalidStateError') {
+            await disconnectSerial();
+            return;
+        }
+        logToConsole(`[SERIAL] Lectura: ${name || '?'} ${error.message || ''}`, 'warning');
+        await disconnectSerial();
+        showToast('Error de lectura serial', 'error');
     }
 }
 
