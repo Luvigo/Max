@@ -27,6 +27,8 @@ let serialWriter = null;
 let readBuffer = '';
 /** Muestra texto acumulado sin \\n (p. ej. Serial.print) tras una pausa */
 let serialReadBufferIdleTimer = null;
+/** Decodificación UTF-8 incremental (sin pipeThrough: evita FramingError con CH340/ESP32) */
+let serialReadTextDecoder = null;
 
 // Proyectos
 let currentProjectId = null;
@@ -2484,10 +2486,10 @@ async function connectSerial() {
         // Abrir conexión
         await serialPort.open({ baudRate: baudrate });
         
-        // fatal: false evita excepción con bytes inválidos (bootloader ESP32, ruido, datos binarios)
-        const decoder = new TextDecoderStream('utf-8', { fatal: false, ignoreBOM: true });
-        const inputStream = serialPort.readable.pipeThrough(decoder);
-        serialReader = inputStream.getReader();
+        // Lectura en bytes + TextDecoder incremental: pipeThrough(TextDecoderStream) provoca
+        // FramingError en algunos USB-UART (p. ej. CH340) al arrancar el ESP32.
+        serialReadTextDecoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true });
+        serialReader = serialPort.readable.getReader();
         
         // Configurar escritura: TextEncoderStream acepta texto, su readable envía bytes al puerto
         // WritableStream no tiene pipeThrough; hay que usar encoder.readable.pipeTo(port.writable)
@@ -2553,6 +2555,7 @@ async function disconnectSerial() {
             serialReadBufferIdleTimer = null;
         }
         readBuffer = '';
+        serialReadTextDecoder = null;
         updateSerialUI(false);
         updateConnectionStatus();
         addSerialLine('Desconectado', 'system');
@@ -2587,12 +2590,19 @@ async function readSerialData() {
             const { value, done } = await serialReader.read();
             
             if (done) {
-                serialReader.releaseLock();
+                if (serialReadTextDecoder) {
+                    try {
+                        const tail = serialReadTextDecoder.decode();
+                        if (tail) readBuffer += tail;
+                    } catch (e) { /* ignore */ }
+                }
+                try { serialReader.releaseLock(); } catch (e) {}
+                serialReader = null;
                 break;
             }
             
-            if (value) {
-                readBuffer += value;
+            if (value && value.byteLength > 0 && serialReadTextDecoder) {
+                readBuffer += serialReadTextDecoder.decode(value, { stream: true });
                 let idx;
                 while ((idx = readBuffer.indexOf('\n')) !== -1) {
                     let line = readBuffer.slice(0, idx);
@@ -2619,9 +2629,19 @@ async function readSerialData() {
             await disconnectSerial();
             return;
         }
+        if (name === 'FramingError' || name === 'BreakError' || name === 'ParityError') {
+            logToConsole(`[SERIAL] ${name}: suele pasar al conectar justo tras subir código. Espera 2–3 s y reconecta.`, 'info');
+            await disconnectSerial();
+            showToast('Puerto serial inestable: espera 2 s tras subir y vuelve a conectar', 'info');
+            return;
+        }
         logToConsole(`[SERIAL] Lectura: ${name || '?'} ${error.message || ''}`, 'warning');
         await disconnectSerial();
         showToast('Error de lectura serial', 'error');
+    } finally {
+        if (!serialReader && isSerialConnected) {
+            await disconnectSerial();
+        }
     }
 }
 
