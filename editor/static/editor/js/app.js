@@ -2439,6 +2439,26 @@ async function uploadCode() {
 // MONITOR SERIAL (Web Serial API)
 // ============================================
 
+/**
+ * ESP32 + CH340/CP2102: al abrir el puerto, Chrome puede dejar DTR/RTS distinto a
+ * Arduino IDE/pyserial; el chip queda “vivo” pero no llegan bytes al stream de lectura,
+ * o aparece FramingError. Liberar líneas y un pulso breve de DTR suele reiniciar el MCU
+ * y activar la salida por UART (equivalente a abrir el monitor en Arduino IDE).
+ */
+async function serialPortStabilizeForEspRun(port) {
+    if (!port || typeof port.setSignals !== 'function') return;
+    try {
+        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        await new Promise(r => setTimeout(r, 80));
+        await port.setSignals({ dataTerminalReady: true, requestToSend: false });
+        await new Promise(r => setTimeout(r, 60));
+        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+        await new Promise(r => setTimeout(r, 200));
+    } catch (e) {
+        /* Driver/SO sin setSignals o sin permiso */
+    }
+}
+
 function openSerialMonitor() {
     document.getElementById('serialModal').classList.add('active');
     
@@ -2483,8 +2503,21 @@ async function connectSerial() {
             }
         } catch (e) {}
         
-        // Abrir conexión
-        await serialPort.open({ baudRate: baudrate });
+        // Abrir conexión (8N1 explícito; algunos adaptadores fallan con valores implícitos)
+        try {
+            await serialPort.open({
+                baudRate: baudrate,
+                dataBits: 8,
+                stopBits: 1,
+                parity: 'none',
+                bufferSize: 8192,
+                flowControl: 'none',
+            });
+        } catch (e) {
+            await serialPort.open({ baudRate: baudrate });
+        }
+        
+        await serialPortStabilizeForEspRun(serialPort);
         
         // Lectura en bytes + TextDecoder incremental: pipeThrough(TextDecoderStream) provoca
         // FramingError en algunos USB-UART (p. ej. CH340) al arrancar el ESP32.
