@@ -1,6 +1,6 @@
 /**
  * Bloques Calvin - Familia técnica separada
- * Naming: base_*/switch_case/case/controls_* (Botflow control), calvin_operator_*, calvin_text_*, serial_* (Botflow), etc.
+ * Naming: base_delay, switch_case, case, controls_* (Botflow), calvin_operator_*, calvin_text_*, serial_* (Botflow), etc.
  * Extensión de MAX-IDE; no modifica max_* ni arduino_*
  */
 
