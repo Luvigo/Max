@@ -1081,12 +1081,19 @@ function calvinResolvePasteWorkspace(mainWorkspace, button) {
     return ws;
 }
 
+/** Blockly 9+: isReadOnly es propiedad; versiones antiguas podían exponer método. */
+function calvinWorkspaceIsReadOnly(ws) {
+    if (!ws) return true;
+    if (typeof ws.isReadOnly === 'function') return ws.isReadOnly();
+    return !!ws.isReadOnly;
+}
+
 /**
  * Prompt renombrar variable (Blockly.dialog o window) y ejecutar pegado con nombre ya escapado.
  */
 function calvinPromptVariableNameAndPaste(mainWorkspace, button, buildBlockXmlWithName) {
     const ws = calvinResolvePasteWorkspace(mainWorkspace, button);
-    if (!ws || ws.isReadOnly()) return;
+    if (!ws || calvinWorkspaceIsReadOnly(ws)) return;
     const title = 'Renombrar variable:';
     function onName(raw) {
         if (raw === null || raw === undefined) return;
@@ -1120,7 +1127,7 @@ function calvinSanitizeVariableName(raw) {
  * Inserta bloques desde XML en el workspace (vista visible), una sola operación de undo.
  */
 function calvinPasteBlocksFromXmlString(workspace, innerBlocksXml) {
-    if (!workspace || workspace.isReadOnly()) return;
+    if (!workspace || calvinWorkspaceIsReadOnly(workspace)) return;
     const ns = 'https://developers.google.com/blockly/xml';
     const dom = Blockly.utils.xml.textToDom('<xml xmlns="' + ns + '">' + innerBlocksXml + '</xml>');
     const blockEl = dom.querySelector('block');
