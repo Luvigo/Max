@@ -59,7 +59,19 @@ class CalvinGeneratorStructureTest(TestCase):
         handlers = _extract_for_block_handlers(self.content)
         expected = [
             'calvin_operator_number',
+            'math_number',
             'calvin_operator_add',
+            'sumar',
+            'restar',
+            'multiplicar',
+            'dividir',
+            'math_random_int',
+            'mayor_que',
+            'menor_que',
+            'igual_que',
+            'logica_y',
+            'logica_o',
+            'math_single',
             'calvin_operator_subtract',
             'calvin_operator_multiply',
             'calvin_operator_divide',
@@ -88,6 +100,26 @@ class CalvinGeneratorStructureTest(TestCase):
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')
 
+    def test_text_botflow_handler_registered(self):
+        """Texto Botflow: literal cadena type text (field TEXT)."""
+        handlers = _extract_for_block_handlers(self.content)
+        self.assertIn('text', handlers, 'Falta handler: text')
+
+    def test_functions_procedures_defnoreturn_handler_registered(self):
+        """Funciones Botflow: procedures_defnoreturn (cuerpo STACK)."""
+        handlers = _extract_for_block_handlers(self.content)
+        self.assertIn('procedures_defnoreturn', handlers, 'Falta handler: procedures_defnoreturn')
+
+    def test_functions_procedures_defreturn_handler_registered(self):
+        """Funciones Botflow: procedures_defreturn (STACK + RETURN)."""
+        handlers = _extract_for_block_handlers(self.content)
+        self.assertIn('procedures_defreturn', handlers, 'Falta handler: procedures_defreturn')
+
+    def test_functions_procedures_ifreturn_handler_registered(self):
+        """Funciones Botflow: procedures_ifreturn."""
+        handlers = _extract_for_block_handlers(self.content)
+        self.assertIn('procedures_ifreturn', handlers, 'Falta handler: procedures_ifreturn')
+
     def test_io_handlers_registered(self):
         """I/O: digital_write, digital_read, analog_read, analog_write, high_low."""
         handlers = _extract_for_block_handlers(self.content)
@@ -97,6 +129,11 @@ class CalvinGeneratorStructureTest(TestCase):
             'calvin_io_analog_read',
             'calvin_io_analog_write',
             'calvin_io_high_low',
+            'inout_highlow',
+            'inout_digital_write',
+            'inout_digital_read',
+            'inout_analog_read',
+            'inout_analog_write',
         ]
         for h in expected:
             self.assertIn(h, handlers, f'Falta handler: {h}')

@@ -17,6 +17,10 @@ def _get_toolbox_config_path():
     return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'toolbox_config.js'
 
 
+def _get_app_js_path():
+    return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'app.js'
+
+
 def _extract_toolbox_section(content, name):
     """Extrae el contenido de TOOLBOX_MAX o TOOLBOX_CALVIN del JS."""
     pattern = rf'const {name} = `(.*?)`;'
@@ -71,11 +75,32 @@ class ToolboxMaxCalvinTest(TestCase):
         self.assertIn('controls_if', block_types)
         self.assertIn('controls_ifelse', block_types)
         self.assertIn('calvin_operator_add', block_types)
+        self.assertIn('math_number', block_types)
+        self.assertIn('sumar', block_types)
+        self.assertIn('restar', block_types)
+        self.assertIn('multiplicar', block_types)
+        self.assertIn('dividir', block_types)
+        self.assertIn('math_random_int', block_types)
+        self.assertIn('mayor_que', block_types)
+        self.assertIn('menor_que', block_types)
+        self.assertIn('igual_que', block_types)
+        self.assertIn('logica_y', block_types)
+        self.assertIn('logica_o', block_types)
+        self.assertIn('math_single', block_types)
         self.assertIn('logic_compare', block_types)
         self.assertIn('logic_negate', block_types)
         self.assertIn('logic_operation', block_types)
         self.assertIn('serial_init', block_types)
+        self.assertIn('inout_highlow', block_types)
+        self.assertIn('inout_digital_write', block_types)
+        self.assertIn('inout_digital_read', block_types)
+        self.assertIn('inout_analog_read', block_types)
+        self.assertIn('inout_analog_write', block_types)
         self.assertIn('calvin_io_digital_write', block_types)
+        self.assertIn('text', block_types)
+        self.assertIn('procedures_defnoreturn', block_types)
+        self.assertIn('procedures_defreturn', block_types)
+        self.assertIn('procedures_ifreturn', block_types)
         self.assertIn('calvin_ble_init', block_types)
         self.assertIn('calvin_botflow1_init_proximidad', block_types)
         self.assertIn('calvin_botflow2_init_lineas', block_types)
@@ -111,3 +136,19 @@ class ToolboxMaxCalvinTest(TestCase):
         ]
         for cat in expected_categories:
             self.assertIn(cat, toolbox_calvin, f'Falta categoría: {cat}')
+
+    def test_calvin_variables_flyout_buttons(self):
+        """Calvin Variables: categoría custom + callbacks en app.js (flyout dinámico Botflow)."""
+        toolbox_calvin = _extract_toolbox_section(self.content, 'TOOLBOX_CALVIN')
+        self.assertIn('custom="CALVIN_VARIABLES_FLYOUT"', toolbox_calvin)
+        self.assertIn('Calvin Variables', toolbox_calvin)
+
+        app_path = _get_app_js_path()
+        self.assertTrue(app_path.exists(), f'No existe {app_path}')
+        app_content = app_path.read_text(encoding='utf-8', errors='replace')
+        self.assertIn("registerToolboxCategoryCallback('CALVIN_VARIABLES_FLYOUT'", app_content)
+        for key in ('calvin_btn_var_string', 'calvin_btn_var_int', 'calvin_btn_var_color'):
+            self.assertIn(f"registerButtonCallback('{key}'", app_content,
+                          f'Falta registerButtonCallback para {key}')
+        self.assertIn("addButton('Crear variable numérica'", app_content)
+        self.assertIn("addButton('Crear variable de color'", app_content)

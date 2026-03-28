@@ -113,6 +113,34 @@
         return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITION];
     };
 
+    // BotFlow: sumar (misma expresión que calvin_operator_add)
+    arduinoGenerator.forBlock['sumar'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
+        return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITION];
+    };
+
+    // BotFlow: restar (misma expresión que calvin_operator_subtract)
+    arduinoGenerator.forBlock['restar'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
+        return [`(${a} - ${b})`, arduinoGenerator.ORDER_ADDITION];
+    };
+
+    // BotFlow: multiplicar (misma expresión que calvin_operator_multiply)
+    arduinoGenerator.forBlock['multiplicar'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_MULTIPLICATIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_MULTIPLICATIVE) || '0';
+        return [`(${a} * ${b})`, arduinoGenerator.ORDER_MULTIPLICATIVE];
+    };
+
+    // BotFlow: dividir (misma expresión que calvin_operator_divide)
+    arduinoGenerator.forBlock['dividir'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_MULTIPLICATIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_MULTIPLICATIVE) || '1';
+        return [`(${a} / ${b})`, arduinoGenerator.ORDER_MULTIPLICATIVE];
+    };
+
     // resta
     arduinoGenerator.forBlock['calvin_operator_subtract'] = function(block) {
         const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
@@ -139,6 +167,61 @@
         const min = arduinoGenerator.valueToCode(block, 'MIN', arduinoGenerator.ORDER_ATOMIC) || '0';
         const max = arduinoGenerator.valueToCode(block, 'MAX', arduinoGenerator.ORDER_ATOMIC) || '100';
         return [`random(${min}, (${max}) + 1)`, arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    // BotFlow: math_random_int (misma expresión que calvin_operator_random; entradas FROM / TO)
+    arduinoGenerator.forBlock['math_random_int'] = function(block) {
+        const from = arduinoGenerator.valueToCode(block, 'FROM', arduinoGenerator.ORDER_ATOMIC) || '1';
+        const to = arduinoGenerator.valueToCode(block, 'TO', arduinoGenerator.ORDER_ATOMIC) || '10';
+        return [`random(${from}, (${to}) + 1)`, arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    // BotFlow: mayor_que (misma expresión que calvin_operator_gt)
+    arduinoGenerator.forBlock['mayor_que'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        return [`(${a} > ${b})`, arduinoGenerator.ORDER_RELATIONAL];
+    };
+
+    // BotFlow: menor_que (misma expresión que calvin_operator_lt)
+    arduinoGenerator.forBlock['menor_que'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_RELATIONAL) || '0';
+        return [`(${a} < ${b})`, arduinoGenerator.ORDER_RELATIONAL];
+    };
+
+    // BotFlow: igual_que (misma expresión que calvin_operator_eq)
+    arduinoGenerator.forBlock['igual_que'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_EQUALITY) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_EQUALITY) || '0';
+        return [`(${a} == ${b})`, arduinoGenerator.ORDER_EQUALITY];
+    };
+
+    // BotFlow: logica_y (misma expresión que calvin_operator_and)
+    arduinoGenerator.forBlock['logica_y'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_LOGICAL_AND) || 'false';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_LOGICAL_AND) || 'false';
+        return [`(${a} && ${b})`, arduinoGenerator.ORDER_LOGICAL_AND];
+    };
+
+    // BotFlow: logica_o (misma expresión que calvin_operator_or)
+    arduinoGenerator.forBlock['logica_o'] = function(block) {
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_LOGICAL_OR) || 'false';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_LOGICAL_OR) || 'false';
+        return [`(${a} || ${b})`, arduinoGenerator.ORDER_LOGICAL_OR];
+    };
+
+    // BotFlow: math_single (ROOT = misma expresión que calvin_operator_sqrt; entrada NUM)
+    arduinoGenerator.forBlock['math_single'] = function(block) {
+        const op = block.getFieldValue('OP');
+        const num = arduinoGenerator.valueToCode(block, 'NUM', arduinoGenerator.ORDER_NONE) || '0';
+        if (op === 'ROOT') {
+            if (!arduinoGenerator.includes_['math']) {
+                arduinoGenerator.includes_['math'] = '#include <math.h>';
+            }
+            return [`sqrt(${num})`, arduinoGenerator.ORDER_ATOMIC];
+        }
+        return ['0', arduinoGenerator.ORDER_ATOMIC];
     };
 
     // >, <, =
@@ -422,6 +505,38 @@
         return [val, arduinoGenerator.ORDER_ATOMIC];
     };
 
+    // BotFlow: inout_highlow (campo BOOL; misma expresión que calvin_io_high_low)
+    arduinoGenerator.forBlock['inout_highlow'] = function(block) {
+        const val = block.getFieldValue('BOOL') || 'HIGH';
+        return [val, arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    // BotFlow: inout_digital_write (STAT por campo; misma llamada que calvin_io_digital_write)
+    arduinoGenerator.forBlock['inout_digital_write'] = function(block) {
+        const pin = block.getFieldValue('PIN');
+        const stat = block.getFieldValue('STAT') || 'HIGH';
+        return `  digitalWrite(${pin}, ${stat});\n`;
+    };
+
+    // BotFlow: inout_digital_read (misma expresión que calvin_io_digital_read)
+    arduinoGenerator.forBlock['inout_digital_read'] = function(block) {
+        const pin = block.getFieldValue('PIN');
+        return [`digitalRead(${pin})`, arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    // BotFlow: inout_analog_read (campo PIN = A0, A1, …; literal Arduino)
+    arduinoGenerator.forBlock['inout_analog_read'] = function(block) {
+        const pin = block.getFieldValue('PIN') || 'A0';
+        return [`analogRead(${pin})`, arduinoGenerator.ORDER_ATOMIC];
+    };
+
+    // BotFlow: inout_analog_write (entrada NUM; misma llamada que calvin_io_analog_write)
+    arduinoGenerator.forBlock['inout_analog_write'] = function(block) {
+        const pin = block.getFieldValue('PIN');
+        const val = arduinoGenerator.valueToCode(block, 'NUM', arduinoGenerator.ORDER_ATOMIC) || '0';
+        return `  analogWrite(${pin}, ${val});\n`;
+    };
+
     arduinoGenerator.forBlock['calvin_io_digital_write'] = function(block) {
         const pin = block.getFieldValue('PIN');
         const stat = arduinoGenerator.valueToCode(block, 'STAT', arduinoGenerator.ORDER_ATOMIC) || 'HIGH';
@@ -470,6 +585,42 @@
         return '';
     };
 
+    // BotFlow / Blockly: procedures_defnoreturn (cuerpo en STACK; misma firma que calvin_func_defnoreturn)
+    arduinoGenerator.forBlock['procedures_defnoreturn'] = function(block) {
+        const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
+        const params = getCalvinFuncParams(block);
+        const sig = params.length > 0
+            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            : 'void';
+        const body = arduinoGenerator.statementToCode(block, 'STACK') || '';
+        const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
+        const fn = `void ${name}(${sig}) {\n${bodyIndent}\n}`;
+        const key = 'calvin_fn_' + name;
+        if (!arduinoGenerator.functions_[key]) {
+            arduinoGenerator.functions_[key] = fn;
+        }
+        return '';
+    };
+
+    // BotFlow / Blockly: procedures_defreturn (STACK + RETURN; tipo int por defecto en C)
+    arduinoGenerator.forBlock['procedures_defreturn'] = function(block) {
+        const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
+        const type = 'int';
+        const params = getCalvinFuncParams(block);
+        const sig = params.length > 0
+            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            : 'void';
+        const body = arduinoGenerator.statementToCode(block, 'STACK') || '';
+        const ret = arduinoGenerator.valueToCode(block, 'RETURN', arduinoGenerator.ORDER_ATOMIC) || '0';
+        const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
+        const fn = `${type} ${name}(${sig}) {\n${bodyIndent}\n  return ${ret};\n}`;
+        const key = 'calvin_fn_' + name;
+        if (!arduinoGenerator.functions_[key]) {
+            arduinoGenerator.functions_[key] = fn;
+        }
+        return '';
+    };
+
     // 2) Función con retorno
     arduinoGenerator.forBlock['calvin_func_defreturn'] = function(block) {
         const name = (block.getFieldValue('NAME') || 'do something2').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something2';
@@ -494,6 +645,16 @@
         const cond = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
         const val = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
         return `  if (${cond}) return ${val};\n`;
+    };
+
+    // BotFlow / Blockly: procedures_ifreturn (mutation value=0 → return sin expresión)
+    arduinoGenerator.forBlock['procedures_ifreturn'] = function(block) {
+        const cond = arduinoGenerator.valueToCode(block, 'CONDITION', arduinoGenerator.ORDER_ATOMIC) || 'false';
+        if (block.getInput('VALUE')) {
+            const val = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
+            return `  if (${cond}) return ${val};\n`;
+        }
+        return `  if (${cond}) return;\n`;
     };
 
     // Llamar función sin retorno

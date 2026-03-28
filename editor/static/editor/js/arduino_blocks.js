@@ -314,6 +314,35 @@ Blockly.Blocks['arduino_set_variable'] = {
     }
 };
 
+// Blockly / Botflow: leer variable (FieldVariable + mapa del workspace)
+if (typeof Blockly.Blocks['variables_get'] === 'undefined') {
+    Blockly.Blocks['variables_get'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldVariable(null), 'VAR');
+            this.setOutput(true, null);
+            this.setColour(290);
+            this.setTooltip('Valor de la variable (desplegable)');
+        }
+    };
+}
+
+// Blockly / Botflow: asignar variable
+if (typeof Blockly.Blocks['variables_set'] === 'undefined') {
+    Blockly.Blocks['variables_set'] = {
+        init: function() {
+            this.appendValueInput('VALUE')
+                .appendField('set')
+                .appendField(new Blockly.FieldVariable(null), 'VAR')
+                .appendField('to');
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(290);
+            this.setTooltip('Asigna un valor a la variable elegida');
+        }
+    };
+}
+
 // ============================================
 // BLOQUES DE MATEMÁTICAS
 // ============================================

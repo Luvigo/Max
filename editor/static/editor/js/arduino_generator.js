@@ -249,6 +249,32 @@ arduinoGenerator.forBlock['arduino_set_variable'] = function(block) {
     return `  ${name} = ${value};\n`;
 };
 
+function arduinoVariableNameFromFieldVar(block, workspace) {
+    const id = block.getFieldValue('VAR');
+    if (!id || !workspace) return 'i';
+    const model = workspace.getVariableMap().getVariableById(id);
+    if (model) return model.name;
+    if (arduinoGenerator.nameDB_ && Blockly.Names && Blockly.Names.NameType) {
+        try {
+            return arduinoGenerator.nameDB_.getName(id, Blockly.Names.NameType.VARIABLE);
+        } catch (e) { /* ignore */ }
+    }
+    return 'i';
+}
+
+arduinoGenerator.forBlock['variables_get'] = function(block) {
+    const ws = block.workspace;
+    const name = arduinoVariableNameFromFieldVar(block, ws);
+    return [name, arduinoGenerator.ORDER_ATOMIC];
+};
+
+arduinoGenerator.forBlock['variables_set'] = function(block) {
+    const ws = block.workspace;
+    const name = arduinoVariableNameFromFieldVar(block, ws);
+    const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
+    return `  ${name} = ${value};\n`;
+};
+
 // ============================================
 // GENERADORES DE MATEMÁTICAS
 // ============================================

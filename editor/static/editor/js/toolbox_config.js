@@ -353,6 +353,53 @@
                 <block type="calvin_operator_number">
                     <field name="NUM">0</field>
                 </block>
+                <block type="math_number">
+                    <field name="NUM">0</field>
+                </block>
+                <block type="sumar">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="restar">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="multiplicar">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="dividir">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
+                </block>
+                <block type="math_random_int">
+                    <value name="FROM"><shadow type="math_number"><field name="NUM">1</field></shadow></value>
+                    <value name="TO"><shadow type="math_number"><field name="NUM">10</field></shadow></value>
+                </block>
+                <block type="mayor_que">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="menor_que">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="igual_que">
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="logica_y">
+                    <value name="A"><block type="arduino_true"></block></value>
+                    <value name="B"><block type="arduino_false"></block></value>
+                </block>
+                <block type="logica_o">
+                    <value name="A"><block type="arduino_true"></block></value>
+                    <value name="B"><block type="arduino_false"></block></value>
+                </block>
+                <block type="math_single">
+                    <field name="OP">ROOT</field>
+                    <value name="NUM"><shadow type="math_number"><field name="NUM">9</field></shadow></value>
+                </block>
                 <block type="calvin_operator_add">
                     <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
                     <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
@@ -402,6 +449,9 @@
                 </block>
             </category>
             <category name="Calvin Texto" colour="160">
+                <block type="text">
+                    <field name="TEXT"></field>
+                </block>
                 <block type="calvin_text_string">
                     <field name="TEXT">texto</field>
                 </block>
@@ -462,6 +512,23 @@
                 <block type="calvin_ble_char_value_string"></block>
             </category>
             <category name="Calvin I/O" colour="230">
+                <block type="inout_highlow">
+                    <field name="BOOL">HIGH</field>
+                </block>
+                <block type="inout_digital_write">
+                    <field name="PIN">13</field>
+                    <field name="STAT">HIGH</field>
+                </block>
+                <block type="inout_digital_read">
+                    <field name="PIN">2</field>
+                </block>
+                <block type="inout_analog_read">
+                    <field name="PIN">A0</field>
+                </block>
+                <block type="inout_analog_write">
+                    <field name="PIN">9</field>
+                    <value name="NUM"><shadow type="math_number"><field name="NUM">128</field></shadow></value>
+                </block>
                 <block type="calvin_io_high_low">
                     <field name="VAL">HIGH</field>
                 </block>
@@ -487,6 +554,18 @@
                 </block>
             </category>
             <category name="Calvin Funciones" colour="290">
+                <block type="procedures_defnoreturn">
+                    <field name="NAME">do something</field>
+                </block>
+                <block type="procedures_defreturn">
+                    <field name="NAME">do something</field>
+                    <value name="RETURN"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
+                <block type="procedures_ifreturn">
+                    <mutation value="1"></mutation>
+                    <value name="CONDITION"><block type="arduino_false"></block></value>
+                    <value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                </block>
                 <block type="calvin_func_defnoreturn">
                     <field name="NAME">do something</field>
                 </block>
@@ -506,34 +585,7 @@
                     <field name="NAME">do something2</field>
                 </block>
             </category>
-            <category name="Calvin Variables" colour="290">
-                <label text="── Crear variable de texto ──"></label>
-                <block type="arduino_variable_string">
-                    <field name="NAME">texto</field>
-                    <value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>
-                </block>
-                <label text="── Crear variable numérica ──"></label>
-                <block type="arduino_variable_int">
-                    <field name="NAME">numero</field>
-                    <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="arduino_variable_float">
-                    <field name="NAME">decimal</field>
-                    <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
-                </block>
-                <label text="── Crear variable de color ──"></label>
-                <block type="arduino_variable_string">
-                    <field name="NAME">color</field>
-                    <value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>
-                </block>
-                <label text="── Usar variables ──"></label>
-                <block type="arduino_get_variable">
-                    <field name="NAME">variable</field>
-                </block>
-                <block type="calvin_var_set">
-                    <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
-                </block>
-            </category>
+            <category name="Calvin Variables" colour="290" custom="CALVIN_VARIABLES_FLYOUT"></category>
             <category name="Calvin BotFlow Nivel 1" colour="100">
                 <block type="calvin_botflow1_init_proximidad"></block>
                 <block type="calvin_botflow1_distancia"></block>

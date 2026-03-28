@@ -1047,6 +1047,254 @@ function showAgentBanner() {
 }
 
 /**
+ * Escapa texto para usar dentro de campos en XML de Blockly.
+ */
+function calvinXmlEscapeFieldText(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+/**
+ * Convierte el nombre tecleado en identificador C válido (Arduino).
+ */
+function calvinSanitizeVariableName(raw) {
+    if (raw === null || raw === undefined) return null;
+    let t = String(raw).trim();
+    if (!t) return null;
+    t = t.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '_');
+    if (/^[0-9]/.test(t)) {
+        t = '_' + t;
+    }
+    return t || null;
+}
+
+/**
+ * Inserta bloques desde XML en el workspace (vista visible), una sola operación de undo.
+ */
+function calvinPasteBlocksFromXmlString(workspace, innerBlocksXml) {
+    if (!workspace || workspace.isReadOnly()) return;
+    const ns = 'https://developers.google.com/blockly/xml';
+    const dom = Blockly.utils.xml.textToDom('<xml xmlns="' + ns + '">' + innerBlocksXml + '</xml>');
+    const blockEl = dom.querySelector('block');
+    if (!blockEl) return;
+    const m = workspace.getMetrics();
+    const x = m ? Math.max(24, m.viewLeft + 48) : 48;
+    const y = m ? Math.max(24, m.viewTop + 48) : 48;
+    blockEl.setAttribute('x', String(x));
+    blockEl.setAttribute('y', String(y));
+    Blockly.Events.setGroup(true);
+    try {
+        Blockly.Xml.domToWorkspace(dom, workspace);
+    } finally {
+        Blockly.Events.setGroup(false);
+    }
+}
+
+/**
+ * Parsea un único <block>...</block> para ítems del flyout del toolbox.
+ */
+function calvinToolboxBlockFromXmlString(innerBlockXml) {
+    const ns = 'https://developers.google.com/blockly/xml';
+    const dom = Blockly.utils.xml.textToDom('<xml xmlns="' + ns + '">' + innerBlockXml + '</xml>');
+    return dom.querySelector('block');
+}
+
+/**
+ * Sincroniza Blockly.VariableMap con bloques de declaración int/float/String (nombre en field NAME).
+ */
+function calvinEnsureBlocklyVariableForArduinoDeclaration(block) {
+    if (!block || block.isInFlyout) return;
+    const t = block.type;
+    if (t !== 'arduino_variable_string' && t !== 'arduino_variable_int' && t !== 'arduino_variable_float') {
+        return;
+    }
+    const ws = block.workspace;
+    if (!ws || ws.isFlyout) return;
+    const name = calvinSanitizeVariableName(block.getFieldValue('NAME'));
+    if (!name) return;
+    try {
+        if (!ws.getVariableMap().getVariable(name, '')) {
+            ws.createVariable(name, '');
+        }
+    } catch (e) { /* nombre duplicado u otra restricción */ }
+}
+
+/**
+ * Flyout dinámico "Calvin Variables" (Botflow: crear + set/get con desplegable).
+ */
+function calvinVariablesFlyoutCategory(workspace) {
+    const xmlList = [];
+
+    function addButton(text, callbackKey) {
+        const b = Blockly.utils.xml.createElement('button');
+        b.setAttribute('text', text);
+        b.setAttribute('callbackKey', callbackKey);
+        xmlList.push(b);
+    }
+
+    function addLabel(text) {
+        const lb = Blockly.utils.xml.createElement('label');
+        lb.setAttribute('text', text);
+        xmlList.push(lb);
+    }
+
+    addButton('Crear variable de texto', 'calvin_btn_var_string');
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="arduino_variable_string">' +
+        '<field name="NAME">texto</field>' +
+        '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>' +
+        '</block>'));
+
+    addButton('Crear variable numérica', 'calvin_btn_var_int');
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="arduino_variable_int">' +
+        '<field name="NAME">numero</field>' +
+        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
+        '</block>'));
+
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="arduino_variable_float">' +
+        '<field name="NAME">decimal</field>' +
+        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
+        '</block>'));
+
+    addButton('Crear variable de color', 'calvin_btn_var_color');
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="arduino_variable_string">' +
+        '<field name="NAME">color</field>' +
+        '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>' +
+        '</block>'));
+
+    addLabel('── Usar variables ──');
+
+    const vars = workspace.getVariableMap().getAllVariables();
+    if (vars.length > 0) {
+        const setBlock = Blockly.utils.xml.createElement('block');
+        setBlock.setAttribute('type', 'variables_set');
+        const f0 = Blockly.utils.xml.createElement('field');
+        f0.setAttribute('name', 'VAR');
+        f0.setAttribute('id', vars[0].getId());
+        if (vars[0].type) {
+            f0.setAttribute('variabletype', vars[0].type);
+        }
+        f0.textContent = vars[0].name;
+        setBlock.appendChild(f0);
+        const valIn = Blockly.utils.xml.createElement('value');
+        valIn.setAttribute('name', 'VALUE');
+        setBlock.appendChild(valIn);
+        xmlList.push(setBlock);
+
+        for (let i = 0; i < vars.length; i++) {
+            const v = vars[i];
+            const gb = Blockly.utils.xml.createElement('block');
+            gb.setAttribute('type', 'variables_get');
+            const gf = Blockly.utils.xml.createElement('field');
+            gf.setAttribute('name', 'VAR');
+            gf.setAttribute('id', v.getId());
+            if (v.type) {
+                gf.setAttribute('variabletype', v.type);
+            }
+            gf.textContent = v.name;
+            gb.appendChild(gf);
+            xmlList.push(gb);
+        }
+    }
+
+    addLabel('── Otros ──');
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="arduino_get_variable"><field name="NAME">variable</field></block>'));
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="calvin_var_set">' +
+        '<field name="VAR">item</field>' +
+        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
+        '</block>'));
+
+    return xmlList;
+}
+
+/**
+ * Registra flyout dinámico, botones y sincronización VariableMap ↔ declaraciones Arduino.
+ */
+function registerCalvinVariablesToolboxIntegration(workspace) {
+    if (!workspace) return;
+    if (typeof workspace.registerToolboxCategoryCallback === 'function') {
+        workspace.registerToolboxCategoryCallback('CALVIN_VARIABLES_FLYOUT', calvinVariablesFlyoutCategory);
+    }
+    registerCalvinVariableToolboxCallbacks(workspace);
+
+    if (workspace.calvinVarDeclSyncListener_) {
+        workspace.removeChangeListener(workspace.calvinVarDeclSyncListener_);
+    }
+    workspace.calvinVarDeclSyncListener_ = function(event) {
+        if (!event || event.type !== Blockly.Events.BLOCK_CREATE) return;
+        const id = event.blockId;
+        if (!id) return;
+        const block = workspace.getBlockById(id);
+        if (block) {
+            calvinEnsureBlocklyVariableForArduinoDeclaration(block);
+        }
+    };
+    workspace.addChangeListener(workspace.calvinVarDeclSyncListener_);
+}
+
+/**
+ * Botones del flyout "Calvin Variables": prompt estilo Botflow y creación de bloque.
+ */
+function registerCalvinVariableToolboxCallbacks(workspace) {
+    if (!workspace || typeof workspace.registerButtonCallback !== 'function') return;
+
+    const promptTitle = 'Renombrar variable:';
+
+    workspace.registerButtonCallback('calvin_btn_var_string', function(button) {
+        const ws = button.getTargetWorkspace();
+        if (!ws || ws.isReadOnly()) return;
+        const raw = window.prompt(promptTitle, '');
+        if (raw === null) return;
+        const name = calvinSanitizeVariableName(raw);
+        if (!name) return;
+        const ne = calvinXmlEscapeFieldText(name);
+        calvinPasteBlocksFromXmlString(ws,
+            '<block type="arduino_variable_string">' +
+            '<field name="NAME">' + ne + '</field>' +
+            '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>' +
+            '</block>');
+    });
+
+    workspace.registerButtonCallback('calvin_btn_var_int', function(button) {
+        const ws = button.getTargetWorkspace();
+        if (!ws || ws.isReadOnly()) return;
+        const raw = window.prompt(promptTitle, '');
+        if (raw === null) return;
+        const name = calvinSanitizeVariableName(raw);
+        if (!name) return;
+        const ne = calvinXmlEscapeFieldText(name);
+        calvinPasteBlocksFromXmlString(ws,
+            '<block type="arduino_variable_int">' +
+            '<field name="NAME">' + ne + '</field>' +
+            '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
+            '</block>');
+    });
+
+    workspace.registerButtonCallback('calvin_btn_var_color', function(button) {
+        const ws = button.getTargetWorkspace();
+        if (!ws || ws.isReadOnly()) return;
+        const raw = window.prompt(promptTitle, '');
+        if (raw === null) return;
+        const name = calvinSanitizeVariableName(raw);
+        if (!name) return;
+        const ne = calvinXmlEscapeFieldText(name);
+        calvinPasteBlocksFromXmlString(ws,
+            '<block type="arduino_variable_string">' +
+            '<field name="NAME">' + ne + '</field>' +
+            '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>' +
+            '</block>');
+    });
+}
+
+/**
  * Inicializa el workspace de Blockly
  */
 function initBlockly() {
@@ -1086,6 +1334,8 @@ function initBlockly() {
         },
         renderer: 'zelos'
     });
+
+    registerCalvinVariablesToolboxIntegration(workspace);
 
     // Recalcular geometría (toolbox + flyout) tras layout; sin esto el flyout puede quedar a tamaño 0.
     function calvinBlocklyResize() {
@@ -1208,6 +1458,8 @@ function switchRobot(robot) {
             move: { scrollbars: true, drag: true, wheel: true },
             renderer: 'zelos'
         });
+
+        registerCalvinVariablesToolboxIntegration(workspace);
 
         function resizeAfterRobotSwitch() {
             if (workspace && typeof Blockly !== 'undefined' && Blockly.svgResize) {

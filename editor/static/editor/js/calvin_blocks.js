@@ -1,6 +1,6 @@
 /**
  * Bloques Calvin - Familia técnica separada
- * Naming: base_delay, switch_case, case, controls_* (Botflow), calvin_operator_*, calvin_text_*, serial_* (Botflow), etc.
+ * Naming: base_delay, switch_case, case, controls_* (Botflow), procedures_defnoreturn/procedures_defreturn/procedures_ifreturn (Botflow funciones), sumar/restar/.../math_single (Botflow), calvin_operator_*, calvin_text_*, serial_* (Botflow), inout_* (Botflow I/O), etc.
  * Extensión de MAX-IDE; no modifica max_* ni arduino_*
  */
 
@@ -151,6 +151,149 @@
             this.setOutput(true, "Number");
             this.setColour(COLOUR_OPERATOR);
             this.setTooltip("Suma dos números");
+        }
+    };
+
+    // BotFlow: sumar — A [+] B (sombras math_number en importación XML)
+    Blockly.Blocks['sumar'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('+');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Suma A + B (Botflow: sumar)');
+        }
+    };
+
+    // BotFlow: restar — A [−] B (sombras math_number en importación XML)
+    Blockly.Blocks['restar'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('-');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Resta A - B (Botflow: restar)');
+        }
+    };
+
+    // BotFlow: multiplicar — A [*] B (sombras math_number en importación XML)
+    Blockly.Blocks['multiplicar'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('*');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Multiplica A * B (Botflow: multiplicar)');
+        }
+    };
+
+    // BotFlow: dividir — A [/] B (sombras math_number en importación XML)
+    Blockly.Blocks['dividir'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('/');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Divide A / B (Botflow: dividir)');
+        }
+    };
+
+    // BotFlow: math_random_int — FROM / TO (sombras math_number; mismas etiquetas que calvin_operator_random)
+    Blockly.Blocks['math_random_int'] = {
+        init: function() {
+            this.appendValueInput('FROM').setCheck(null).appendField('número aleatorio entre');
+            this.appendValueInput('TO').setCheck(null).appendField('y');
+            this.setInputsInline(true);
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Entero aleatorio entre FROM y TO (inclusivo) (Botflow: math_random_int)');
+        }
+    };
+
+    // BotFlow: mayor_que — A [>] B (sombras math_number; misma lógica que calvin_operator_gt)
+    Blockly.Blocks['mayor_que'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('>');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Verdadero si A > B (Botflow: mayor_que)');
+        }
+    };
+
+    // BotFlow: menor_que — A [<] B (sombras math_number; misma lógica que calvin_operator_lt)
+    Blockly.Blocks['menor_que'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('<');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Verdadero si A < B (Botflow: menor_que)');
+        }
+    };
+
+    // BotFlow: igual_que — A [=] B (sombras math_number; misma lógica que calvin_operator_eq)
+    Blockly.Blocks['igual_que'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('=');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Verdadero si A == B (Botflow: igual_que)');
+        }
+    };
+
+    // BotFlow: logica_y — A [y] B (misma lógica que calvin_operator_and)
+    Blockly.Blocks['logica_y'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('y');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Verdadero si A y B son verdaderos (Botflow: logica_y)');
+        }
+    };
+
+    // BotFlow: logica_o — A [o] B (misma lógica que calvin_operator_or)
+    Blockly.Blocks['logica_o'] = {
+        init: function() {
+            this.appendValueInput('A').setCheck(null);
+            this.appendDummyInput().appendField('o');
+            this.appendValueInput('B').setCheck(null);
+            this.setInputsInline(true);
+            this.setOutput(true, 'Boolean');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Verdadero si A o B es verdadero (Botflow: logica_o)');
+        }
+    };
+
+    // BotFlow: math_single — dropdown OP en la fila NUM (p. ej. ROOT = raíz cuadrada)
+    Blockly.Blocks['math_single'] = {
+        init: function() {
+            this.appendValueInput('NUM')
+                .setCheck(null)
+                .appendField(new Blockly.FieldDropdown([
+                    ['raíz cuadrada de', 'ROOT']
+                ]), 'OP');
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_OPERATOR);
+            this.setTooltip('Operación sobre un número (Botflow: math_single)');
         }
     };
 
@@ -434,12 +577,12 @@
         }
     };
 
-    // Sombra estándar Blockly usada por Botflow; MAX usa calvin_operator_number en toolbox
+    // Número literal Blockly/Botflow (field NUM); mismo tipo que sombras en sumar, etc.
     if (typeof Blockly.Blocks['math_number'] === 'undefined') {
         Blockly.Blocks['math_number'] = {
             init: function() {
                 this.appendDummyInput()
-                    .appendField(new Blockly.FieldNumber(115200, 0, 2000000, 0), 'NUM');
+                    .appendField(new Blockly.FieldNumber(0), 'NUM');
                 this.setOutput(true, 'Number');
                 this.setColour(COLOUR_OPERATOR);
                 this.setTooltip('Número (compat. importación Botflow / Blockly)');
@@ -447,7 +590,7 @@
         };
     }
 
-    // Texto literal Blockly/Botflow (shadow "text", field TEXT)
+    // Texto literal Botflow / Blockly (categoría Texto; sombra en serial_print, etc.)
     if (typeof Blockly.Blocks['text'] === 'undefined') {
         Blockly.Blocks['text'] = {
             init: function() {
@@ -455,7 +598,7 @@
                     .appendField(new Blockly.FieldTextInput(''), 'TEXT');
                 this.setOutput(true, 'String');
                 this.setColour(COLOUR_TEXT);
-                this.setTooltip('Texto (compat. importación Botflow / Blockly)');
+                this.setTooltip('Texto literal (Botflow: text)');
             }
         };
     }
@@ -567,6 +710,77 @@
     // ============================================
     // calvin_io_* - Entrada/Salida (IN/OUT)
     // ============================================
+
+    // BotFlow: inout_highlow — campo BOOL HIGH/LOW (misma salida que calvin_io_high_low)
+    Blockly.Blocks['inout_highlow'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField(new Blockly.FieldDropdown([['HIGH', 'HIGH'], ['LOW', 'LOW']]), 'BOOL');
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_IO);
+            this.setTooltip('HIGH o LOW (Botflow: inout_highlow)');
+        }
+    };
+
+    // BotFlow: inout_digital_write — PIN y STAT como campos (sin value STAT)
+    Blockly.Blocks['inout_digital_write'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('DigitalWrite PIN#')
+                .appendField(new Blockly.FieldNumber(13, 0, 255), 'PIN')
+                .appendField('Stat')
+                .appendField(new Blockly.FieldDropdown([['HIGH', 'HIGH'], ['LOW', 'LOW']]), 'STAT');
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_IO);
+            this.setTooltip('digitalWrite(pin, HIGH|LOW) (Botflow: inout_digital_write)');
+        }
+    };
+
+    // BotFlow: inout_digital_read — «DigitalRead PIN#» + campo PIN
+    Blockly.Blocks['inout_digital_read'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('DigitalRead PIN#')
+                .appendField(new Blockly.FieldNumber(2, 0, 255), 'PIN');
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_IO);
+            this.setTooltip('digitalRead(pin) (Botflow: inout_digital_read)');
+        }
+    };
+
+    // BotFlow: inout_analog_read — «AnalogRead PIN#» + PIN A0..A15 (valor literal p. ej. A0)
+    Blockly.Blocks['inout_analog_read'] = {
+        init: function() {
+            var analogPinOptions = [];
+            for (var i = 0; i <= 15; i++) {
+                var ax = 'A' + i;
+                analogPinOptions.push([ax, ax]);
+            }
+            this.appendDummyInput()
+                .appendField('AnalogRead PIN#')
+                .appendField(new Blockly.FieldDropdown(analogPinOptions), 'PIN');
+            this.setOutput(true, 'Number');
+            this.setColour(COLOUR_IO);
+            this.setTooltip('analogRead(Ax) (Botflow: inout_analog_read)');
+        }
+    };
+
+    // BotFlow: inout_analog_write — PIN + entrada NUM (valor PWM)
+    Blockly.Blocks['inout_analog_write'] = {
+        init: function() {
+            this.appendDummyInput()
+                .appendField('AnalogWrite PIN#')
+                .appendField(new Blockly.FieldNumber(9, 0, 255), 'PIN');
+            this.appendValueInput('NUM')
+                .setCheck(null);
+            this.setInputsInline(true);
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_IO);
+            this.setTooltip('analogWrite(pin, valor) (Botflow: inout_analog_write)');
+        }
+    };
 
     // 1) HIGH / LOW - valor constante
     Blockly.Blocks['calvin_io_high_low'] = {
@@ -744,6 +958,97 @@
         if (this.allowStatements_ === undefined) this.allowStatements_ = true;
     };
     Blockly.Extensions.registerMutator('calvin_func_mutator', CALVIN_FUNC_MUTATOR, calvinFuncMutatorHelper, ['calvin_func_mutatorarg']);
+
+    // Mutador igual que calvin_func_* pero cuerpo en STACK (Blockly/Botflow procedures_defnoreturn)
+    const PROCEDURES_DEFNORETURN_MUTATOR = Object.assign({}, CALVIN_FUNC_MUTATOR, {
+        updateShape_: function() {
+            if (this.getInput('PARAMS_LABEL')) {
+                this.removeInput('PARAMS_LABEL');
+            }
+            if (this.paramNames_.length > 0) {
+                this.appendDummyInput('PARAMS_LABEL')
+                    .appendField('with:')
+                    .appendField(this.paramNames_.join(', '));
+                this.moveInputBefore('PARAMS_LABEL', 'STACK');
+            }
+            if (this.getInput('STACK')) {
+                this.getInput('STACK').setVisible(this.allowStatements_);
+            }
+        }
+    });
+    Blockly.Extensions.registerMutator('procedures_defnoreturn_mutator', PROCEDURES_DEFNORETURN_MUTATOR, calvinFuncMutatorHelper, ['calvin_func_mutatorarg']);
+
+    // BotFlow / Blockly: procedures_defnoreturn — to [NAME] [PARAMS] + STACK (sombrero, sin prev/next)
+    Blockly.Blocks['procedures_defnoreturn'] = {
+        hasReturnType: false,
+        init: function() {
+            this.appendDummyInput()
+                .appendField('to')
+                .appendField(new Blockly.FieldTextInput('do something'), 'NAME')
+                .appendField('', 'PARAMS');
+            this.appendStatementInput('STACK');
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip('Define una función sin retorno (Botflow / Blockly procedures_defnoreturn)');
+            this.setPreviousStatement(false, null);
+            this.setNextStatement(false, null);
+        }
+    };
+    Blockly.Blocks['procedures_defnoreturn'].mutator = 'procedures_defnoreturn_mutator';
+
+    // BotFlow / Blockly: procedures_defreturn — to [NAME] [PARAMS] + STACK + return [RETURN]
+    Blockly.Blocks['procedures_defreturn'] = {
+        hasReturnType: true,
+        init: function() {
+            this.appendDummyInput()
+                .appendField('to')
+                .appendField(new Blockly.FieldTextInput('do something'), 'NAME')
+                .appendField('', 'PARAMS');
+            this.appendStatementInput('STACK');
+            this.appendValueInput('RETURN')
+                .setCheck(null)
+                .appendField('return');
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip('Define una función con valor de retorno (Botflow / Blockly procedures_defreturn)');
+            this.setPreviousStatement(false, null);
+            this.setNextStatement(false, null);
+        }
+    };
+    Blockly.Blocks['procedures_defreturn'].mutator = 'procedures_defnoreturn_mutator';
+
+    // BotFlow / Blockly: procedures_ifreturn — sí [COND] return [VALUE]; mutation value 0 = sin expresión
+    Blockly.Blocks['procedures_ifreturn'] = {
+        hasReturnValue_: true,
+        updateShape_: function() {
+            if (this.getInput('VALUE')) {
+                this.removeInput('VALUE');
+            }
+            if (this.hasReturnValue_) {
+                this.appendValueInput('VALUE')
+                    .setCheck(null)
+                    .appendField('return');
+            }
+        },
+        mutationToDom: function() {
+            const container = Blockly.utils.xml.createElement('mutation');
+            container.setAttribute('value', this.hasReturnValue_ ? '1' : '0');
+            return container;
+        },
+        domToMutation: function(xmlElement) {
+            this.hasReturnValue_ = xmlElement.getAttribute('value') !== '0';
+            this.updateShape_();
+        },
+        init: function() {
+            this.hasReturnValue_ = true;
+            this.appendValueInput('CONDITION')
+                .setCheck(null)
+                .appendField('sí');
+            this.updateShape_();
+            this.setPreviousStatement(true, null);
+            this.setNextStatement(true, null);
+            this.setColour(COLOUR_FUNC);
+            this.setTooltip('Si la condición se cumple, return (Botflow / Blockly procedures_ifreturn)');
+        }
+    };
 
     // 1) Función sin retorno (void) - como original "to [do something]" con mutador
     Blockly.Blocks['calvin_func_defnoreturn'] = {
