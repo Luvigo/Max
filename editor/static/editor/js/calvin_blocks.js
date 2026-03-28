@@ -979,8 +979,10 @@
     Blockly.Extensions.registerMutator('procedures_defnoreturn_mutator', PROCEDURES_DEFNORETURN_MUTATOR, calvinFuncMutatorHelper, ['calvin_func_mutatorarg']);
 
     // BotFlow / Blockly: procedures_defnoreturn — to [NAME] [PARAMS] + STACK (sombrero, sin prev/next)
+    // Blockly 9+: la tuerca del mutador requiere `extensions`, no la propiedad .mutator.
     Blockly.Blocks['procedures_defnoreturn'] = {
         hasReturnType: false,
+        extensions: ['procedures_defnoreturn_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField('to')
@@ -993,11 +995,11 @@
             this.setNextStatement(false, null);
         }
     };
-    Blockly.Blocks['procedures_defnoreturn'].mutator = 'procedures_defnoreturn_mutator';
 
     // BotFlow / Blockly: procedures_defreturn — to [NAME] [PARAMS] + STACK + return [RETURN]
     Blockly.Blocks['procedures_defreturn'] = {
         hasReturnType: true,
+        extensions: ['procedures_defnoreturn_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField('to')
@@ -1013,7 +1015,6 @@
             this.setNextStatement(false, null);
         }
     };
-    Blockly.Blocks['procedures_defreturn'].mutator = 'procedures_defnoreturn_mutator';
 
     // BotFlow / Blockly: procedures_ifreturn — sí [COND] return [VALUE]; mutation value 0 = sin expresión
     Blockly.Blocks['procedures_ifreturn'] = {
@@ -1053,6 +1054,7 @@
     // 1) Función sin retorno (void) - como original "to [do something]" con mutador
     Blockly.Blocks['calvin_func_defnoreturn'] = {
         hasReturnType: false,
+        extensions: ['calvin_func_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField("función")
@@ -1065,11 +1067,11 @@
             this.setTooltip("Define una función. Usa la tuerca para añadir parámetros.");
         }
     };
-    Blockly.Blocks['calvin_func_defnoreturn'].mutator = 'calvin_func_mutator';
 
     // 2) Función con retorno - como original "to [do something2]" con return y mutador
     Blockly.Blocks['calvin_func_defreturn'] = {
         hasReturnType: true,
+        extensions: ['calvin_func_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField("función")
@@ -1091,7 +1093,6 @@
             this.setTooltip("Define una función que devuelve un valor. Usa la tuerca para parámetros.");
         }
     };
-    Blockly.Blocks['calvin_func_defreturn'].mutator = 'calvin_func_mutator';
 
     // 3) Si [condición] return [valor] - early return (usar dentro de función con retorno)
     Blockly.Blocks['calvin_func_ifreturn'] = {
@@ -1194,6 +1195,7 @@
 
     // Llamar función (sin retorno) - con mutador para argumentos
     Blockly.Blocks['calvin_func_call'] = {
+        extensions: ['calvin_func_call_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField(new Blockly.FieldTextInput("do something"), "NAME");
@@ -1203,10 +1205,10 @@
             this.setTooltip("Llama a una función. Usa la tuerca para añadir argumentos.");
         }
     };
-    Blockly.Blocks['calvin_func_call'].mutator = 'calvin_func_call_mutator';
 
     // Llamar función con retorno - con mutador para argumentos
     Blockly.Blocks['calvin_func_call_return'] = {
+        extensions: ['calvin_func_call_mutator'],
         init: function() {
             this.appendDummyInput()
                 .appendField(new Blockly.FieldTextInput("do something2"), "NAME");
@@ -1215,7 +1217,6 @@
             this.setTooltip("Llama a una función y usa el valor. Usa la tuerca para argumentos.");
         }
     };
-    Blockly.Blocks['calvin_func_call_return'].mutator = 'calvin_func_call_mutator';
 
     // ============================================
     // calvin_var_* - Variables (reutiliza arduino_get/set, añade labels tipo)

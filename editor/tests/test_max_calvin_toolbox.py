@@ -96,9 +96,6 @@ class ToolboxMaxCalvinTest(TestCase):
         self.assertIn('inout_analog_read', block_types)
         self.assertIn('inout_analog_write', block_types)
         self.assertIn('text', block_types)
-        self.assertIn('procedures_defnoreturn', block_types)
-        self.assertIn('procedures_defreturn', block_types)
-        self.assertIn('procedures_ifreturn', block_types)
         self.assertIn('calvin_ble_init', block_types)
         self.assertIn('calvin_botflow1_init_proximidad', block_types)
         self.assertIn('calvin_botflow2_init_lineas', block_types)
@@ -148,5 +145,20 @@ class ToolboxMaxCalvinTest(TestCase):
         for key in ('calvin_btn_var_string', 'calvin_btn_var_int', 'calvin_btn_var_color'):
             self.assertIn(f"registerButtonCallback('{key}'", app_content,
                           f'Falta registerButtonCallback para {key}')
-        self.assertIn("addButton('Crear variable numérica'", app_content)
-        self.assertIn("addButton('Crear variable de color'", app_content)
+        self.assertIn('addButtonJson', app_content)
+        self.assertIn('callbackkey', app_content.lower())
+        self.assertIn("addButtonJson('Crear variable numérica'", app_content)
+        self.assertIn("addButtonJson('Crear variable de color'", app_content)
+
+    def test_calvin_functions_flyout_dynamic(self):
+        """Calvin Funciones: categoría custom + callback que lista llamadas por definición."""
+        toolbox_calvin = _extract_toolbox_section(self.content, 'TOOLBOX_CALVIN')
+        self.assertIn('custom="CALVIN_FUNCTIONS_FLYOUT"', toolbox_calvin)
+        self.assertIn('Calvin Funciones', toolbox_calvin)
+
+        app_path = _get_app_js_path()
+        self.assertTrue(app_path.exists(), f'No existe {app_path}')
+        app_content = app_path.read_text(encoding='utf-8', errors='replace')
+        self.assertIn("registerToolboxCategoryCallback('CALVIN_FUNCTIONS_FLYOUT'", app_content)
+        self.assertIn('calvinFunctionsFlyoutCategory', app_content)
+        self.assertIn('calvinCollectProcedureDefinitions', app_content)

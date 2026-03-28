@@ -467,20 +467,7 @@
                     <value name="NUM"><shadow type="math_number"><field name="NUM">128</field></shadow></value>
                 </block>
             </category>
-            <category name="Calvin Funciones" colour="290">
-                <block type="procedures_defnoreturn">
-                    <field name="NAME">do something</field>
-                </block>
-                <block type="procedures_defreturn">
-                    <field name="NAME">do something</field>
-                    <value name="RETURN"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
-                </block>
-                <block type="procedures_ifreturn">
-                    <mutation value="1"></mutation>
-                    <value name="CONDITION"><block type="arduino_false"></block></value>
-                    <value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
-                </block>
-            </category>
+            <category name="Calvin Funciones" colour="290" custom="CALVIN_FUNCTIONS_FLYOUT"></category>
             <category name="Calvin Variables" colour="290" custom="CALVIN_VARIABLES_FLYOUT"></category>
             <category name="Calvin BotFlow Nivel 1" colour="100">
                 <block type="calvin_botflow1_init_proximidad"></block>

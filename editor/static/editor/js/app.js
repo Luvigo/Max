@@ -1126,26 +1126,31 @@ function calvinEnsureBlocklyVariableForArduinoDeclaration(block) {
  * Flyout dinámico "Calvin Variables" (Botflow: crear + set/get con desplegable).
  */
 function calvinVariablesFlyoutCategory(workspace) {
-    const xmlList = [];
+    // Blockly 9: los botones deben ir como JSON con `callbackkey` en minúsculas
+    // (ButtonInfo). Un <button callbackKey="..."> creado con createElement a veces
+    // no enlaza el callback y el clic no dispara nada (sin prompt).
+    const contents = [];
 
-    function addButton(text, callbackKey) {
-        const b = Blockly.utils.xml.createElement('button');
-        b.setAttribute('text', text);
-        b.setAttribute('callbackKey', callbackKey);
-        xmlList.push(b);
+    function addButtonJson(text, callbackKey) {
+        contents.push({
+            kind: 'button',
+            text: text,
+            callbackkey: callbackKey
+        });
     }
 
-    function addLabel(text) {
-        const lb = Blockly.utils.xml.createElement('label');
-        lb.setAttribute('text', text);
-        xmlList.push(lb);
+    function addLabelJson(text) {
+        contents.push({
+            kind: 'label',
+            text: text
+        });
     }
 
-    addButton('Crear variable de texto', 'calvin_btn_var_string');
-    addButton('Crear variable numérica', 'calvin_btn_var_int');
-    addButton('Crear variable de color', 'calvin_btn_var_color');
+    addButtonJson('Crear variable de texto', 'calvin_btn_var_string');
+    addButtonJson('Crear variable numérica', 'calvin_btn_var_int');
+    addButtonJson('Crear variable de color', 'calvin_btn_var_color');
 
-    addLabel('── Usar variables ──');
+    addLabelJson('── Usar variables ──');
 
     const vars = workspace.getVariableMap().getAllVariables();
     if (vars.length > 0) {
@@ -1162,7 +1167,7 @@ function calvinVariablesFlyoutCategory(workspace) {
         const valIn = Blockly.utils.xml.createElement('value');
         valIn.setAttribute('name', 'VALUE');
         setBlock.appendChild(valIn);
-        xmlList.push(setBlock);
+        contents.push(setBlock);
 
         for (let i = 0; i < vars.length; i++) {
             const v = vars[i];
@@ -1176,11 +1181,135 @@ function calvinVariablesFlyoutCategory(workspace) {
             }
             gf.textContent = v.name;
             gb.appendChild(gf);
-            xmlList.push(gb);
+            contents.push(gb);
+        }
+    }
+
+    return contents;
+}
+
+/**
+ * Recorre el workspace y devuelve definiciones procedures_defnoreturn / procedures_defreturn (no flyout).
+ */
+function calvinCollectProcedureDefinitions(workspace) {
+    const out = [];
+    if (!workspace || typeof workspace.getAllBlocks !== 'function') {
+        return out;
+    }
+    const seen = Object.create(null);
+    const blocks = workspace.getAllBlocks(false);
+    for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        if (!b || b.isInFlyout) continue;
+        const t = b.type;
+        if (t !== 'procedures_defnoreturn' && t !== 'procedures_defreturn') continue;
+        const raw = String(b.getFieldValue('NAME') || '').trim() || 'do something';
+        const san = raw.replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
+        if (seen[san]) continue;
+        seen[san] = true;
+        const params = Array.isArray(b.paramNames_) ? b.paramNames_.length : 0;
+        out.push({
+            displayName: raw,
+            paramCount: params,
+            hasReturn: t === 'procedures_defreturn'
+        });
+    }
+    return out;
+}
+
+function calvinProcedureFlyoutEventsNeedRefresh(mainWs, event) {
+    if (!event || !mainWs) return false;
+    if (event.workspaceId && event.workspaceId !== mainWs.id) return false;
+    const t = event.type;
+    if (t === Blockly.Events.FINISHED_LOADING) return true;
+    if (t === Blockly.Events.BLOCK_DELETE) return true;
+    if (t === Blockly.Events.BLOCK_CREATE) {
+        const b = event.blockId ? mainWs.getBlockById(event.blockId) : null;
+        if (!b) return false;
+        return b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn';
+    }
+    if (t === Blockly.Events.BLOCK_CHANGE) {
+        const b = event.blockId ? mainWs.getBlockById(event.blockId) : null;
+        if (!b) return false;
+        if (b.type !== 'procedures_defnoreturn' && b.type !== 'procedures_defreturn') return false;
+        if (event.element === 'field' && event.name === 'NAME') return true;
+        if (event.element === 'mutation') return true;
+        return false;
+    }
+    return false;
+}
+
+function calvinTryRefreshToolboxSelection(workspace) {
+    if (!workspace || workspace.isDragging && workspace.isDragging()) return;
+    try {
+        const tb = workspace.getToolbox && workspace.getToolbox();
+        if (tb && typeof tb.refreshSelection === 'function') {
+            tb.refreshSelection();
+        }
+    } catch (e) { /* ignorar */ }
+}
+
+/**
+ * Flyout "Calvin Funciones": definir + si return + una fila de llamada por cada función definida en el workspace.
+ */
+function calvinFunctionsFlyoutCategory(workspace) {
+    const xmlList = [];
+
+    function addLabel(text) {
+        const lb = Blockly.utils.xml.createElement('label');
+        lb.setAttribute('text', text);
+        xmlList.push(lb);
+    }
+
+    addLabel('── Definir ──');
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="procedures_defnoreturn"><field name="NAME">do something</field></block>'));
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="procedures_defreturn">' +
+        '<field name="NAME">do something</field>' +
+        '<value name="RETURN"><shadow type="math_number"><field name="NUM">0</field></shadow></value>' +
+        '</block>'));
+    xmlList.push(calvinToolboxBlockFromXmlString(
+        '<block type="procedures_ifreturn">' +
+        '<mutation value="1"></mutation>' +
+        '<value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow></value>' +
+        '</block>'));
+
+    const procs = calvinCollectProcedureDefinitions(workspace);
+    if (procs.length > 0) {
+        addLabel('── Llamar ──');
+        for (let i = 0; i < procs.length; i++) {
+            const p = procs[i];
+            const type = p.hasReturn ? 'calvin_func_call_return' : 'calvin_func_call';
+            const ne = calvinXmlEscapeFieldText(p.displayName);
+            const n = Math.max(0, p.paramCount | 0);
+            xmlList.push(calvinToolboxBlockFromXmlString(
+                '<block type="' + type + '">' +
+                '<mutation argcount="' + n + '"></mutation>' +
+                '<field name="NAME">' + ne + '</field>' +
+                '</block>'));
         }
     }
 
     return xmlList;
+}
+
+/**
+ * Flyout dinámico de funciones + refresco al crear/editar/borrar definiciones.
+ */
+function registerCalvinFunctionsToolboxIntegration(workspace) {
+    if (!workspace) return;
+    if (typeof workspace.registerToolboxCategoryCallback === 'function') {
+        workspace.registerToolboxCategoryCallback('CALVIN_FUNCTIONS_FLYOUT', calvinFunctionsFlyoutCategory);
+    }
+    if (workspace.calvinProcFlyoutListener_) {
+        workspace.removeChangeListener(workspace.calvinProcFlyoutListener_);
+    }
+    workspace.calvinProcFlyoutListener_ = function(event) {
+        if (!calvinProcedureFlyoutEventsNeedRefresh(workspace, event)) return;
+        calvinTryRefreshToolboxSelection(workspace);
+    };
+    workspace.addChangeListener(workspace.calvinProcFlyoutListener_);
 }
 
 /**
@@ -1215,9 +1344,14 @@ function registerCalvinVariableToolboxCallbacks(workspace) {
     if (!workspace || typeof workspace.registerButtonCallback !== 'function') return;
 
     const promptTitle = 'Renombrar variable:';
+    const mainWs = workspace;
 
     workspace.registerButtonCallback('calvin_btn_var_string', function(button) {
-        const ws = button.getTargetWorkspace();
+        let ws = mainWs;
+        if (button && typeof button.getTargetWorkspace === 'function') {
+            const t = button.getTargetWorkspace();
+            if (t) ws = t;
+        }
         if (!ws || ws.isReadOnly()) return;
         const raw = window.prompt(promptTitle, '');
         if (raw === null) return;
@@ -1232,7 +1366,11 @@ function registerCalvinVariableToolboxCallbacks(workspace) {
     });
 
     workspace.registerButtonCallback('calvin_btn_var_int', function(button) {
-        const ws = button.getTargetWorkspace();
+        let ws = mainWs;
+        if (button && typeof button.getTargetWorkspace === 'function') {
+            const t = button.getTargetWorkspace();
+            if (t) ws = t;
+        }
         if (!ws || ws.isReadOnly()) return;
         const raw = window.prompt(promptTitle, '');
         if (raw === null) return;
@@ -1247,7 +1385,11 @@ function registerCalvinVariableToolboxCallbacks(workspace) {
     });
 
     workspace.registerButtonCallback('calvin_btn_var_color', function(button) {
-        const ws = button.getTargetWorkspace();
+        let ws = mainWs;
+        if (button && typeof button.getTargetWorkspace === 'function') {
+            const t = button.getTargetWorkspace();
+            if (t) ws = t;
+        }
         if (!ws || ws.isReadOnly()) return;
         const raw = window.prompt(promptTitle, '');
         if (raw === null) return;
@@ -1304,6 +1446,7 @@ function initBlockly() {
     });
 
     registerCalvinVariablesToolboxIntegration(workspace);
+    registerCalvinFunctionsToolboxIntegration(workspace);
 
     // Recalcular geometría (toolbox + flyout) tras layout; sin esto el flyout puede quedar a tamaño 0.
     function calvinBlocklyResize() {
@@ -1428,6 +1571,7 @@ function switchRobot(robot) {
         });
 
         registerCalvinVariablesToolboxIntegration(workspace);
+        registerCalvinFunctionsToolboxIntegration(workspace);
 
         function resizeAfterRobotSwitch() {
             if (workspace && typeof Blockly !== 'undefined' && Blockly.svgResize) {
