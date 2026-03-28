@@ -716,7 +716,7 @@
         init: function() {
             this.appendDummyInput()
                 .appendField(new Blockly.FieldDropdown([['HIGH', 'HIGH'], ['LOW', 'LOW']]), 'BOOL');
-            this.setOutput(true, 'Number');
+            this.setOutput(true, 'Boolean');
             this.setColour(COLOUR_IO);
             this.setTooltip('HIGH o LOW (Botflow: inout_highlow)');
         }
@@ -743,7 +743,7 @@
             this.appendDummyInput()
                 .appendField('DigitalRead PIN#')
                 .appendField(new Blockly.FieldNumber(2, 0, 255), 'PIN');
-            this.setOutput(true, 'Number');
+            this.setOutput(true, 'Boolean');
             this.setColour(COLOUR_IO);
             this.setTooltip('digitalRead(pin) (Botflow: inout_digital_read)');
         }

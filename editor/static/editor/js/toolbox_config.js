@@ -385,14 +385,8 @@
                     <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
                     <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
                 </block>
-                <block type="logica_y">
-                    <value name="A"><block type="arduino_true"></block></value>
-                    <value name="B"><block type="arduino_false"></block></value>
-                </block>
-                <block type="logica_o">
-                    <value name="A"><block type="arduino_true"></block></value>
-                    <value name="B"><block type="arduino_false"></block></value>
-                </block>
+                <block type="logica_y"></block>
+                <block type="logica_o"></block>
                 <block type="math_single">
                     <field name="OP">ROOT</field>
                     <value name="NUM"><shadow type="math_number"><field name="NUM">9</field></shadow></value>
@@ -401,13 +395,6 @@
             <category name="Calvin Texto" colour="160">
                 <block type="text">
                     <field name="TEXT"></field>
-                </block>
-                <block type="calvin_text_string">
-                    <field name="TEXT">texto</field>
-                </block>
-                <block type="calvin_text_concat">
-                    <value name="A"><block type="calvin_text_string"><field name="TEXT">Hola</field></block></value>
-                    <value name="B"><block type="calvin_text_string"><field name="TEXT">mundo</field></block></value>
                 </block>
             </category>
             <category name="Calvin Serial" colour="20">

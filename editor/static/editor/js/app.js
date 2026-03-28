@@ -1142,31 +1142,8 @@ function calvinVariablesFlyoutCategory(workspace) {
     }
 
     addButton('Crear variable de texto', 'calvin_btn_var_string');
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="arduino_variable_string">' +
-        '<field name="NAME">texto</field>' +
-        '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>' +
-        '</block>'));
-
     addButton('Crear variable numérica', 'calvin_btn_var_int');
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="arduino_variable_int">' +
-        '<field name="NAME">numero</field>' +
-        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
-        '</block>'));
-
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="arduino_variable_float">' +
-        '<field name="NAME">decimal</field>' +
-        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
-        '</block>'));
-
     addButton('Crear variable de color', 'calvin_btn_var_color');
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="arduino_variable_string">' +
-        '<field name="NAME">color</field>' +
-        '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>' +
-        '</block>'));
 
     addLabel('── Usar variables ──');
 
