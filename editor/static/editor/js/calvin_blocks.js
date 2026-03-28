@@ -9,10 +9,8 @@
 
     if (typeof Blockly === 'undefined') return;
 
-    /** Control “general” Calvin (delay, switch): azul */
+    /** Control Calvin (delay, switch, bucles Botflow, si/sino, logic_*): azul unificado */
     const COLOUR_CONTROL = 210;
-    /** Botflow: bucles, si/sino y bloques logic_* (mismo naranja que referencia) */
-    const COLOUR_BOTFLOW_ORANGE = 45;
     const COLOUR_OPERATOR = 200;
     const COLOUR_TEXT = 160;
     const COLOUR_SERIAL = 20;
@@ -80,7 +78,7 @@
             this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('while / repeat-until (Botflow). MODE: WHILE o UNTIL.');
         }
     };
@@ -97,7 +95,7 @@
             this.appendStatementInput('DO').setCheck(null).appendField('hacer');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('Bucle for con variable de Blockly (Botflow controls_for).');
         }
     };
@@ -110,7 +108,7 @@
             this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('if (Botflow): sí condición entonces …');
         }
     };
@@ -124,7 +122,7 @@
             this.setInputsInline(true);
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('if / else (Botflow): sí … entonces … si no …');
         }
     };
@@ -310,24 +308,24 @@
             this.appendValueInput('B').setCheck(null).appendField('');
             this.setInputsInline(true);
             this.setOutput(true, 'Boolean');
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('Comparación (Botflow logic_compare)');
         }
     };
 
-    // BotFlow / Blockly: logic_negate — no BOOL
+    // BotFlow / Blockly: logic_negate — etiqueta «sí» como en Botflow; código generado sigue siendo !(BOOL)
     Blockly.Blocks['logic_negate'] = {
         init: function() {
             this.appendValueInput('BOOL')
                 .setCheck(null)
-                .appendField('no');
+                .appendField('sí');
             this.setOutput(true, 'Boolean');
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
-            this.setTooltip('Negación lógica (Botflow logic_negate)');
+            this.setColour(COLOUR_CONTROL);
+            this.setTooltip('logic_negate: genera !(condición).');
         }
     };
 
-    // BotFlow / Blockly: logic_operation — A OP B (etiquetas AND/OR como en Botflow; valores XML: AND|OR)
+    // BotFlow / Blockly: logic_operation — A OP B (etiquetas AND/OR; valores XML: AND|OR)
     Blockly.Blocks['logic_operation'] = {
         init: function() {
             this.appendValueInput('A').setCheck(null).appendField('');
@@ -339,7 +337,7 @@
             this.appendValueInput('B').setCheck(null).appendField('');
             this.setInputsInline(true);
             this.setOutput(true, 'Boolean');
-            this.setColour(COLOUR_BOTFLOW_ORANGE);
+            this.setColour(COLOUR_CONTROL);
             this.setTooltip('AND / OR (Botflow logic_operation)');
         }
     };

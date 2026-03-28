@@ -323,20 +323,8 @@
                         <shadow type="arduino_number"><field name="NUM">500</field></shadow>
                     </value>
                 </block>
-                <block type="controls_if">
-                    <value name="IF0"><block type="logic_compare">
-                        <field name="OP">EQ</field>
-                        <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                        <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    </block></value>
-                </block>
-                <block type="controls_ifelse">
-                    <value name="IF0"><block type="logic_compare">
-                        <field name="OP">EQ</field>
-                        <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                        <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    </block></value>
-                </block>
+                <block type="controls_if"></block>
+                <block type="controls_ifelse"></block>
                 <block type="logic_compare">
                     <field name="OP">EQ</field>
                     <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
@@ -345,8 +333,6 @@
                 <block type="logic_negate"></block>
                 <block type="logic_operation">
                     <field name="OP">AND</field>
-                    <value name="A"><block type="arduino_true"></block></value>
-                    <value name="B"><block type="arduino_false"></block></value>
                 </block>
                 <block type="switch_case">
                     <value name="VARIABLE"><block type="arduino_number"><field name="NUM">1</field></block></value>
