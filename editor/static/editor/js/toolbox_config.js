@@ -327,8 +327,8 @@
                 <block type="controls_ifelse"></block>
                 <block type="logic_compare">
                     <field name="OP">EQ</field>
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
+                    <value name="A"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
+                    <value name="B"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
                 </block>
                 <block type="logic_negate"></block>
                 <block type="logic_operation">
@@ -350,9 +350,6 @@
                 </block>
             </category>
             <category name="Calvin Operadores" colour="200">
-                <block type="calvin_operator_number">
-                    <field name="NUM">0</field>
-                </block>
                 <block type="math_number">
                     <field name="NUM">0</field>
                 </block>
@@ -399,53 +396,6 @@
                 <block type="math_single">
                     <field name="OP">ROOT</field>
                     <value name="NUM"><shadow type="math_number"><field name="NUM">9</field></shadow></value>
-                </block>
-                <block type="calvin_operator_add">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_subtract">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_multiply">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_divide">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">1</field></block></value>
-                </block>
-                <block type="calvin_operator_random">
-                    <value name="MIN"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="MAX"><block type="calvin_operator_number"><field name="NUM">100</field></block></value>
-                </block>
-                <block type="calvin_operator_gt">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_lt">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_eq">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_operator_and">
-                    <value name="A"><block type="arduino_true"></block></value>
-                    <value name="B"><block type="arduino_false"></block></value>
-                </block>
-                <block type="calvin_operator_or">
-                    <value name="A"><block type="arduino_true"></block></value>
-                    <value name="B"><block type="arduino_false"></block></value>
-                </block>
-                <block type="calvin_operator_sqrt">
-                    <value name="X"><block type="calvin_operator_number"><field name="NUM">16</field></block></value>
-                </block>
-                <block type="calvin_operator_compare">
-                    <value name="A"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
-                    <value name="B"><block type="calvin_operator_number"><field name="NUM">0</field></block></value>
                 </block>
             </category>
             <category name="Calvin Texto" colour="160">
@@ -529,29 +479,6 @@
                     <field name="PIN">9</field>
                     <value name="NUM"><shadow type="math_number"><field name="NUM">128</field></shadow></value>
                 </block>
-                <block type="calvin_io_high_low">
-                    <field name="VAL">HIGH</field>
-                </block>
-                <block type="calvin_io_digital_write">
-                    <field name="PIN">13</field>
-                    <value name="STAT">
-                        <block type="calvin_io_high_low">
-                            <field name="VAL">HIGH</field>
-                        </block>
-                    </value>
-                </block>
-                <block type="calvin_io_digital_read">
-                    <field name="PIN">2</field>
-                </block>
-                <block type="calvin_io_analog_read">
-                    <field name="PIN">0</field>
-                </block>
-                <block type="calvin_io_analog_write">
-                    <field name="PIN">9</field>
-                    <value name="VALUE">
-                        <block type="calvin_operator_number"><field name="NUM">128</field></block>
-                    </value>
-                </block>
             </category>
             <category name="Calvin Funciones" colour="290">
                 <block type="procedures_defnoreturn">
@@ -565,24 +492,6 @@
                     <mutation value="1"></mutation>
                     <value name="CONDITION"><block type="arduino_false"></block></value>
                     <value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow></value>
-                </block>
-                <block type="calvin_func_defnoreturn">
-                    <field name="NAME">do something</field>
-                </block>
-                <block type="calvin_func_defreturn">
-                    <field name="NAME">do something2</field>
-                    <field name="RETURN_TYPE">int</field>
-                    <value name="RETURN"><block type="arduino_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_func_ifreturn">
-                    <value name="CONDITION"><block type="arduino_false"></block></value>
-                    <value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>
-                </block>
-                <block type="calvin_func_call">
-                    <field name="NAME">do something</field>
-                </block>
-                <block type="calvin_func_call_return">
-                    <field name="NAME">do something2</field>
                 </block>
             </category>
             <category name="Calvin Variables" colour="290" custom="CALVIN_VARIABLES_FLYOUT"></category>

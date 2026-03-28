@@ -1203,15 +1203,6 @@ function calvinVariablesFlyoutCategory(workspace) {
         }
     }
 
-    addLabel('── Otros ──');
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="arduino_get_variable"><field name="NAME">variable</field></block>'));
-    xmlList.push(calvinToolboxBlockFromXmlString(
-        '<block type="calvin_var_set">' +
-        '<field name="VAR">item</field>' +
-        '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
-        '</block>'));
-
     return xmlList;
 }
 
