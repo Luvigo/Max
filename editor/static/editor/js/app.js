@@ -1057,6 +1057,51 @@ function calvinXmlEscapeFieldText(s) {
         .replace(/"/g, '&quot;');
 }
 
+/** Escapa valores en atributos XML (id de variable, etc.). */
+function calvinXmlEscapeAttr(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
+/**
+ * Workspace donde deben insertarse bloques al usar botones del flyout (nunca el workspace interno del flyout).
+ */
+function calvinResolvePasteWorkspace(mainWorkspace, button) {
+    let ws = mainWorkspace;
+    if (button && typeof button.getTargetWorkspace === 'function') {
+        const t = button.getTargetWorkspace();
+        if (t) ws = t;
+    }
+    if (ws && ws.isFlyout) {
+        const tw = ws.targetWorkspace;
+        if (tw) ws = tw;
+    }
+    return ws;
+}
+
+/**
+ * Prompt renombrar variable (Blockly.dialog o window) y ejecutar pegado con nombre ya escapado.
+ */
+function calvinPromptVariableNameAndPaste(mainWorkspace, button, buildBlockXmlWithName) {
+    const ws = calvinResolvePasteWorkspace(mainWorkspace, button);
+    if (!ws || ws.isReadOnly()) return;
+    const title = 'Renombrar variable:';
+    function onName(raw) {
+        if (raw === null || raw === undefined) return;
+        const name = calvinSanitizeVariableName(String(raw).trim());
+        if (!name) return;
+        const ne = calvinXmlEscapeFieldText(name);
+        calvinPasteBlocksFromXmlString(ws, buildBlockXmlWithName(ne));
+    }
+    if (typeof Blockly !== 'undefined' && Blockly.dialog && typeof Blockly.dialog.prompt === 'function') {
+        Blockly.dialog.prompt(title, '', onName);
+    } else {
+        onName(window.prompt(title, ''));
+    }
+}
+
 /**
  * Convierte el nombre tecleado en identificador C válido (Arduino).
  */
@@ -1126,9 +1171,9 @@ function calvinEnsureBlocklyVariableForArduinoDeclaration(block) {
  * Flyout dinámico "Calvin Variables" (Botflow: crear + set/get con desplegable).
  */
 function calvinVariablesFlyoutCategory(workspace) {
-    // Blockly 9: los botones deben ir como JSON con `callbackkey` en minúsculas
-    // (ButtonInfo). Un <button callbackKey="..."> creado con createElement a veces
-    // no enlaza el callback y el clic no dispara nada (sin prompt).
+    // Todo como JSON homogéneo: si mezclamos objetos {kind:...} con nodos DOM <block>,
+    // createFlyoutInfo_ hace e.kind.toUpperCase() sobre el Element y falla (p. ej. al existir variables).
+    // Botones: ButtonInfo con callbackkey en minúsculas (Blockly 9).
     const contents = [];
 
     function addButtonJson(text, callbackKey) {
@@ -1146,6 +1191,13 @@ function calvinVariablesFlyoutCategory(workspace) {
         });
     }
 
+    function varFieldXml(v) {
+        const id = calvinXmlEscapeAttr(v.getId());
+        const nm = calvinXmlEscapeFieldText(v.name);
+        const vt = v.type ? ' variabletype="' + calvinXmlEscapeAttr(v.type) + '"' : '';
+        return '<field name="VAR" id="' + id + '"' + vt + '>' + nm + '</field>';
+    }
+
     addButtonJson('Crear variable de texto', 'calvin_btn_var_string');
     addButtonJson('Crear variable numérica', 'calvin_btn_var_int');
     addButtonJson('Crear variable de color', 'calvin_btn_var_color');
@@ -1154,34 +1206,16 @@ function calvinVariablesFlyoutCategory(workspace) {
 
     const vars = workspace.getVariableMap().getAllVariables();
     if (vars.length > 0) {
-        const setBlock = Blockly.utils.xml.createElement('block');
-        setBlock.setAttribute('type', 'variables_set');
-        const f0 = Blockly.utils.xml.createElement('field');
-        f0.setAttribute('name', 'VAR');
-        f0.setAttribute('id', vars[0].getId());
-        if (vars[0].type) {
-            f0.setAttribute('variabletype', vars[0].type);
-        }
-        f0.textContent = vars[0].name;
-        setBlock.appendChild(f0);
-        const valIn = Blockly.utils.xml.createElement('value');
-        valIn.setAttribute('name', 'VALUE');
-        setBlock.appendChild(valIn);
-        contents.push(setBlock);
-
+        const v0 = vars[0];
+        contents.push({
+            kind: 'block',
+            blockxml: '<block type="variables_set">' + varFieldXml(v0) + '<value name="VALUE"></value></block>'
+        });
         for (let i = 0; i < vars.length; i++) {
-            const v = vars[i];
-            const gb = Blockly.utils.xml.createElement('block');
-            gb.setAttribute('type', 'variables_get');
-            const gf = Blockly.utils.xml.createElement('field');
-            gf.setAttribute('name', 'VAR');
-            gf.setAttribute('id', v.getId());
-            if (v.type) {
-                gf.setAttribute('variabletype', v.type);
-            }
-            gf.textContent = v.name;
-            gb.appendChild(gf);
-            contents.push(gb);
+            contents.push({
+                kind: 'block',
+                blockxml: '<block type="variables_get">' + varFieldXml(vars[i]) + '</block>'
+            });
         }
     }
 
@@ -1343,64 +1377,33 @@ function registerCalvinVariablesToolboxIntegration(workspace) {
 function registerCalvinVariableToolboxCallbacks(workspace) {
     if (!workspace || typeof workspace.registerButtonCallback !== 'function') return;
 
-    const promptTitle = 'Renombrar variable:';
     const mainWs = workspace;
 
     workspace.registerButtonCallback('calvin_btn_var_string', function(button) {
-        let ws = mainWs;
-        if (button && typeof button.getTargetWorkspace === 'function') {
-            const t = button.getTargetWorkspace();
-            if (t) ws = t;
-        }
-        if (!ws || ws.isReadOnly()) return;
-        const raw = window.prompt(promptTitle, '');
-        if (raw === null) return;
-        const name = calvinSanitizeVariableName(raw);
-        if (!name) return;
-        const ne = calvinXmlEscapeFieldText(name);
-        calvinPasteBlocksFromXmlString(ws,
-            '<block type="arduino_variable_string">' +
-            '<field name="NAME">' + ne + '</field>' +
-            '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>' +
-            '</block>');
+        calvinPromptVariableNameAndPaste(mainWs, button, function(ne) {
+            return '<block type="arduino_variable_string">' +
+                '<field name="NAME">' + ne + '</field>' +
+                '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value>' +
+                '</block>';
+        });
     });
 
     workspace.registerButtonCallback('calvin_btn_var_int', function(button) {
-        let ws = mainWs;
-        if (button && typeof button.getTargetWorkspace === 'function') {
-            const t = button.getTargetWorkspace();
-            if (t) ws = t;
-        }
-        if (!ws || ws.isReadOnly()) return;
-        const raw = window.prompt(promptTitle, '');
-        if (raw === null) return;
-        const name = calvinSanitizeVariableName(raw);
-        if (!name) return;
-        const ne = calvinXmlEscapeFieldText(name);
-        calvinPasteBlocksFromXmlString(ws,
-            '<block type="arduino_variable_int">' +
-            '<field name="NAME">' + ne + '</field>' +
-            '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
-            '</block>');
+        calvinPromptVariableNameAndPaste(mainWs, button, function(ne) {
+            return '<block type="arduino_variable_int">' +
+                '<field name="NAME">' + ne + '</field>' +
+                '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value>' +
+                '</block>';
+        });
     });
 
     workspace.registerButtonCallback('calvin_btn_var_color', function(button) {
-        let ws = mainWs;
-        if (button && typeof button.getTargetWorkspace === 'function') {
-            const t = button.getTargetWorkspace();
-            if (t) ws = t;
-        }
-        if (!ws || ws.isReadOnly()) return;
-        const raw = window.prompt(promptTitle, '');
-        if (raw === null) return;
-        const name = calvinSanitizeVariableName(raw);
-        if (!name) return;
-        const ne = calvinXmlEscapeFieldText(name);
-        calvinPasteBlocksFromXmlString(ws,
-            '<block type="arduino_variable_string">' +
-            '<field name="NAME">' + ne + '</field>' +
-            '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>' +
-            '</block>');
+        calvinPromptVariableNameAndPaste(mainWs, button, function(ne) {
+            return '<block type="arduino_variable_string">' +
+                '<field name="NAME">' + ne + '</field>' +
+                '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value>' +
+                '</block>';
+        });
     });
 }
 
