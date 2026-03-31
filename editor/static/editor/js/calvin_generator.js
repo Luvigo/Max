@@ -108,23 +108,23 @@
 
     // suma
     arduinoGenerator.forBlock['calvin_operator_add'] = function(block) {
-        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
-        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
-        return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITION];
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITIVE];
     };
 
     // BotFlow: sumar (misma expresión que calvin_operator_add)
     arduinoGenerator.forBlock['sumar'] = function(block) {
-        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
-        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
-        return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITION];
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        return [`(${a} + ${b})`, arduinoGenerator.ORDER_ADDITIVE];
     };
 
     // BotFlow: restar (misma expresión que calvin_operator_subtract)
     arduinoGenerator.forBlock['restar'] = function(block) {
-        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
-        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
-        return [`(${a} - ${b})`, arduinoGenerator.ORDER_ADDITION];
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        return [`(${a} - ${b})`, arduinoGenerator.ORDER_ADDITIVE];
     };
 
     // BotFlow: multiplicar (misma expresión que calvin_operator_multiply)
@@ -143,9 +143,9 @@
 
     // resta
     arduinoGenerator.forBlock['calvin_operator_subtract'] = function(block) {
-        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '0';
-        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '0';
-        return [`(${a} - ${b})`, arduinoGenerator.ORDER_ADDITION];
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITIVE) || '0';
+        return [`(${a} - ${b})`, arduinoGenerator.ORDER_ADDITIVE];
     };
 
     // multiplicación
@@ -311,9 +311,9 @@
     };
 
     arduinoGenerator.forBlock['calvin_text_concat'] = function(block) {
-        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITION) || '""';
-        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITION) || '""';
-        return [`(String)(${a}) + (String)(${b})`, arduinoGenerator.ORDER_ADDITION];
+        const a = arduinoGenerator.valueToCode(block, 'A', arduinoGenerator.ORDER_ADDITIVE) || '""';
+        const b = arduinoGenerator.valueToCode(block, 'B', arduinoGenerator.ORDER_ADDITIVE) || '""';
+        return [`(String)(${a}) + (String)(${b})`, arduinoGenerator.ORDER_ADDITIVE];
     };
 
     // ============================================
