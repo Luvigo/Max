@@ -1175,7 +1175,8 @@ function calvinEnsureBlocklyVariableForArduinoDeclaration(block) {
 }
 
 /**
- * Flyout dinámico "Calvin Variables" (Botflow: crear + set/get con desplegable).
+ * Flyout dinámico "Calvin Variables" (Botflow: crear con botón, declaraciones arrastrables para recuperar,
+ * set/get con desplegable).
  */
 function calvinVariablesFlyoutCategory(workspace) {
     // Todo como JSON homogéneo: si mezclamos objetos {kind:...} con nodos DOM <block>,
@@ -1208,6 +1209,23 @@ function calvinVariablesFlyoutCategory(workspace) {
     addButtonJson('Crear variable de texto', 'calvin_btn_var_string');
     addButtonJson('Crear variable numérica', 'calvin_btn_var_int');
     addButtonJson('Crear variable de color', 'calvin_btn_var_color');
+
+    addLabelJson('── Declarar (arrastrar / recuperar) ──');
+    contents.push({
+        kind: 'block',
+        blockxml: '<block type="arduino_variable_int"><field name="NAME">variable</field>' +
+            '<value name="VALUE"><block type="arduino_number"><field name="NUM">0</field></block></value></block>'
+    });
+    contents.push({
+        kind: 'block',
+        blockxml: '<block type="arduino_variable_string"><field name="NAME">texto</field>' +
+            '<value name="VALUE"><block type="arduino_string"><field name="TEXT"></field></block></value></block>'
+    });
+    contents.push({
+        kind: 'block',
+        blockxml: '<block type="arduino_variable_string"><field name="NAME">color</field>' +
+            '<value name="VALUE"><block type="arduino_string"><field name="TEXT">#000000</field></block></value></block>'
+    });
 
     addLabelJson('── Usar variables ──');
 
