@@ -37,11 +37,96 @@ arduinoGenerator.ORDER_CONDITIONAL = 13;
 arduinoGenerator.ORDER_ASSIGNMENT = 14;
 arduinoGenerator.ORDER_NONE = 99;
 
+/**
+ * Identificador C válido (alineado con calvinSanitizeVariableName en app.js).
+ * @param {*} raw
+ * @returns {string}
+ */
+function arduinoSanitizeVarName(raw) {
+    if (raw === null || raw === undefined) return '';
+    let t = String(raw).trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '_');
+    if (/^[0-9]/.test(t)) {
+        t = '_' + t;
+    }
+    return t || '';
+}
+
 // Variables para almacenar includes, variables, funciones y setups
 arduinoGenerator.includes_ = {};
 arduinoGenerator.variables_ = {};
 arduinoGenerator.functions_ = {};
 arduinoGenerator.setups_ = {};
+
+/**
+ * Recorre el workspace (sin flyout) y registra declaraciones globales desde bloques
+ * arduino_variable_* (primera aparición por nombre gana; no duplicar).
+ */
+arduinoGenerator._collectExplicitGlobalVarDecls = function(workspace) {
+    if (!workspace || typeof workspace.getAllBlocks !== 'function') return;
+    const lines = arduinoGenerator._globalVarDeclLines;
+    if (!lines) return;
+    const blocks = workspace.getAllBlocks(true);
+    for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
+        if (!block || block.disabled || block.isInFlyout) continue;
+        const t = block.type;
+        let name;
+        let line;
+        try {
+            if (t === 'arduino_variable_int') {
+                name = arduinoSanitizeVarName(block.getFieldValue('NAME'));
+                if (!name || lines[name]) continue;
+                const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
+                line = 'int ' + name + ' = ' + value + ';';
+            } else if (t === 'arduino_variable_float') {
+                name = arduinoSanitizeVarName(block.getFieldValue('NAME'));
+                if (!name || lines[name]) continue;
+                const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0.0';
+                line = 'float ' + name + ' = ' + value + ';';
+            } else if (t === 'arduino_variable_string') {
+                name = arduinoSanitizeVarName(block.getFieldValue('NAME'));
+                if (!name || lines[name]) continue;
+                const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '""';
+                line = 'String ' + name + ' = ' + value + ';';
+            } else if (t === 'arduino_variable_boolean') {
+                name = arduinoSanitizeVarName(block.getFieldValue('NAME'));
+                if (!name || lines[name]) continue;
+                const value = block.getFieldValue('VALUE') || 'false';
+                line = 'bool ' + name + ' = ' + value + ';';
+            } else {
+                continue;
+            }
+        } catch (e) {
+            continue;
+        }
+        lines[name] = line;
+    }
+};
+
+/**
+ * Si la variable Blockly aún no tiene declaración global, añade una por defecto
+ * (solo variables_get / variables_set; no pisa declaraciones explícitas).
+ */
+arduinoGenerator._ensureBlocklyVariableGlobalDecl = function(workspace, block) {
+    if (!workspace || !block || !arduinoGenerator._globalVarDeclLines) return;
+    const id = block.getFieldValue('VAR');
+    if (!id) return;
+    const model = workspace.getVariableMap().getVariableById(id);
+    if (!model) return;
+    const name = arduinoSanitizeVarName(model.name);
+    if (!name || arduinoGenerator._globalVarDeclLines[name]) return;
+    const typ = String(model.type || '').toLowerCase();
+    if (typ === 'string') {
+        arduinoGenerator._globalVarDeclLines[name] = 'String ' + name + ' = "";';
+    } else if (typ === 'boolean') {
+        arduinoGenerator._globalVarDeclLines[name] = 'bool ' + name + ' = false;';
+    } else if (typ === 'colour' || typ === 'color') {
+        arduinoGenerator._globalVarDeclLines[name] = 'String ' + name + ' = String("#000000");';
+    } else {
+        // Number, '' u otro: entero por defecto (Calvin numérico / sin tipo)
+        arduinoGenerator._globalVarDeclLines[name] = 'int ' + name + ' = 0;';
+    }
+};
 
 // Función de inicialización
 arduinoGenerator.init = function(workspace) {
@@ -49,6 +134,10 @@ arduinoGenerator.init = function(workspace) {
     arduinoGenerator.variables_ = {};
     arduinoGenerator.functions_ = {};
     arduinoGenerator.setups_ = {};
+    arduinoGenerator._globalVarDeclLines = Object.create(null);
+    if (workspace && typeof workspace.getAllBlocks === 'function') {
+        arduinoGenerator._collectExplicitGlobalVarDecls(workspace);
+    }
     // Calvin BLE: reset estado entre generaciones
     arduinoGenerator.bleChars_ = {};
     arduinoGenerator.bleSvcIndex = 0;
@@ -63,10 +152,16 @@ arduinoGenerator.finish = function(code) {
         includes += (arduinoGenerator.includes_[name] || '') + '\n';
     }
     
-    // Generar variables globales
+    // Generar variables globales (MAX/servos + declaraciones usuario/Blockly ordenadas)
     let variables = '';
     for (let name in arduinoGenerator.variables_) {
         variables += (arduinoGenerator.variables_[name] || '') + '\n';
+    }
+    if (arduinoGenerator._globalVarDeclLines) {
+        const gkeys = Object.keys(arduinoGenerator._globalVarDeclLines).sort();
+        for (let gi = 0; gi < gkeys.length; gi++) {
+            variables += (arduinoGenerator._globalVarDeclLines[gkeys[gi]] || '') + '\n';
+        }
     }
     
     // Generar funciones Calvin (definiciones)
@@ -214,28 +309,21 @@ arduinoGenerator.forBlock['arduino_serial_read'] = function(block) {
 // GENERADORES DE VARIABLES
 // ============================================
 
-arduinoGenerator.forBlock['arduino_variable_int'] = function(block) {
-    const name = block.getFieldValue('NAME');
-    const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
-    return `  int ${name} = ${value};\n`;
+// Declaraciones int/String/float/bool: se emiten en zona global vía _collectExplicitGlobalVarDecls (init); el bloque no genera línea en setup/loop.
+arduinoGenerator.forBlock['arduino_variable_int'] = function() {
+    return '';
 };
 
-arduinoGenerator.forBlock['arduino_variable_float'] = function(block) {
-    const name = block.getFieldValue('NAME');
-    const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0.0';
-    return `  float ${name} = ${value};\n`;
+arduinoGenerator.forBlock['arduino_variable_float'] = function() {
+    return '';
 };
 
-arduinoGenerator.forBlock['arduino_variable_string'] = function(block) {
-    const name = block.getFieldValue('NAME');
-    const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '""';
-    return `  String ${name} = ${value};\n`;
+arduinoGenerator.forBlock['arduino_variable_string'] = function() {
+    return '';
 };
 
-arduinoGenerator.forBlock['arduino_variable_boolean'] = function(block) {
-    const name = block.getFieldValue('NAME');
-    const value = block.getFieldValue('VALUE');
-    return `  bool ${name} = ${value};\n`;
+arduinoGenerator.forBlock['arduino_variable_boolean'] = function() {
+    return '';
 };
 
 arduinoGenerator.forBlock['arduino_get_variable'] = function(block) {
@@ -264,13 +352,17 @@ function arduinoVariableNameFromFieldVar(block, workspace) {
 
 arduinoGenerator.forBlock['variables_get'] = function(block) {
     const ws = block.workspace;
-    const name = arduinoVariableNameFromFieldVar(block, ws);
+    arduinoGenerator._ensureBlocklyVariableGlobalDecl(ws, block);
+    const raw = arduinoVariableNameFromFieldVar(block, ws);
+    const name = arduinoSanitizeVarName(raw) || 'i';
     return [name, arduinoGenerator.ORDER_ATOMIC];
 };
 
 arduinoGenerator.forBlock['variables_set'] = function(block) {
     const ws = block.workspace;
-    const name = arduinoVariableNameFromFieldVar(block, ws);
+    arduinoGenerator._ensureBlocklyVariableGlobalDecl(ws, block);
+    const raw = arduinoVariableNameFromFieldVar(block, ws);
+    const name = arduinoSanitizeVarName(raw) || 'i';
     const value = arduinoGenerator.valueToCode(block, 'VALUE', arduinoGenerator.ORDER_ATOMIC) || '0';
     return `  ${name} = ${value};\n`;
 };

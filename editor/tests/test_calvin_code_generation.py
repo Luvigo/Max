@@ -21,6 +21,10 @@ def _get_blocks_path():
     return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'calvin_blocks.js'
 
 
+def _get_arduino_core_generator_path():
+    return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'arduino_generator.js'
+
+
 def _extract_for_block_handlers(content):
     """Extrae bloques registrados en arduinoGenerator.forBlock['...']."""
     return re.findall(r"arduinoGenerator\.forBlock\['([^']+)'\]", content)
@@ -554,3 +558,44 @@ class CalvinSecondBatchBlocksTest(TestCase):
             _has_pattern(self.generator_content, r"valueToCode\([^)]*['\"]CONTENT['\"]"),
             'Serial print debe leer input CONTENT',
         )
+
+
+class ArduinoGeneratorGlobalVariablesTest(TestCase):
+    """Declaraciones globales (arduino_variable_* + variables_get/set) en arduino_generator.js."""
+
+    def setUp(self):
+        path = _get_arduino_core_generator_path()
+        self.assertTrue(path.exists(), f'No existe {path}')
+        self.content = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_helpers_for_global_var_declarations(self):
+        self.assertIn('arduinoSanitizeVarName', self.content)
+        self.assertIn('_collectExplicitGlobalVarDecls', self.content)
+        self.assertIn('_ensureBlocklyVariableGlobalDecl', self.content)
+        self.assertIn('_globalVarDeclLines', self.content)
+
+    def test_arduino_variable_blocks_return_empty_statement(self):
+        """Las declaraciones tipadas no deben generar líneas dentro de setup/loop."""
+        for b in (
+            'arduino_variable_int',
+            'arduino_variable_float',
+            'arduino_variable_string',
+            'arduino_variable_boolean',
+        ):
+            with self.subTest(block=b):
+                needle = "forBlock['%s'] = function" % b
+                pos = self.content.find(needle)
+                self.assertNotEqual(pos, -1, f'Falta handler {b}')
+                chunk = self.content[pos : pos + 120]
+                self.assertIn("return ''", chunk, f'{b} debe retornar vacío (declaración global en init/finish)')
+
+    def test_variables_get_set_use_ensure_and_sanitize(self):
+        self.assertIn('_ensureBlocklyVariableGlobalDecl(ws, block)', self.content)
+        self.assertIn('arduinoSanitizeVarName(raw)', self.content)
+
+    def test_finish_outputs_sorted_global_decl_lines(self):
+        idx = self.content.find('arduinoGenerator.finish = function')
+        self.assertNotEqual(idx, -1)
+        tail = self.content[idx : idx + 2800]
+        self.assertIn('_globalVarDeclLines', tail)
+        self.assertIn('gkeys', tail)

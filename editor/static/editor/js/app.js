@@ -1167,9 +1167,18 @@ function calvinEnsureBlocklyVariableForArduinoDeclaration(block) {
     if (!ws || ws.isFlyout) return;
     const name = calvinSanitizeVariableName(block.getFieldValue('NAME'));
     if (!name) return;
+    const typ = (t === 'arduino_variable_int' || t === 'arduino_variable_float') ? 'Number' : 'String';
     try {
-        if (!ws.getVariableMap().getVariable(name, '')) {
-            ws.createVariable(name, '');
+        const all = ws.getVariableMap().getAllVariables();
+        let exists = false;
+        for (let i = 0; i < all.length; i++) {
+            if (calvinSanitizeVariableName(all[i].name) === name) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            ws.createVariable(name, typ);
         }
     } catch (e) { /* nombre duplicado u otra restricción */ }
 }
