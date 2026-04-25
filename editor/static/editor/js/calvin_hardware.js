@@ -56,41 +56,33 @@
         getNoteFreq: getNoteFreq,
 
         getProximityCode: function(pinTrig, pinEcho, isEsp32) {
-            if (isEsp32) {
-                const t = pinTrig || CALVIN_PINS_ESP32.PROX_TRIG;
-                const e = pinEcho || CALVIN_PINS_ESP32.PROX_ECHO;
-                return {
-                    defines: `#define trigPin ${t}\n#define echoPin ${e}\n#define SOUND_SPEED 0.034f`,
-                    vars: 'long duration;\nfloat distanceCm;\nfloat distanceCmlast;',
-                    func: `float calvin_distancia_cm(void) {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(5);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-  if (duration == 0) return 999.0f;
-  distanceCm = duration * SOUND_SPEED / 2.0f;
-  return distanceCm;
-}`,
-                    setup: '  pinMode(trigPin, OUTPUT);\n  pinMode(echoPin, INPUT);'
-                };
-            }
-            const t = pinTrig || CALVIN_PINS.PROX_TRIG;
-            const e = pinEcho || CALVIN_PINS.PROX_ECHO;
+            const pins = isEsp32 ? CALVIN_PINS_ESP32 : CALVIN_PINS;
+            const t = (pinTrig !== undefined && pinTrig !== null && pinTrig !== '') ? pinTrig : pins.PROX_TRIG;
+            const e = (pinEcho !== undefined && pinEcho !== null && pinEcho !== '') ? pinEcho : pins.PROX_ECHO;
+            // Misma plantilla AVR/ESP32: timeout pulseIn evita 0 espurio en ESP32; 999 = sin eco/timeout
             return {
-                defines: `#define CALVIN_PROX_TRIG ${t}\n#define CALVIN_PROX_ECHO ${e}`,
-                vars: 'long _calvin_prox_us;\nfloat _calvin_prox_cm;',
-                func: `float calvin_distancia_cm(void) {
-  digitalWrite(CALVIN_PROX_TRIG, LOW);
-  delayMicroseconds(2);
-  digitalWrite(CALVIN_PROX_TRIG, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(CALVIN_PROX_TRIG, LOW);
-  _calvin_prox_us = pulseIn(CALVIN_PROX_ECHO, HIGH, 30000);
-  _calvin_prox_cm = _calvin_prox_us * 0.034f / 2.0f;
-  return _calvin_prox_cm;
-}`,
+                defines:
+                    '#define CALVIN_PROX_TRIG ' + t + '\n' +
+                    '#define CALVIN_PROX_ECHO ' + e + '\n' +
+                    '#define CALVIN_DISTANCE_TRIG_PIN CALVIN_PROX_TRIG\n' +
+                    '#define CALVIN_DISTANCE_ECHO_PIN CALVIN_PROX_ECHO\n' +
+                    '#define SOUND_SPEED 0.034f',
+                vars: 'long duration;\nfloat distanceCm;',
+                func:
+                    'float calvin_distancia_cm(void) {\n' +
+                    '  digitalWrite(CALVIN_PROX_TRIG, LOW);\n' +
+                    '  delayMicroseconds(5);\n' +
+                    '  digitalWrite(CALVIN_PROX_TRIG, HIGH);\n' +
+                    '  delayMicroseconds(10);\n' +
+                    '  digitalWrite(CALVIN_PROX_TRIG, LOW);\n' +
+                    '  duration = pulseIn(CALVIN_PROX_ECHO, HIGH, 30000);\n' +
+                    '  if (duration == 0) {\n' +
+                    '    // sin eco o timeout pulseIn (30 ms): revisar TRIG/ECHO, pinMode y cableado\n' +
+                    '    return 999.0f;\n' +
+                    '  }\n' +
+                    '  distanceCm = (float)duration * SOUND_SPEED / 2.0f;\n' +
+                    '  return distanceCm;\n' +
+                    '}',
                 setup: '  pinMode(CALVIN_PROX_TRIG, OUTPUT);\n  pinMode(CALVIN_PROX_ECHO, INPUT);'
             };
         },

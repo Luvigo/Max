@@ -1429,7 +1429,7 @@
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_BOTFLOW2);
-            this.setTooltip("Configura los sensores de línea. Pines desde calvin_hardware (ESP32: 34,35,36).");
+            this.setTooltip("Configura los sensores de línea. Pines desde calvin_hardware (ESP32: 34,35,39).");
         }
     };
 

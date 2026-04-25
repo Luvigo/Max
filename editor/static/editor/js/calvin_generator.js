@@ -784,7 +784,8 @@
     };
 
     arduinoGenerator.forBlock['calvin_botflow1_distancia'] = function(block) {
-        ensureCalvinProximity(undefined, undefined, false);
+        // Inyecta pinMode TRIG/ECHO una sola vez si el usuario no colocó init proximidad
+        ensureCalvinProximity(undefined, undefined, true);
         return ['calvin_distancia_cm()', arduinoGenerator.ORDER_ATOMIC];
     };
 

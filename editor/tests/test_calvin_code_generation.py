@@ -25,6 +25,10 @@ def _get_arduino_core_generator_path():
     return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'arduino_generator.js'
 
 
+def _get_calvin_hardware_path():
+    return Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'calvin_hardware.js'
+
+
 def _extract_for_block_handlers(content):
     """Extrae bloques registrados en arduinoGenerator.forBlock['...']."""
     return re.findall(r"arduinoGenerator\.forBlock\['([^']+)'\]", content)
@@ -599,3 +603,31 @@ class ArduinoGeneratorGlobalVariablesTest(TestCase):
         tail = self.content[idx : idx + 2800]
         self.assertIn('_globalVarDeclLines', tail)
         self.assertIn('gkeys', tail)
+
+
+class CalvinHardwareProximityTest(TestCase):
+    """Sensor proximidad Calvin: pulseIn con timeout y defines centralizados."""
+
+    def setUp(self):
+        path = _get_calvin_hardware_path()
+        self.assertTrue(path.exists(), f'No existe {path}')
+        self.hw = path.read_text(encoding='utf-8', errors='replace')
+
+    def test_proximity_pulsein_has_timeout_microseconds(self):
+        self.assertRegex(
+            self.hw,
+            r'pulseIn\s*\(\s*CALVIN_PROX_ECHO\s*,\s*HIGH\s*,\s*30000\s*\)',
+            'ESP32/AVR deben usar pulseIn(..., 30000) para evitar 0 permanente',
+        )
+
+    def test_proximity_defines_distance_pin_aliases(self):
+        self.assertIn('CALVIN_DISTANCE_TRIG_PIN', self.hw)
+        self.assertIn('CALVIN_DISTANCE_ECHO_PIN', self.hw)
+
+    def test_distancia_generator_requests_proximity_setup_once(self):
+        gen = _get_generator_path().read_text(encoding='utf-8', errors='replace')
+        self.assertIn(
+            "ensureCalvinProximity(undefined, undefined, true)",
+            gen,
+            'distancia [cm] debe inyectar pinMode si falta init proximidad',
+        )
