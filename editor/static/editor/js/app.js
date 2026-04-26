@@ -30,6 +30,17 @@ let serialReadBufferIdleTimer = null;
 /** Decodificación UTF-8 incremental (sin pipeThrough: evita FramingError con CH340/ESP32) */
 let serialReadTextDecoder = null;
 
+/** Cola del Monitor Serial: evita congelar el DOM con miles de append/s. */
+const SERIAL_MONITOR_MAX_VISIBLE = 500;
+const SERIAL_MONITOR_MAX_PER_FRAME = 200;
+const SERIAL_MONITOR_MAX_PENDING = 12000;
+/** Entre ráfagas de render, pausa breve para no monopolizar el hilo (≈100–200 ms). */
+const SERIAL_MONITOR_INTER_BURST_MS = 120;
+let serialOutputPending = [];
+let serialOutputRafId = 0;
+let serialInterBurstTimer = 0;
+let serialMonitorOverflowWarned = false;
+
 // Proyectos
 let currentProjectId = null;
 
@@ -3006,6 +3017,7 @@ async function disconnectSerial() {
         }
         readBuffer = '';
         serialReadTextDecoder = null;
+        resetSerialOutputQueue();
         updateSerialUI(false);
         updateConnectionStatus();
         addSerialLine('Desconectado', 'system');
@@ -3138,17 +3150,95 @@ function updateSerialUI(connected, port = '', baudrate = '') {
     }
 }
 
+function resetSerialOutputQueue() {
+    if (serialOutputRafId) {
+        try {
+            cancelAnimationFrame(serialOutputRafId);
+        } catch (e) { /* ok */ }
+        serialOutputRafId = 0;
+    }
+    if (serialInterBurstTimer) {
+        try {
+            clearTimeout(serialInterBurstTimer);
+        } catch (e) { /* ok */ }
+        serialInterBurstTimer = 0;
+    }
+    serialOutputPending = [];
+    serialMonitorOverflowWarned = false;
+}
+
+/**
+ * Añade una línea al monitor: se encola y se pinta en lotes (rAF) para no bloquear la UI.
+ * No altera el flujo de lectura del puerto; solo la visualización.
+ */
 function addSerialLine(text, type = 'received') {
+    const t = type || 'received';
+    const s = String(text);
+    serialOutputPending.push({ text: s, type: t });
+    if (serialOutputPending.length > SERIAL_MONITOR_MAX_PENDING) {
+        const drop = serialOutputPending.length - SERIAL_MONITOR_MAX_PENDING;
+        serialOutputPending = serialOutputPending.slice(-SERIAL_MONITOR_MAX_PENDING);
+        if (!serialMonitorOverflowWarned) {
+            serialOutputPending.unshift({
+                text: 'Demasiados datos seriales. Se están limitando los logs para proteger el navegador.',
+                type: 'system'
+            });
+            serialMonitorOverflowWarned = true;
+        }
+    }
+    if (!serialOutputRafId && !serialInterBurstTimer) {
+        serialOutputRafId = requestAnimationFrame(flushSerialOutputToDom);
+    }
+}
+
+function scheduleSerialOutputNextBatch() {
+    if (serialOutputRafId || serialInterBurstTimer) return;
+    if (serialOutputPending.length > SERIAL_MONITOR_MAX_PER_FRAME * 4) {
+        serialInterBurstTimer = setTimeout(function() {
+            serialInterBurstTimer = 0;
+            if (serialOutputPending.length && !serialOutputRafId) {
+                serialOutputRafId = requestAnimationFrame(flushSerialOutputToDom);
+            }
+        }, SERIAL_MONITOR_INTER_BURST_MS);
+    } else {
+        serialOutputRafId = requestAnimationFrame(flushSerialOutputToDom);
+    }
+}
+
+function flushSerialOutputToDom() {
+    serialOutputRafId = 0;
     const output = document.getElementById('serialOutput');
-    const line = document.createElement('div');
-    line.className = `line ${type}`;
-    line.textContent = text;
-    output.appendChild(line);
+    if (!output) {
+        serialOutputPending = [];
+        return;
+    }
+    const take = Math.min(SERIAL_MONITOR_MAX_PER_FRAME, serialOutputPending.length);
+    if (take === 0) return;
+    const batch = serialOutputPending.splice(0, take);
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < batch.length; i++) {
+        const item = batch[i];
+        const line = document.createElement('div');
+        line.className = 'line ' + item.type;
+        line.textContent = item.text;
+        frag.appendChild(line);
+    }
+    output.appendChild(frag);
+    while (output.children.length > SERIAL_MONITOR_MAX_VISIBLE) {
+        output.removeChild(output.firstChild);
+    }
     output.scrollTop = output.scrollHeight;
+    if (serialOutputPending.length) {
+        scheduleSerialOutputNextBatch();
+    }
 }
 
 function clearSerialOutput() {
-    document.getElementById('serialOutput').innerHTML = '<div class="line system">Limpiado</div>';
+    resetSerialOutputQueue();
+    const output = document.getElementById('serialOutput');
+    if (output) {
+        output.innerHTML = '<div class="line system">Limpiado</div>';
+    }
 }
 
 // ============================================
