@@ -123,6 +123,22 @@ class CalvinGeneratorStructureTest(TestCase):
         handlers = _extract_for_block_handlers(self.content)
         self.assertIn('procedures_defreturn', handlers, 'Falta handler: procedures_defreturn')
 
+    def test_functions_params_sanitization_in_generator(self):
+        """Parámetros Calvin: calvinSanitizeParamNameForC y firmas C int a, int b."""
+        self.assertTrue(
+            _has_pattern(self.content, r'function calvinSanitizeParamNameForC\s*\('),
+            'Debe existir calvinSanitizeParamNameForC en el generador',
+        )
+        self.assertTrue(
+            _has_pattern(self.content, r'function getCalvinFuncParams\s*\('),
+            'Debe existir getCalvinFuncParams',
+        )
+        self.assertIn(
+            "return 'int ' + p",
+            self.content,
+            'Firmas de parámetros deben usar int + nombre sanitizado',
+        )
+
     def test_functions_procedures_ifreturn_handler_registered(self):
         """Funciones Botflow: procedures_ifreturn."""
         handlers = _extract_for_block_handlers(self.content)
@@ -381,6 +397,12 @@ class CalvinBlocksUpdatedTest(TestCase):
                     _has_pattern(self.generator_content, pattern),
                     f'Handler para {block_type} debe existir en calvin_generator.js'
                 )
+
+    def test_procedure_param_sync_helpers_in_blocks(self):
+        """Funciones: sync de parámetros con mapa de variables (cuerpo con variables_get)."""
+        self.assertIn('function calvinSyncProcedureParamVariables', self.blocks_content)
+        self.assertIn('function calvinSanitizeParamNameForC', self.blocks_content)
+        self.assertIn('calvinSyncProcedureParamVariables(this)', self.blocks_content)
 
     def test_key_fields_exist_in_block_definitions(self):
         """Los campos principales deben aparecer en la definición del bloque."""

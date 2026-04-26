@@ -863,6 +863,39 @@
     // calvin_func_* - Funciones (con mutador: input name, allow statements)
     // ============================================
 
+    /** Nombre C válido; debe coincidir con la sanitización del generador (calvin_generator). */
+    function calvinSanitizeParamNameForC(raw) {
+        let t = String(raw == null || raw === undefined ? 'x' : raw).trim()
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_]/g, '_') || 'x';
+        if (/^[0-9]/.test(t)) t = '_' + t;
+        return t;
+    }
+
+    /** Crea variables de workspace para parámetros (el cuerpo usa variables_get con el mismo nombre). */
+    function calvinSyncProcedureParamVariables(block) {
+        if (!block || block.isInFlyout) return;
+        const ws = block.workspace;
+        if (!ws || typeof ws.createVariable !== 'function' || !ws.getVariableMap) return;
+        const map = ws.getVariableMap();
+        const names = block.paramNames_ || [];
+        for (let i = 0; i < names.length; i++) {
+            const n = String(names[i] || 'x');
+            if (!n) continue;
+            let found = false;
+            const all = map.getAllVariables();
+            for (let j = 0; j < all.length; j++) {
+                if (all[j].name === n) { found = true; break; }
+            }
+            if (found) continue;
+            try {
+                ws.createVariable(n, 'Number');
+            } catch (e) {
+                try { ws.createVariable(n, ''); } catch (e2) { /* límite o duplicado */ }
+            }
+        }
+    }
+
     // Bloques para el mutador (solo aparecen en el popup de la tuerca)
     Blockly.Blocks['calvin_func_mutatorarg'] = {
         init: function() {
@@ -899,7 +932,8 @@
             };
         },
         loadExtraState: function(state) {
-            this.paramNames_ = state && state.paramNames ? state.paramNames : [];
+            const raw = state && state.paramNames ? state.paramNames : [];
+            this.paramNames_ = raw.map(function(n) { return calvinSanitizeParamNameForC(n); });
             this.allowStatements_ = state && state.allowStatements !== undefined ? state.allowStatements : true;
             this.updateShape_();
         },
@@ -918,7 +952,7 @@
             this.paramNames_ = [];
             const args = xmlElement.getElementsByTagName('arg');
             for (let i = 0; i < args.length; i++) {
-                this.paramNames_.push(args[i].getAttribute('name') || 'x');
+                this.paramNames_.push(calvinSanitizeParamNameForC(args[i].getAttribute('name') || 'x'));
             }
             this.updateShape_();
         },
@@ -941,7 +975,7 @@
             this.paramNames_ = [];
             let argBlock = containerBlock.getInputTargetBlock('INPUTS');
             while (argBlock && !argBlock.isInsertionMarker()) {
-                this.paramNames_.push(argBlock.getFieldValue('NAME') || 'x');
+                this.paramNames_.push(calvinSanitizeParamNameForC(argBlock.getFieldValue('NAME') || 'x'));
                 argBlock = argBlock.getNextBlock();
             }
             this.updateShape_();
@@ -960,6 +994,7 @@
             if (this.getInput('STUFF')) {
                 this.getInput('STUFF').setVisible(this.allowStatements_);
             }
+            calvinSyncProcedureParamVariables(this);
         }
     };
 
@@ -984,6 +1019,7 @@
             if (this.getInput('STACK')) {
                 this.getInput('STACK').setVisible(this.allowStatements_);
             }
+            calvinSyncProcedureParamVariables(this);
         }
     });
     Blockly.Extensions.registerMutator('procedures_defnoreturn_mutator', PROCEDURES_DEFNORETURN_MUTATOR, calvinFuncMutatorHelper, ['calvin_func_mutatorarg']);
@@ -1000,7 +1036,7 @@
                 .appendField('', 'PARAMS');
             this.appendStatementInput('STACK');
             this.setColour(COLOUR_FUNC);
-            this.setTooltip('Define una función sin retorno (Botflow / Blockly procedures_defnoreturn)');
+            this.setTooltip('Define una función sin retorno. Usa la tuerca: parámetros (inputs) y allow statements. Los nombres de parámetro son variables usables en el cuerpo.');
             this.setPreviousStatement(false, null);
             this.setNextStatement(false, null);
         }
@@ -1020,7 +1056,7 @@
                 .setCheck(null)
                 .appendField('return');
             this.setColour(COLOUR_FUNC);
-            this.setTooltip('Define una función con valor de retorno (Botflow / Blockly procedures_defreturn)');
+            this.setTooltip('Define una función con retorno. Usa la tuerca para añadir parámetros; el cuerpo usa variables_get con esos nombres (tipo int en C).');
             this.setPreviousStatement(false, null);
             this.setNextStatement(false, null);
         }

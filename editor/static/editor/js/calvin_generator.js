@@ -563,9 +563,19 @@
     // calvin_func_* - Funciones
     // ============================================
 
+    /** Alineado con calvin_blocks.js (calvinSanitizeParamNameForC). */
+    function calvinSanitizeParamNameForC(raw) {
+        let t = String(raw == null || raw === undefined ? 'x' : raw).trim()
+            .replace(/\s+/g, '_')
+            .replace(/[^a-zA-Z0-9_]/g, '_') || 'x';
+        if (/^[0-9]/.test(t)) t = '_' + t;
+        return t;
+    }
+
     function getCalvinFuncParams(block) {
         const p = block.paramNames_;
-        return Array.isArray(p) ? p : [];
+        if (!Array.isArray(p)) return [];
+        return p.map(function(x) { return calvinSanitizeParamNameForC(x); });
     }
 
     // 1) Función sin retorno -> void name(int x, ...) { ... }
@@ -573,7 +583,7 @@
         const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
         const params = getCalvinFuncParams(block);
         const sig = params.length > 0
-            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            ? params.map(function(p) { return 'int ' + p; }).join(', ')
             : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STUFF') || '';
         const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
@@ -590,7 +600,7 @@
         const name = (block.getFieldValue('NAME') || 'do something').replace(/[^a-zA-Z0-9_]/g, '_') || 'do_something';
         const params = getCalvinFuncParams(block);
         const sig = params.length > 0
-            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            ? params.map(function(p) { return 'int ' + p; }).join(', ')
             : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STACK') || '';
         const bodyIndent = body ? '  ' + body.replace(/\n/g, '\n  ') : '';
@@ -608,7 +618,7 @@
         const type = 'int';
         const params = getCalvinFuncParams(block);
         const sig = params.length > 0
-            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            ? params.map(function(p) { return 'int ' + p; }).join(', ')
             : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STACK') || '';
         const ret = arduinoGenerator.valueToCode(block, 'RETURN', arduinoGenerator.ORDER_ATOMIC) || '0';
@@ -627,7 +637,7 @@
         const type = block.getFieldValue('RETURN_TYPE') || 'int';
         const params = getCalvinFuncParams(block);
         const sig = params.length > 0
-            ? params.map(function(p) { return 'int ' + (p.replace(/[^a-zA-Z0-9_]/g, '_') || 'x'); }).join(', ')
+            ? params.map(function(p) { return 'int ' + p; }).join(', ')
             : 'void';
         const body = arduinoGenerator.statementToCode(block, 'STUFF') || '';
         const ret = arduinoGenerator.valueToCode(block, 'RETURN', arduinoGenerator.ORDER_ATOMIC) || ('int' === type ? '0' : 'float' === type ? '0.0' : '""');
