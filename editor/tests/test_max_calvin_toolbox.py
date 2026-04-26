@@ -162,3 +162,16 @@ class ToolboxMaxCalvinTest(TestCase):
         self.assertIn("registerToolboxCategoryCallback('CALVIN_FUNCTIONS_FLYOUT'", app_content)
         self.assertIn('calvinFunctionsFlyoutCategory', app_content)
         self.assertIn('calvinCollectProcedureDefinitions', app_content)
+
+    def test_calvin_io_toolbox_defaults_esp32_led_r(self):
+        """Calvin I/O: pines por defecto LED R (23), no 13, para pruebas visibles en el carro."""
+        toolbox_calvin = _extract_toolbox_section(self.content, 'TOOLBOX_CALVIN')
+        self.assertIn('inout_digital_write', toolbox_calvin)
+        self.assertGreaterEqual(toolbox_calvin.count('<field name="PIN">23</field>'), 3)
+        self.assertNotIn('<field name="PIN">13</field>', toolbox_calvin)
+        self.assertIn('<field name="PIN">A0</field>', toolbox_calvin)
+        hw = Path(__file__).resolve().parent.parent / 'static' / 'editor' / 'js' / 'calvin_hardware.js'
+        self.assertTrue(hw.exists(), f'No existe {hw}')
+        hwc = hw.read_text(encoding='utf-8', errors='replace')
+        self.assertIn('IO_TOOLBOX_DEFAULTS', hwc)
+        self.assertIn('RGB_R', hwc)

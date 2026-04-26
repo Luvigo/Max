@@ -711,6 +711,16 @@
     // calvin_io_* - Entrada/Salida (IN/OUT)
     // ============================================
 
+    function calvinInoutToolboxPinNumber(key, fallback) {
+        try {
+            const h = typeof window !== 'undefined' && window.CalvinHardware ? window.CalvinHardware : null;
+            if (h && h.IO_TOOLBOX_DEFAULTS && typeof h.IO_TOOLBOX_DEFAULTS[key] === 'number') {
+                return h.IO_TOOLBOX_DEFAULTS[key];
+            }
+        } catch (e) { /* sin hardware aún */ }
+        return fallback;
+    }
+
     // BotFlow: inout_highlow — campo BOOL HIGH/LOW (misma salida que calvin_io_high_low)
     Blockly.Blocks['inout_highlow'] = {
         init: function() {
@@ -727,7 +737,7 @@
         init: function() {
             this.appendDummyInput()
                 .appendField('DigitalWrite PIN#')
-                .appendField(new Blockly.FieldNumber(13, 0, 255), 'PIN')
+                .appendField(new Blockly.FieldNumber(calvinInoutToolboxPinNumber('DIGITAL_WRITE_PIN', 23), 0, 255), 'PIN')
                 .appendField('Stat')
                 .appendField(new Blockly.FieldDropdown([['HIGH', 'HIGH'], ['LOW', 'LOW']]), 'STAT');
             this.setPreviousStatement(true, null);
@@ -742,7 +752,7 @@
         init: function() {
             this.appendDummyInput()
                 .appendField('DigitalRead PIN#')
-                .appendField(new Blockly.FieldNumber(2, 0, 255), 'PIN');
+                .appendField(new Blockly.FieldNumber(calvinInoutToolboxPinNumber('DIGITAL_READ_PIN', 23), 0, 255), 'PIN');
             this.setOutput(true, 'Boolean');
             this.setColour(COLOUR_IO);
             this.setTooltip('digitalRead(pin) (Botflow: inout_digital_read)');
@@ -771,7 +781,7 @@
         init: function() {
             this.appendDummyInput()
                 .appendField('AnalogWrite PIN#')
-                .appendField(new Blockly.FieldNumber(9, 0, 255), 'PIN');
+                .appendField(new Blockly.FieldNumber(calvinInoutToolboxPinNumber('ANALOG_WRITE_PIN', 23), 0, 255), 'PIN');
             this.appendValueInput('NUM')
                 .setCheck(null);
             this.setInputsInline(true);

@@ -33,6 +33,17 @@
 
     const CALVIN_PINS = CALVIN_PINS_AVR;
 
+    /**
+     * Defaults de los bloques inout_* en el toolbox Calvin (ESP32: LED R=23, A0 ≈ GPIO36).
+     * Mantener alineado con TOOLBOX_CALVIN "Calvin I/O" en toolbox_config.js.
+     */
+    const IO_TOOLBOX_DEFAULTS = {
+        DIGITAL_WRITE_PIN: CALVIN_PINS_ESP32.RGB_R,
+        DIGITAL_READ_PIN: CALVIN_PINS_ESP32.RGB_R,
+        ANALOG_WRITE_PIN: CALVIN_PINS_ESP32.RGB_R,
+        ANALOG_READ_PIN: 'A0'
+    };
+
     // Notas musicales: [octava 0-5] -> frecuencia Hz
     const NOTAS = {
         DO: [33, 65, 131, 262, 523, 1047],
@@ -53,6 +64,7 @@
     window.CalvinHardware = {
         PINS: CALVIN_PINS,
         PINS_ESP32: CALVIN_PINS_ESP32,
+        IO_TOOLBOX_DEFAULTS: IO_TOOLBOX_DEFAULTS,
         getNoteFreq: getNoteFreq,
 
         getProximityCode: function(pinTrig, pinEcho, isEsp32) {

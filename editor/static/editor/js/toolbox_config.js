@@ -452,18 +452,19 @@
                 <block type="inout_highlow">
                     <field name="BOOL">HIGH</field>
                 </block>
+                <!-- I/O: defaults alineados con CalvinHardware.IO_TOOLBOX_DEFAULTS (ESP32 LED R=23, A0) -->
                 <block type="inout_digital_write">
-                    <field name="PIN">13</field>
+                    <field name="PIN">23</field>
                     <field name="STAT">HIGH</field>
                 </block>
                 <block type="inout_digital_read">
-                    <field name="PIN">2</field>
+                    <field name="PIN">23</field>
                 </block>
                 <block type="inout_analog_read">
                     <field name="PIN">A0</field>
                 </block>
                 <block type="inout_analog_write">
-                    <field name="PIN">9</field>
+                    <field name="PIN">23</field>
                     <value name="NUM"><shadow type="math_number"><field name="NUM">128</field></shadow></value>
                 </block>
             </category>
