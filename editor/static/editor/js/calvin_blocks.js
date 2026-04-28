@@ -1242,11 +1242,26 @@
             }
         },
         updateShape_: function() {
-            let i = 0;
-            while (this.getInput('ARG' + i)) this.removeInput('ARG' + i), i++;
-            for (i = 0; i < this.argCount_; i++) {
-                this.appendValueInput('ARG' + i).appendField('arg' + (i + 1));
+            if (this.getInput('PAREN_CLOSE')) {
+                this.removeInput('PAREN_CLOSE');
             }
+            let i = 0;
+            while (this.getInput('ARG' + i)) {
+                this.removeInput('ARG' + i);
+                i++;
+            }
+            const n = this.argCount_ | 0;
+            // Formato tipo Blockly: ejecutar función ( arg1 , arg2 ) en línea cuando cabe.
+            for (i = 0; i < n; i++) {
+                const lbl = i === 0 ? ' (' : ', ';
+                this.appendValueInput('ARG' + i)
+                    .setCheck(null)
+                    .appendField(lbl);
+            }
+            if (n > 0) {
+                this.appendDummyInput('PAREN_CLOSE').appendField(')');
+            }
+            this.setInputsInline(true);
         }
     };
 
@@ -1258,25 +1273,28 @@
     // Llamar función (sin retorno) - con mutador para argumentos
     Blockly.Blocks['calvin_func_call'] = {
         init: function() {
-            this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput("do something"), "NAME");
+            this.appendDummyInput('NAME_ROW')
+                .appendField('llamar')
+                .appendField(new Blockly.FieldTextInput('miFuncion'), 'NAME');
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Llama a una función. Usa la tuerca para añadir argumentos.");
+            this.setTooltip('Ejecuta la función definida arriba. Tuerca = número de argumentos. Une valores a ( · , · ); sin argumentos parece solo «llamar nombre».');
             calvinApplyBlockExtension('calvin_func_call_mutator', this);
+            this.setInputsInline(true);
         }
     };
 
     // Llamar función con retorno - con mutador para argumentos
     Blockly.Blocks['calvin_func_call_return'] = {
         init: function() {
-            this.appendDummyInput()
-                .appendField(new Blockly.FieldTextInput("do something2"), "NAME");
+            this.appendDummyInput('NAME_ROW')
+                .appendField(new Blockly.FieldTextInput('miFuncion'), 'NAME');
             this.setOutput(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Llama a una función y usa el valor. Usa la tuerca para argumentos.");
+            this.setTooltip('Valor devuelto por la función (expresión). Tuerca para argumentos; conecta igual que «llamar».');
             calvinApplyBlockExtension('calvin_func_call_mutator', this);
+            this.setInputsInline(true);
         }
     };
 
