@@ -109,6 +109,26 @@ body {
     letter-spacing: -0.5px;
 }
 
+.ide-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.ide-nav-links .btn-sm.ide-nav-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
 .logo-badge {
     font-size: 0.6rem;
     color: var(--accent-cyan);
