@@ -1346,12 +1346,10 @@ function calvinFunctionsFlyoutCategory(workspace) {
     xmlList.push(calvinToolboxBlockFromXmlString(
         '<block type="procedures_defreturn">' +
         '<field name="NAME">do something</field>' +
-        '<value name="RETURN"><shadow type="math_number"><field name="NUM">0</field></shadow></value>' +
         '</block>'));
     xmlList.push(calvinToolboxBlockFromXmlString(
         '<block type="procedures_ifreturn">' +
         '<mutation value="1"></mutation>' +
-        '<value name="VALUE"><shadow type="math_number"><field name="NUM">0</field></shadow></value>' +
         '</block>'));
 
     const procs = calvinCollectProcedureDefinitions(workspace);

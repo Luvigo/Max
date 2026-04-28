@@ -1071,7 +1071,7 @@
                 .setCheck(null)
                 .appendField('return');
             this.setColour(COLOUR_FUNC);
-            this.setTooltip('Define una función con retorno. Usa la tuerca para añadir parámetros; el cuerpo usa variables_get con esos nombres (tipo int en C).');
+            this.setTooltip('Función con retorno int. Tuerca: parámetros. Junto a «return», conecta bloques (Variables: obtén x; Operadores: multiplicar x×2), no texto libre: el número solo era la sombra opcional.');
             this.setPreviousStatement(false, null);
             this.setNextStatement(false, null);
             calvinApplyBlockExtension('procedures_defnoreturn_mutator', this);
@@ -1151,7 +1151,7 @@
             this.setPreviousStatement(true, null);
             this.setNextStatement(true, null);
             this.setColour(COLOUR_FUNC);
-            this.setTooltip("Define una función que devuelve un valor. Usa la tuerca para parámetros.");
+            this.setTooltip("Función con retorno. Tuerca: parámetros. En «devolver», conecta Variables y Operadores (p. ej. multiplicar obtén-x por 2); no es un cuadro para escribir fórmulas en texto.");
             calvinApplyBlockExtension('calvin_func_mutator', this);
         }
     };
