@@ -12,6 +12,7 @@ from . import ide_views
 from . import agent_views
 from . import error_views
 from . import notification_views
+from . import student_views
 
 # Sin app_name: estas URLs quedan sin namespace en la raíz.
 # reverse('index'), reverse('compile'), etc. apuntan aquí.
@@ -53,6 +54,12 @@ urlpatterns = [
     path('api/ide/projects/save-as/', ide_views.api_ide_save_as, name='api_ide_save_as'),
     path('api/ide/projects/<str:project_id>/rename/', ide_views.api_ide_rename_project, name='api_ide_rename_project'),
     path('api/ide/projects/<str:project_id>/delete/', ide_views.api_ide_delete_project, name='api_ide_delete_project'),
+    # Proyectos de estudiante (mismo handler que bajo /i/<slug>/; rutas en raíz para fetch desde cualquier origen)
+    path('api/projects/save/', student_views.api_save_project, name='global_api_save_project'),
+    path('api/projects/load/<int:project_id>/', student_views.api_load_project, name='global_api_load_project'),
+    path('api/projects/list/', student_views.api_list_projects, name='global_api_list_projects'),
+    path('api/projects/create/', student_views.api_create_project, name='global_api_create_project'),
+    path('api/projects/delete/<int:project_id>/', student_views.api_delete_project, name='global_api_delete_project'),
     path('api/agent/register/', agent_views.api_agent_register, name='api_agent_register'),
     path('api/agent/heartbeat/', agent_views.api_agent_heartbeat, name='api_agent_heartbeat'),
     path('api/agent/list/', agent_views.api_agent_list, name='api_agent_list'),

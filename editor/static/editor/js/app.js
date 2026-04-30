@@ -3385,6 +3385,21 @@ function closeStudentProjectsMenu() {
     if (projectsMenu) projectsMenu.style.display = 'none';
 }
 
+/** Evita SyntaxError cuando el servidor devuelve HTML (404 login, etc.) */
+async function parseApiJsonResponse(response) {
+    const text = await response.text();
+    const ct = (response.headers.get('content-type') || '').toLowerCase();
+    if (!ct.includes('application/json')) {
+        const hint = response.status === 404 ? ' Ruta API no encontrada o sesión no válida.' : '';
+        throw new Error(`El servidor no devolvió JSON (${response.status}).${hint}`);
+    }
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new Error('JSON inválido en la respuesta del servidor.');
+    }
+}
+
 function positionStudentProjectsMenu(btnEl, menuEl) {
     if (!btnEl || !menuEl) return;
     const r = btnEl.getBoundingClientRect();
@@ -3401,7 +3416,7 @@ async function loadProjectsMenuList() {
     listDiv.innerHTML = '<div class="projects-loading">Cargando proyectos...</div>';
     try {
         const response = await fetch('/api/projects/list/');
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         if (!data.success) {
             listDiv.innerHTML = `<div class="projects-empty">${escapeHtml(data.error || 'No se pudieron cargar los proyectos')}</div>`;
             return;
@@ -3426,7 +3441,7 @@ async function loadProjectsMenuList() {
                 </div>`;
         }).join('');
     } catch (err) {
-        listDiv.innerHTML = '<div class="projects-empty">Error al cargar proyectos</div>';
+        listDiv.innerHTML = `<div class="projects-empty">${escapeHtml(err.message || 'Error al cargar proyectos')}</div>`;
         console.error(err);
     }
 }
@@ -3453,7 +3468,7 @@ async function renameStudentProjectFromMenu(projectId) {
                 arduino_code: code
             })
         });
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         if (data.success) {
             await loadProjectsMenuList();
             if (String(currentProjectId) === String(projectId)) {
@@ -3476,7 +3491,7 @@ async function deleteStudentProjectFromMenu(projectId, displayName) {
             method: 'POST',
             headers: { 'X-CSRFToken': getCsrfToken() }
         });
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         if (data.success) {
             await loadProjectsMenuList();
             if (String(currentProjectId) === String(projectId)) {
@@ -3551,7 +3566,7 @@ function showStudentSaveAsModal() {
                     arduino_code: code
                 })
             });
-            const data = await response.json();
+            const data = await parseApiJsonResponse(response);
             if (data.success) {
                 currentProjectId = data.project_id;
                 currentProjectDisplayName = name;
@@ -3705,7 +3720,7 @@ async function saveProjectToServer() {
             })
         });
         
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         if (data.success) {
             currentProjectId = data.project_id;
             showToast('Proyecto guardado exitosamente', 'success');
@@ -3734,7 +3749,7 @@ async function loadProjectsList() {
     
     try {
         const response = await fetch('/api/projects/list/');
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         
         if (data.success) {
             if (data.projects.length === 0) {
@@ -3763,7 +3778,7 @@ async function loadProjectsList() {
 async function loadProjectFromServer(projectId) {
     try {
         const response = await fetch(`/api/projects/load/${projectId}/`);
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         
         if (data.success && data.project) {
             currentProjectId = data.project.id;
@@ -3813,7 +3828,7 @@ async function createNewProject() {
             })
         });
         
-        const data = await response.json();
+        const data = await parseApiJsonResponse(response);
         if (data.success) {
             currentProjectId = data.project_id;
             currentProjectDisplayName = nameInput.value.trim();

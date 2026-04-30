@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/blockly@9.3.3/blockly.min.js"></script>
     
     <!-- Estilos -->
-    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032847">
+    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032849">
     
     <!-- Estilos de Proyectos -->
     <style>
@@ -28,8 +28,13 @@
             position: absolute;
             top: 100%;
             left: 0;
-            z-index: 1000;
+            z-index: 10000;
             min-width: 320px;
+            max-width: min(420px, calc(100vw - 24px));
+            max-height: min(70vh, 520px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
             background: var(--color-bg-card, #161b22);
             border: 1px solid var(--color-border, #30363d);
             border-radius: 8px;
@@ -45,6 +50,7 @@
             border-bottom: 1px solid var(--color-border, #30363d);
             font-weight: 600;
             color: var(--color-text, #e6edf3);
+            flex-shrink: 0;
         }
         
         .projects-menu-header .btn-close {
@@ -65,11 +71,15 @@
             gap: 8px;
             padding: 12px 16px;
             border-bottom: 1px solid var(--color-border, #30363d);
+            flex-shrink: 0;
+            flex-wrap: wrap;
         }
         
         .projects-menu-list {
-            max-height: 300px;
+            max-height: 280px;
             overflow-y: auto;
+            flex: 1;
+            min-height: 0;
         }
         
         .projects-loading, .projects-empty {
@@ -867,7 +877,7 @@ void loop() {
     <script src="{% static 'editor/js/calvin_hardware.js' %}?v=2026032837"></script>
     <script src="{% static 'editor/js/calvin_blocks.js' %}?v=2026032841"></script>
     <script src="{% static 'editor/js/calvin_generator.js' %}?v=2026032821"></script>
-    <script src="{% static 'editor/js/app.js' %}?v=2026032848"></script>
+    <script src="{% static 'editor/js/app.js' %}?v=2026032849"></script>
     
     {% if project_xml %}
     <script>
