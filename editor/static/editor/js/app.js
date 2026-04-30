@@ -41,8 +41,20 @@ let serialOutputRafId = 0;
 let serialInterBurstTimer = 0;
 let serialMonitorOverflowWarned = false;
 
-// Proyectos
+// Proyectos (panel "Mis proyectos" = modelo Project /api/projects/*)
 let currentProjectId = null;
+/** Nombre mostrado en el header; sincronizado al guardar/cargar */
+let currentProjectDisplayName = 'Nuevo Proyecto';
+
+function updateHeaderProjectTitle() {
+    const el = document.getElementById('currentProjectName');
+    if (el) el.textContent = currentProjectDisplayName;
+}
+
+/** true si el id corresponde a Project de estudiante (numérico); UUID = IDEProject */
+function isStudentProjectId(id) {
+    return id !== null && id !== undefined && Number.isInteger(Number(id)) && Number(id) > 0;
+}
 
 // ============================================
 // AGENT LOCAL - Configuración y estado
@@ -1829,6 +1841,14 @@ async function autoSaveNow(reason = 'interval') {
                     xml_content: xmlText,
                     arduino_code: arduinoGenerator.workspaceToCode(workspace)
                 });
+            } else if (isStudentProjectId(currentProjectId)) {
+                url = '/api/projects/save/';
+                body = JSON.stringify({
+                    project_id: currentProjectId,
+                    name: currentProjectDisplayName || 'Proyecto',
+                    xml_content: xmlText,
+                    arduino_code: arduinoGenerator.workspaceToCode(workspace)
+                });
             } else {
                 url = '/api/ide/autosave/';
                 body = JSON.stringify({
@@ -2117,20 +2137,22 @@ function initEventListeners() {
     }
     
     // Botones de archivo
-    document.getElementById('btnNew').addEventListener('click', newProject);
+    document.getElementById('btnNew')?.addEventListener('click', newProject);
     document.getElementById('btnSave').addEventListener('click', saveProject);
     document.getElementById('btnLoad').addEventListener('click', () => document.getElementById('fileInput').click());
     document.getElementById('fileInput').addEventListener('change', loadProject);
     
-    // Botones de proyectos (si existen)
-    const btnSaveProject = document.getElementById('btnSaveProject');
+    // Botones de proyectos (toolbar: ids únicos para no chocar con el menú del header)
+    const btnSaveProjectToolbar = document.getElementById('btnSaveProjectToolbar');
     const btnLoadProject = document.getElementById('btnLoadProject');
-    if (btnSaveProject) {
-        btnSaveProject.addEventListener('click', saveProjectToServer);
+    if (btnSaveProjectToolbar) {
+        btnSaveProjectToolbar.addEventListener('click', () => saveProjectToServer());
     }
     if (btnLoadProject) {
         btnLoadProject.addEventListener('click', openProjectsModal);
     }
+    
+    initStudentProjectsDropdown();
     
     // Modal de proyectos
     const projectsModal = document.getElementById('projectsModal');
@@ -3244,9 +3266,14 @@ function clearSerialOutput() {
 // ============================================
 
 function newProject() {
+    if (!workspace) return;
     if (confirm('¿Crear nuevo proyecto?')) {
         workspace.clear();
         addInitialBlocks();
+        currentProjectId = null;
+        currentProjectDisplayName = 'Nuevo Proyecto';
+        updateHeaderProjectTitle();
+        updateCode();
         showToast('Nuevo proyecto', 'info');
     }
 }
@@ -3274,6 +3301,10 @@ function loadProject(event) {
             const xml = Blockly.utils.xml.textToDom(e.target.result);
             workspace.clear();
             Blockly.Xml.domToWorkspace(xml, workspace);
+            currentProjectId = null;
+            currentProjectDisplayName = 'Nuevo Proyecto';
+            updateHeaderProjectTitle();
+            updateCode();
             showToast('Proyecto cargado', 'success');
         } catch (error) {
             showToast('Error al cargar', 'error');
@@ -3349,41 +3380,314 @@ function escapeHtml(text) {
 // GESTIÓN DE PROYECTOS EN SERVIDOR
 // ============================================
 
+function closeStudentProjectsMenu() {
+    const projectsMenu = document.getElementById('projectsMenu');
+    if (projectsMenu) projectsMenu.style.display = 'none';
+}
+
+function positionStudentProjectsMenu(btnEl, menuEl) {
+    if (!btnEl || !menuEl) return;
+    const r = btnEl.getBoundingClientRect();
+    menuEl.style.position = 'fixed';
+    menuEl.style.top = `${Math.round(r.bottom + 6)}px`;
+    menuEl.style.left = `${Math.round(r.left)}px`;
+    menuEl.style.right = 'auto';
+    menuEl.style.zIndex = '5000';
+}
+
+async function loadProjectsMenuList() {
+    const listDiv = document.getElementById('projectsMenuList');
+    if (!listDiv) return;
+    listDiv.innerHTML = '<div class="projects-loading">Cargando proyectos...</div>';
+    try {
+        const response = await fetch('/api/projects/list/');
+        const data = await response.json();
+        if (!data.success) {
+            listDiv.innerHTML = `<div class="projects-empty">${escapeHtml(data.error || 'No se pudieron cargar los proyectos')}</div>`;
+            return;
+        }
+        if (data.projects.length === 0) {
+            listDiv.innerHTML = '<div class="projects-empty">No tienes proyectos guardados.<br>¡Crea uno nuevo!</div>';
+            return;
+        }
+        listDiv.innerHTML = data.projects.map(p => {
+            const safeName = escapeHtml(p.name);
+            const when = escapeHtml(new Date(p.updated_at).toLocaleString('es-ES'));
+            return `
+                <div class="project-item" data-student-project-id="${p.id}">
+                    <div class="project-item-info" style="cursor:pointer;">
+                        <div class="project-item-name">${safeName}</div>
+                        <div class="project-item-date">${when}</div>
+                    </div>
+                    <div class="project-item-actions">
+                        <button type="button" data-menu-rename="${p.id}" title="Renombrar">✏️</button>
+                        <button type="button" class="btn-delete" data-menu-delete="${p.id}" title="Eliminar">🗑️</button>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        listDiv.innerHTML = '<div class="projects-empty">Error al cargar proyectos</div>';
+        console.error(err);
+    }
+}
+
+async function renameStudentProjectFromMenu(projectId) {
+    const row = document.querySelector(`[data-student-project-id="${projectId}"]`);
+    const cur = row?.querySelector('.project-item-name')?.textContent?.trim() || '';
+    const newName = prompt('Nuevo nombre del proyecto:', cur);
+    if (!newName || !newName.trim() || newName.trim() === cur) return;
+    if (!workspace) return;
+    const xmlText = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+    const code = arduinoGenerator.workspaceToCode(workspace);
+    try {
+        const response = await fetch('/api/projects/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                project_id: projectId,
+                name: newName.trim(),
+                xml_content: xmlText,
+                arduino_code: code
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await loadProjectsMenuList();
+            if (String(currentProjectId) === String(projectId)) {
+                currentProjectDisplayName = newName.trim();
+                updateHeaderProjectTitle();
+            }
+            showToast('Proyecto renombrado', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo renombrar'), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+async function deleteStudentProjectFromMenu(projectId, displayName) {
+    if (!confirm(`¿Eliminar el proyecto "${displayName}"?\nEsta acción no se puede deshacer.`)) return;
+    try {
+        const response = await fetch(`/api/projects/delete/${projectId}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCsrfToken() }
+        });
+        const data = await response.json();
+        if (data.success) {
+            await loadProjectsMenuList();
+            if (String(currentProjectId) === String(projectId)) {
+                currentProjectId = null;
+                currentProjectDisplayName = 'Nuevo Proyecto';
+                updateHeaderProjectTitle();
+            }
+            showToast('Proyecto eliminado', 'success');
+        } else {
+            showToast('Error: ' + (data.error || 'No se pudo eliminar'), 'error');
+        }
+    } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+
+/**
+ * Guardar como nuevo proyecto (o duplicar) en el panel de estudiante.
+ */
+function showStudentSaveAsModal() {
+    if (!workspace) {
+        showToast('No hay workspace disponible', 'error');
+        return;
+    }
+    const suggested = (currentProjectDisplayName && currentProjectDisplayName !== 'Nuevo Proyecto')
+        ? currentProjectDisplayName
+        : '';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'studentSaveAsOverlay';
+    overlay.style.cssText = 'opacity:1;visibility:visible;display:flex;z-index:6000;';
+    overlay.innerHTML = `
+        <div class="modal" style="max-width:440px;">
+            <div class="modal-header">
+                <h2 class="modal-title">💾 Guardar proyecto</h2>
+                <button type="button" class="modal-close" id="studentSaveAsClose" aria-label="Cerrar">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="studentSaveAsName" value="${escapeHtml(suggested)}" placeholder="Mi proyecto" style="width:100%;padding:10px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;">
+                </div>
+                <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                    <button type="button" class="btn" id="studentSaveAsCancel">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="studentSaveAsConfirmGuardar">Guardar</button>
+                </div>
+            </div>
+        </div>`;
+    document.body.appendChild(overlay);
+
+    const cleanup = () => overlay.remove();
+    const runSave = async () => {
+        const nameEl = document.getElementById('studentSaveAsName');
+        const name = nameEl && nameEl.value.trim();
+        if (!name) {
+            showToast('El nombre no puede estar vacío', 'warning');
+            return;
+        }
+        const xmlText = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
+        const code = arduinoGenerator.workspaceToCode(workspace);
+        try {
+            const response = await fetch('/api/projects/save/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
+                },
+                body: JSON.stringify({
+                    project_id: null,
+                    name,
+                    xml_content: xmlText,
+                    arduino_code: code
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                currentProjectId = data.project_id;
+                currentProjectDisplayName = name;
+                updateHeaderProjectTitle();
+                cleanup();
+                closeStudentProjectsMenu();
+                showToast('Proyecto guardado: ' + name, 'success');
+                logToConsole('Proyecto guardado en el servidor (nuevo)', 'success');
+            } else {
+                showToast('Error al guardar: ' + (data.error || ''), 'error');
+            }
+        } catch (e) {
+            showToast('Error: ' + e.message, 'error');
+        }
+    };
+
+    overlay.querySelector('#studentSaveAsClose')?.addEventListener('click', cleanup);
+    overlay.querySelector('#studentSaveAsCancel')?.addEventListener('click', cleanup);
+    overlay.querySelector('#studentSaveAsConfirmGuardar')?.addEventListener('click', () => { runSave(); });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(); });
+    const inp = document.getElementById('studentSaveAsName');
+    if (inp) {
+        inp.focus();
+        inp.select();
+    }
+}
+
+function initStudentProjectsDropdown() {
+    const btnProjectsMenu = document.getElementById('btnProjectsMenu');
+    const projectsMenu = document.getElementById('projectsMenu');
+    const btnCloseProjectsMenu = document.getElementById('btnCloseProjectsMenu');
+    const projectsMenuList = document.getElementById('projectsMenuList');
+    const btnNewProject = document.getElementById('btnNewProject');
+    const btnSaveProjectMenu = document.getElementById('btnSaveProjectMenu');
+    const btnSaveAsProject = document.getElementById('btnSaveAsProject');
+
+    if (!btnProjectsMenu || !projectsMenu) return;
+
+    let menuOpen = false;
+
+    function closeMenu() {
+        menuOpen = false;
+        projectsMenu.style.display = 'none';
+    }
+
+    function openMenu() {
+        menuOpen = true;
+        projectsMenu.style.display = 'block';
+        positionStudentProjectsMenu(btnProjectsMenu, projectsMenu);
+        loadProjectsMenuList();
+    }
+
+    btnProjectsMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (menuOpen) closeMenu();
+        else openMenu();
+    });
+
+    btnCloseProjectsMenu?.addEventListener('click', closeMenu);
+
+    document.addEventListener('click', (e) => {
+        if (menuOpen && !projectsMenu.contains(e.target) && !btnProjectsMenu.contains(e.target)) {
+            closeMenu();
+        }
+    });
+
+    window.addEventListener('resize', () => {
+        if (menuOpen) positionStudentProjectsMenu(btnProjectsMenu, projectsMenu);
+    });
+    window.addEventListener('scroll', () => {
+        if (menuOpen) positionStudentProjectsMenu(btnProjectsMenu, projectsMenu);
+    }, true);
+
+    btnNewProject?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!workspace) return;
+        if (!confirm('¿Crear un nuevo proyecto? Se perderán los cambios no guardados.')) return;
+        workspace.clear();
+        addInitialBlocks();
+        currentProjectId = null;
+        currentProjectDisplayName = 'Nuevo Proyecto';
+        updateHeaderProjectTitle();
+        updateCode();
+        closeMenu();
+        showToast('Nuevo proyecto', 'info');
+    });
+
+    btnSaveProjectMenu?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        saveProjectToServer();
+    });
+
+    btnSaveAsProject?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showStudentSaveAsModal();
+    });
+
+    projectsMenuList?.addEventListener('click', (e) => {
+        const delBtn = e.target.closest('[data-menu-delete]');
+        const renBtn = e.target.closest('[data-menu-rename]');
+        if (delBtn) {
+            e.stopPropagation();
+            const pid = delBtn.getAttribute('data-menu-delete');
+            const row = delBtn.closest('.project-item');
+            const title = row?.querySelector('.project-item-name')?.textContent?.trim() || '';
+            deleteStudentProjectFromMenu(pid, title);
+            return;
+        }
+        if (renBtn) {
+            e.stopPropagation();
+            const pid = renBtn.getAttribute('data-menu-rename');
+            renameStudentProjectFromMenu(pid);
+            return;
+        }
+        const row = e.target.closest('.project-item');
+        if (row && !e.target.closest('.project-item-actions')) {
+            e.stopPropagation();
+            const pid = row.getAttribute('data-student-project-id');
+            if (pid) loadProjectFromServer(pid);
+            closeMenu();
+        }
+    });
+}
+
 async function saveProjectToServer() {
     if (!workspace) {
         showToast('No hay workspace disponible', 'error');
         return;
     }
     
-    const xml = Blockly.Xml.workspaceToDom(workspace);
-    const xmlText = Blockly.Xml.domToText(xml);
+    const xmlText = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
     const code = arduinoGenerator.workspaceToCode(workspace);
     
     if (!currentProjectId) {
-        const name = prompt('Nombre del proyecto:');
-        if (!name) return;
-        
-        try {
-            const response = await fetch('/api/projects/create/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCsrfToken()
-                },
-                body: JSON.stringify({ name, description: '' })
-            });
-            
-            const data = await response.json();
-            if (data.success) {
-                currentProjectId = data.project_id;
-            } else {
-                showToast('Error al crear proyecto: ' + data.error, 'error');
-                return;
-            }
-        } catch (error) {
-            showToast('Error: ' + error.message, 'error');
-            return;
-        }
+        showStudentSaveAsModal();
+        return;
     }
     
     try {
@@ -3395,7 +3699,7 @@ async function saveProjectToServer() {
             },
             body: JSON.stringify({
                 project_id: currentProjectId,
-                name: document.getElementById('projectName')?.value || 'Proyecto sin nombre',
+                name: currentProjectDisplayName || 'Proyecto',
                 xml_content: xmlText,
                 arduino_code: code
             })
@@ -3403,6 +3707,7 @@ async function saveProjectToServer() {
         
         const data = await response.json();
         if (data.success) {
+            currentProjectId = data.project_id;
             showToast('Proyecto guardado exitosamente', 'success');
             logToConsole('Proyecto guardado en el servidor', 'success');
         } else {
@@ -3422,7 +3727,7 @@ async function openProjectsModal() {
 }
 
 async function loadProjectsList() {
-    const listDiv = document.getElementById('projectsList');
+    const listDiv = document.getElementById('projectsModalList');
     if (!listDiv) return;
     
     listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #8b949e;">Cargando proyectos...</div>';
@@ -3443,12 +3748,12 @@ async function loadProjectsList() {
                                 ${new Date(project.updated_at).toLocaleString('es-ES')}
                             </div>
                         </div>
-                        <button class="btn btn-sm btn-primary" onclick="loadProjectFromServer(${project.id})">Cargar</button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="loadProjectFromServer(${project.id})">Cargar</button>
                     </div>
                 `).join('');
             }
         } else {
-            listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f85149;">Error al cargar proyectos</div>';
+            listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f85149;">' + escapeHtml(data.error || 'Error al cargar proyectos') + '</div>';
         }
     } catch (error) {
         listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f85149;">Error: ' + error.message + '</div>';
@@ -3462,6 +3767,8 @@ async function loadProjectFromServer(projectId) {
         
         if (data.success && data.project) {
             currentProjectId = data.project.id;
+            currentProjectDisplayName = data.project.name || 'Proyecto';
+            updateHeaderProjectTitle();
             
             if (data.project.xml_content) {
                 const xml = Blockly.utils.xml.textToDom(data.project.xml_content);
@@ -3470,6 +3777,7 @@ async function loadProjectFromServer(projectId) {
                 updateCode();
             }
             
+            closeStudentProjectsMenu();
             const modal = document.getElementById('projectsModal');
             if (modal) modal.style.display = 'none';
             
@@ -3508,6 +3816,8 @@ async function createNewProject() {
         const data = await response.json();
         if (data.success) {
             currentProjectId = data.project_id;
+            currentProjectDisplayName = nameInput.value.trim();
+            updateHeaderProjectTitle();
             
             const createModal = document.getElementById('createProjectModal');
             if (createModal) createModal.style.display = 'none';
@@ -3681,7 +3991,7 @@ async function reportErrorToBackend() {
 }
 
 // Función para cargar proyecto desde template
-window.loadProjectFromTemplate = function(xmlContent, projectId) {
+window.loadProjectFromTemplate = function(xmlContent, projectId, projectName) {
     if (workspace && xmlContent) {
         try {
             const xml = Blockly.utils.xml.textToDom(xmlContent);
@@ -3689,10 +3999,26 @@ window.loadProjectFromTemplate = function(xmlContent, projectId) {
             Blockly.Xml.domToWorkspace(xml, workspace);
             updateCode();
             if (projectId) currentProjectId = projectId;
+            if (projectName) {
+                currentProjectDisplayName = projectName;
+            } else if (projectId) {
+                currentProjectDisplayName = 'Proyecto';
+            }
+            updateHeaderProjectTitle();
         } catch (e) {
             console.error('Error cargando proyecto:', e);
         }
     }
+};
+
+window.setCurrentProject = function(id, name) {
+    currentProjectId = id;
+    currentProjectDisplayName = name || 'Proyecto';
+    updateHeaderProjectTitle();
+};
+
+window.getCurrentProjectId = function() {
+    return currentProjectId;
 };
 
 // Exponer funciones globalmente para botones HTML
