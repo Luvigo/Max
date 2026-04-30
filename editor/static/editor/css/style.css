@@ -149,7 +149,7 @@ body {
     display: flex;
     align-items: center;
     align-content: center;
-    gap: 10px;
+    gap: 14px;
     justify-content: flex-end;
     justify-self: end;
     min-width: 0;
@@ -159,6 +159,7 @@ body {
     width: 100%;
     max-width: 100%;
     padding-bottom: 2px;
+    padding-left: 2px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
@@ -176,14 +177,16 @@ body {
 .control-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background: var(--bg-tertiary);
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: 10px;
     border: 1px solid var(--border-color);
-    flex-shrink: 1;
-    min-width: 0;
-    flex: 0 1 auto;
+    box-sizing: border-box;
+    /* No encoger por debajo del contenido: evita que los marcos se monten unos sobre otros */
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    min-width: auto;
 }
 
 .control-group label {
@@ -200,19 +203,20 @@ body {
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
     color: var(--text-bright);
-    padding: 6px 10px;
+    padding: 4px 8px;
     border-radius: 6px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     cursor: pointer;
-    min-width: 72px;
-    max-width: 160px;
-    flex: 1 1 auto;
+    min-width: 64px;
+    max-width: 138px;
+    flex: 0 1 auto;
 }
 
-/* Puerto: texto largo (p. ej. Agent no disponible) no debe empujar acciones a otra fila */
+/* Puerto: capar ancho sin aplastar los grupos vecinos */
 .control-group:has(#portSelect) select {
-    max-width: 12rem;
+    max-width: 9.5rem;
+    min-width: 5.5rem;
 }
 
 .control-group select:focus {
@@ -351,7 +355,7 @@ body {
         gap: 10px;
     }
     .header-controls {
-        gap: 8px;
+        gap: 12px;
     }
     .control-group select {
         min-width: 100px;
@@ -1500,6 +1504,7 @@ kbd {
     align-items: center;
     gap: 10px;
     margin-right: 12px;
+    flex-shrink: 0;
 }
 
 .activity-badge {
