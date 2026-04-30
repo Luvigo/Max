@@ -23,11 +23,15 @@ def student_dashboard(request):
     
     projects = student.projects.filter(is_active=True).order_by('-updated_at')[:10]
     projects_count = student.projects.filter(is_active=True).count()
+    institution = student.institution
+    if institution is None and student.group_id:
+        institution = student.group.institution
     
     context = {
         'student': student,
         'projects': projects,
         'projects_count': projects_count,
+        'institution': institution,
     }
     return render(request, 'editor/student/dashboard.html', context)
 
@@ -42,9 +46,13 @@ def student_projects(request):
         return redirect('dashboard')
     
     projects = student.projects.filter(is_active=True).order_by('-updated_at')
+    institution = student.institution
+    if institution is None and student.group_id:
+        institution = student.group.institution
     return render(request, 'editor/student/projects_list.html', {
         'student': student,
-        'projects': projects
+        'projects': projects,
+        'institution': institution,
     })
 
 

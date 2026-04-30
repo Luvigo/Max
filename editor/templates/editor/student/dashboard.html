@@ -26,32 +26,38 @@
         <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}" class="btn">Abrir Editor</a>
     </div>
     
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nombre</th>
-                <th>Última Modificación</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for project in projects %}
-            <tr>
-                <td><strong>{{ project.name }}</strong></td>
-                <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
-                <td>
-                    <a href="{% url 'editor:project_detail' project.id %}" class="btn btn-sm btn-primary">Abrir en Editor</a>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="3" style="text-align: center; color: #8b949e;">
-                    No tienes proyectos aún. <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}">¡Crea tu primer proyecto!</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-scroll">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Última Modificación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr>
+                    <td><strong>{{ project.name }}</strong></td>
+                    <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {% if institution %}
+                        <a href="/i/{{ institution.slug }}/student/projects/{{ project.id }}/" class="btn btn-sm btn-primary">Abrir en Editor</a>
+                        {% else %}
+                        <span class="text-muted" style="font-size: 0.85rem;">Sin institución</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" style="text-align: center; color: #8b949e;">
+                        No tienes proyectos aún. <a href="{% if institution %}/i/{{ institution.slug }}/?editor=true{% else %}{% url 'dashboard' %}{% endif %}">¡Crea tu primer proyecto!</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <div style="margin-top: 20px; text-align: center;">
