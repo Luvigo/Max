@@ -4,7 +4,7 @@
 {% block title %}Sandbox - {{ activity.title }}{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032842">
+<link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032843">
 <style>
     .sandbox-context {
         background: var(--color-bg-card, #161b22);
@@ -42,15 +42,9 @@
     
     <!-- Header -->
     <header class="header">
-        <div class="header-left">
-            <nav class="ide-nav-links" aria-label="Salir del IDE">
-                <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="btn btn-ghost btn-sm ide-nav-btn" title="Panel del tutor">← Panel</a>
-                <button type="button"
-                    class="btn btn-ghost btn-sm ide-nav-btn"
-                    id="btnIdeHistoryBackSandbox"
-                    title="Volver a la página anterior del navegador"
-                    data-fallback-url="{% url 'tutor_dashboard' slug=institution.slug %}">← Atrás</button>
-            </nav>
+        <div class="header-brand">
+            <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="header-salir btn btn-ghost btn-sm" title="Ir al panel del tutor">← Panel</a>
+            <span class="header-brand-sep" role="presentation" aria-hidden="true"></span>
             <div class="logo">
             <div class="logo-icon">⚡</div>
             <div class="logo-text">MAX-IDE</div>
@@ -187,18 +181,4 @@
 <script src="{% static 'editor/js/calvin_hardware.js' %}?v=2026032837"></script>
     <script src="{% static 'editor/js/calvin_blocks.js' %}?v=2026032841"></script>
     <script src="{% static 'editor/js/calvin_generator.js' %}?v=2026032821"></script>
-<script>
-(function() {
-    var btn = document.getElementById('btnIdeHistoryBackSandbox');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-        var fb = btn.getAttribute('data-fallback-url') || '';
-        if (window.history.length > 1) {
-            window.history.back();
-        } else if (fb) {
-            window.location.href = fb;
-        }
-    });
-})();
-</script>
 {% endblock %}

@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/blockly@9.3.3/blockly.min.js"></script>
     
     <!-- Estilos -->
-    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032842">
+    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032843">
     
     <!-- Estilos de Proyectos -->
     <style>
@@ -235,21 +235,15 @@
         
         <!-- Header -->
         <header class="header">
-            <div class="header-left">
-                <nav class="ide-nav-links" aria-label="Salir del IDE">
-                    {% if activity_mode %}
-                    <a href="{% url 'editor:student_group_activities' institution_slug=institution.slug %}" class="btn btn-ghost btn-sm ide-nav-btn" title="Volver a la lista de actividades">← Actividades</a>
-                    {% elif tutor_submission_mode %}
-                    <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="btn btn-ghost btn-sm ide-nav-btn" title="Ir al panel del tutor">← Panel</a>
-                    {% else %}
-                    <a href="{% url 'dashboard' %}" class="btn btn-ghost btn-sm ide-nav-btn" title="Ir al panel principal">← Panel</a>
-                    {% endif %}
-                    <button type="button"
-                        class="btn btn-ghost btn-sm ide-nav-btn"
-                        id="btnIdeHistoryBack"
-                        title="Volver a la página anterior del navegador"
-                        data-fallback-url="{% if activity_mode %}{% url 'editor:student_group_activities' institution_slug=institution.slug %}{% elif tutor_submission_mode %}{% url 'tutor_dashboard' slug=institution.slug %}{% else %}{% url 'dashboard' %}{% endif %}">← Atrás</button>
-                </nav>
+            <div class="header-brand">
+                {% if activity_mode %}
+                <a href="{% url 'editor:student_group_activities' institution_slug=institution.slug %}" class="header-salir btn btn-ghost btn-sm" title="Volver a la lista de actividades">← Actividades</a>
+                {% elif tutor_submission_mode %}
+                <a href="{% url 'tutor_dashboard' slug=institution.slug %}" class="header-salir btn btn-ghost btn-sm" title="Ir al panel del tutor">← Panel</a>
+                {% else %}
+                <a href="{% url 'dashboard' %}" class="header-salir btn btn-ghost btn-sm" title="Volver al inicio / panel principal">← Inicio</a>
+                {% endif %}
+                <span class="header-brand-sep" role="presentation" aria-hidden="true"></span>
                 <div class="logo">
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">MAX-IDE</div>
@@ -874,20 +868,6 @@ void loop() {
     <script src="{% static 'editor/js/calvin_blocks.js' %}?v=2026032841"></script>
     <script src="{% static 'editor/js/calvin_generator.js' %}?v=2026032821"></script>
     <script src="{% static 'editor/js/app.js' %}?v=2026032840"></script>
-    <script>
-    (function() {
-        var btn = document.getElementById('btnIdeHistoryBack');
-        if (!btn) return;
-        btn.addEventListener('click', function() {
-            var fb = btn.getAttribute('data-fallback-url') || '';
-            if (window.history.length > 1) {
-                window.history.back();
-            } else if (fb) {
-                window.location.href = fb;
-            }
-        });
-    })();
-    </script>
     
     <!-- Sistema de Mis Proyectos -->
     <script>

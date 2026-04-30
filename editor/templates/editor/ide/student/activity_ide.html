@@ -15,7 +15,7 @@
     <script src="https://unpkg.com/blockly@9.3.3/blockly.min.js"></script>
     
     <!-- Estilos -->
-    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032842">
+    <link rel="stylesheet" href="{% static 'editor/css/style.css' %}?v=2026032843">
     
     <style>
         .activity-context-bar {
@@ -175,15 +175,9 @@
         
         <!-- Header -->
         <header class="header">
-            <div class="header-left">
-                <nav class="ide-nav-links" aria-label="Salir del IDE">
-                    <a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}" class="btn btn-ghost btn-sm ide-nav-btn" title="Volver al curso">← Actividades</a>
-                    <button type="button"
-                        class="btn btn-ghost btn-sm ide-nav-btn"
-                        id="btnIdeHistoryBack"
-                        title="Volver a la página anterior del navegador"
-                        data-fallback-url="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}">← Atrás</button>
-                </nav>
+            <div class="header-brand">
+                <a href="{% url 'editor:student_activities_list' institution_slug=institution.slug course_id=activity.course.id %}" class="header-salir btn btn-ghost btn-sm" title="Volver al curso">← Actividades</a>
+                <span class="header-brand-sep" role="presentation" aria-hidden="true"></span>
                 <div class="logo">
                 <div class="logo-icon">⚡</div>
                 <div class="logo-text">MAX-IDE</div>
@@ -445,20 +439,6 @@
             if (e.target === this) this.classList.remove('active');
         });
         {% endif %}
-    </script>
-    <script>
-    (function() {
-        var btn = document.getElementById('btnIdeHistoryBack');
-        if (!btn) return;
-        btn.addEventListener('click', function() {
-            var fb = btn.getAttribute('data-fallback-url') || '';
-            if (window.history.length > 1) {
-                window.history.back();
-            } else if (fb) {
-                window.location.href = fb;
-            }
-        });
-    })();
     </script>
 </body>
 </html>
