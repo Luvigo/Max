@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="es" data-build-id="{{ BUILD_ID|default:'dev-2026.01.19' }}">
+<html lang="es" data-build-id="{{ BUILD_ID|default:'dev-2026.01.19' }}" class="dashboard-root">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,6 +22,8 @@
             --color-bg-main: #0f1419;
             --color-bg-card: #161b22;
             --color-bg-hover: #1c2128;
+            /* Usado en formularios tutor (inputs/select); antes faltaba y rompía el desplegable */
+            --color-bg-secondary: #1c2128;
             --color-border: #30363d;
             --color-border-light: #21262d;
             
@@ -75,6 +77,28 @@
             color: var(--color-text);
             min-height: 100vh;
             line-height: 1.5;
+        }
+        
+        /* Listas nativas de <select>: evitar texto blanco sobre fondo blanco (Chrome/Edge en tema oscuro) */
+        html.dashboard-root {
+            color-scheme: dark;
+        }
+        
+        select {
+            color-scheme: dark;
+            background-color: var(--color-bg-card);
+            color: var(--color-text);
+        }
+        
+        select option,
+        select optgroup {
+            background-color: var(--color-bg-card);
+            color: var(--color-text);
+        }
+        
+        select option:disabled {
+            color: var(--color-text-subtle);
+            background-color: var(--color-bg-hover);
         }
         
         /* Layout Principal */
