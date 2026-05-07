@@ -717,8 +717,31 @@ class Student(models.Model):
 
 
 class Project(models.Model):
-    """Proyecto de Arduino"""
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='projects', verbose_name="Estudiante")
+    """Proyecto de Arduino (estudiante o tutor en el IDE)."""
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='projects',
+        verbose_name="Estudiante",
+        null=True,
+        blank=True,
+    )
+    tutor_owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='tutor_projects_saved',
+        verbose_name="Tutor (propietario)",
+        null=True,
+        blank=True,
+    )
+    institution = models.ForeignKey(
+        Institution,
+        on_delete=models.CASCADE,
+        related_name='arduino_projects',
+        verbose_name="Institución",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=200, verbose_name="Nombre del Proyecto")
     description = models.TextField(blank=True, verbose_name="Descripción")
     xml_content = models.TextField(blank=True, verbose_name="Contenido XML (Blockly)")
@@ -731,18 +754,37 @@ class Project(models.Model):
         verbose_name = "Proyecto"
         verbose_name_plural = "Proyectos"
         ordering = ['-updated_at']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(student__isnull=False, tutor_owner__isnull=True)
+                    | models.Q(student__isnull=True, tutor_owner__isnull=False)
+                ),
+                name='project_student_xor_tutor_owner',
+            ),
+        ]
     
     def __str__(self):
-        return f"{self.name} - {self.student.user.username}"
+        if self.student_id:
+            return f"{self.name} - {self.student.user.username}"
+        if self.tutor_owner_id:
+            return f"{self.name} - {self.tutor_owner.username} (tutor)"
+        return self.name
     
     def get_last_modified(self):
         return self.updated_at.strftime("%d/%m/%Y %H:%M")
     
-    @property
-    def institution(self):
-        """Obtener institución del proyecto vía estudiante"""
-        if self.student and self.student.course:
-            return self.student.course.institution
+    def resolve_institution(self):
+        """Institución persistida o derivada del estudiante."""
+        if self.institution_id:
+            return self.institution
+        if self.student_id:
+            if self.student.institution_id:
+                return self.student.institution
+            if self.student.group_id:
+                return self.student.group.institution
+            if self.student.course_id:
+                return self.student.course.institution
         return None
 
 

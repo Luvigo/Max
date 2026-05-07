@@ -886,20 +886,23 @@ class StudentAdmin(ExportCSVMixin, AuditMixin, admin.ModelAdmin):
 
 @admin.register(Project)
 class ProjectAdmin(ExportCSVMixin, admin.ModelAdmin):
-    list_display = ['name', 'student', 'get_group', 'get_institution', 'created_at', 'updated_at', 'is_active']
-    list_filter = ['is_active', 'student__institution', 'student__group', 'created_at']
-    search_fields = ['name', 'student__user__username', 'student__student_id', 'description']
+    list_display = ['name', 'student', 'tutor_owner', 'institution', 'get_group', 'get_institution_name', 'created_at', 'updated_at', 'is_active']
+    list_filter = ['is_active', 'institution', 'student__institution', 'student__group', 'created_at']
+    search_fields = ['name', 'student__user__username', 'student__student_id', 'tutor_owner__username', 'description']
     readonly_fields = ['created_at', 'updated_at']
-    raw_id_fields = ['student']
+    raw_id_fields = ['student', 'tutor_owner', 'institution']
     date_hierarchy = 'created_at'
     
     def get_group(self, obj):
-        return obj.student.group.name if obj.student.group else "-"
+        if obj.student_id and obj.student.group_id:
+            return obj.student.group.name
+        return "-"
     get_group.short_description = 'Grupo'
     
-    def get_institution(self, obj):
-        return obj.student.institution.name if obj.student.institution else "-"
-    get_institution.short_description = 'Institución'
+    def get_institution_name(self, obj):
+        inst = obj.resolve_institution()
+        return inst.name if inst else "-"
+    get_institution_name.short_description = 'Institución'
     
     actions = ['activate_projects', 'deactivate_projects', 'export_as_csv']
     

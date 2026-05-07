@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 from django.http import JsonResponse, FileResponse, HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
@@ -434,23 +434,53 @@ def index(request, institution_slug=None):
             if not request.GET and request.path == '/':
                 return redirect('dashboard')
     
+    institution = None
+    if institution_slug:
+        from django.contrib import messages
+        from .models import Institution, Membership
+        institution = get_object_or_404(Institution, slug=institution_slug, status='active')
+        if not request.user.is_superuser:
+            if not Membership.objects.filter(
+                user=request.user,
+                institution=institution,
+                is_active=True,
+                role__in=['tutor', 'student'],
+            ).exists():
+                messages.error(request, 'No tienes acceso a esta institución.')
+                return redirect('dashboard')
+
     # Mostrar el editor (todos pueden acceder si vienen explícitamente)
     project_id = request.GET.get('project_id')
     project = None
     project_xml = ''
     project_code = ''
-    
+
     if project_id:
         try:
-            from .models import Project
-            student = request.user.student_profile
-            project = Project.objects.get(id=project_id, student=student, is_active=True)
-            project_xml = project.xml_content
-            project_code = project.arduino_code
-        except:
+            from .models import Project, Student
+            pid = int(project_id)
+            project = Project.objects.filter(id=pid, is_active=True).first()
+            if project:
+                allowed = False
+                if project.student_id:
+                    try:
+                        if request.user.student_profile.pk == project.student_id:
+                            allowed = True
+                    except Student.DoesNotExist:
+                        pass
+                elif project.tutor_owner_id and institution:
+                    if project.tutor_owner_id == request.user.id and project.institution_id == institution.id:
+                        allowed = True
+                if allowed:
+                    project_xml = project.xml_content
+                    project_code = project.arduino_code
+                else:
+                    project = None
+        except (ValueError, TypeError):
             pass
-    
+
     return render(request, 'editor/index.html', {
+        'institution': institution,
         'project': project,
         'project_xml': project_xml,
         'project_code': project_code,

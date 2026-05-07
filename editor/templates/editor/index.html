@@ -866,6 +866,12 @@ void loop() {
             autosaveEnabled: false
         };
     </script>
+    {% elif institution %}
+    <script>
+        window.IDE_CONFIG = window.IDE_CONFIG || {};
+        window.IDE_CONFIG.institutionSlug = '{{ institution.slug }}';
+        window.IDE_CONFIG.autosaveEnabled = true;
+    </script>
     {% else %}
     <script>
         window.IDE_CONFIG = window.IDE_CONFIG || {};

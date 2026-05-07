@@ -524,27 +524,38 @@
             background: var(--color-bg-hover);
         }
         
+        /* Scroll en tarjetas con muchas filas (dashboard tutor / estudiante) */
+        .dashboard-card-scroll {
+            max-height: min(22rem, 52vh);
+            overflow-y: auto;
+            overflow-x: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+            min-height: 0;
+        }
+        
+        .dashboard-card-scroll::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        .dashboard-card-scroll::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 4px;
+        }
+        
+        .dashboard-card-scroll .data-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--color-bg-card);
+            box-shadow: 0 1px 0 var(--color-border);
+        }
+        
         /* Activity List */
         .activity-list {
             display: flex;
             flex-direction: column;
-        }
-        
-        /* Listas largas (p. ej. proyectos): altura fija y scroll interno */
-        .activity-list--scroll {
-            max-height: 20rem;
-            overflow-y: auto;
-            overscroll-behavior: contain;
-            scrollbar-width: thin;
-        }
-        
-        .activity-list--scroll::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        .activity-list--scroll::-webkit-scrollbar-thumb {
-            background: var(--color-border);
-            border-radius: 4px;
         }
         
         .activity-item {

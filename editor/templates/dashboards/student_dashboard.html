@@ -97,6 +97,7 @@
         </div>
         <div class="card-body" style="padding: 0;">
             {% if my_activities %}
+            <div class="dashboard-card-scroll">
             <div class="activity-list">
                 {% for activity in my_activities %}
                 <div class="activity-item">
@@ -124,6 +125,7 @@
                 </div>
                 {% endfor %}
             </div>
+            </div>
             {% else %}
             <div class="empty-state">
                 <i class="fas fa-clipboard-check"></i>
@@ -145,7 +147,8 @@
         </div>
         <div class="card-body" style="padding: 0;">
             {% if recent_projects %}
-            <div class="activity-list activity-list--scroll">
+            <div class="dashboard-card-scroll">
+            <div class="activity-list">
                 {% for project in recent_projects %}
                 <div class="activity-item">
                     <div class="activity-icon project">
@@ -164,6 +167,7 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
             </div>
             {% else %}
             <div class="empty-state">

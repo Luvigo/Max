@@ -1,0 +1,63 @@
+{% extends "base_dashboard.html" %}
+
+{% block title %}Mis Proyectos - {{ institution.name }} - MAX-IDE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">
+        <i class="fas fa-folder-open" style="color: var(--color-success);"></i>
+        Mis Proyectos
+    </h1>
+    <p class="page-subtitle">{{ institution.name }} · Guardados desde el IDE</p>
+</div>
+
+<div class="card animate-in">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="fas fa-code" style="color: var(--color-primary);"></i>
+            Lista de proyectos
+        </h3>
+        <a href="/i/{{ institution.slug }}/?editor=true" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus"></i> Crear en el IDE
+        </a>
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if projects %}
+        <div class="dashboard-card-scroll">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Creado</th>
+                    <th>Última modificación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in projects %}
+                <tr>
+                    <td><strong>{{ project.name }}</strong></td>
+                    <td>{{ project.created_at|date:"d/m/Y" }}</td>
+                    <td>{{ project.updated_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <a href="{% url 'editor:tutor_project_detail' institution_slug=institution.slug project_id=project.id %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-external-link-alt"></i> Abrir
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-rocket"></i>
+            <p>Aún no tienes proyectos guardados</p>
+            <a href="/i/{{ institution.slug }}/?editor=true" class="btn btn-primary">
+                <i class="fas fa-code"></i> Abrir IDE
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

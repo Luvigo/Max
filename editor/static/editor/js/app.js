@@ -56,6 +56,14 @@ function isStudentProjectId(id) {
     return id !== null && id !== undefined && Number.isInteger(Number(id)) && Number(id) > 0;
 }
 
+/** Base para /api/projects/* con tenant cuando el IDE va bajo /i/<slug>/ */
+function getStudentProjectsApiBase() {
+    if (typeof IDE_CONFIG !== 'undefined' && IDE_CONFIG.institutionSlug) {
+        return '/i/' + IDE_CONFIG.institutionSlug + '/api/projects';
+    }
+    return '/api/projects';
+}
+
 // ============================================
 // AGENT LOCAL - Configuración y estado
 // ============================================
@@ -1842,7 +1850,7 @@ async function autoSaveNow(reason = 'interval') {
                     arduino_code: arduinoGenerator.workspaceToCode(workspace)
                 });
             } else if (isStudentProjectId(currentProjectId)) {
-                url = '/api/projects/save/';
+                url = getStudentProjectsApiBase() + '/save/';
                 body = JSON.stringify({
                     project_id: currentProjectId,
                     name: currentProjectDisplayName || 'Proyecto',
@@ -3415,7 +3423,7 @@ async function loadProjectsMenuList() {
     if (!listDiv) return;
     listDiv.innerHTML = '<div class="projects-loading">Cargando proyectos...</div>';
     try {
-        const response = await fetch('/api/projects/list/');
+        const response = await fetch(getStudentProjectsApiBase() + '/list/');
         const data = await parseApiJsonResponse(response);
         if (!data.success) {
             listDiv.innerHTML = `<div class="projects-empty">${escapeHtml(data.error || 'No se pudieron cargar los proyectos')}</div>`;
@@ -3455,7 +3463,7 @@ async function renameStudentProjectFromMenu(projectId) {
     const xmlText = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
     const code = arduinoGenerator.workspaceToCode(workspace);
     try {
-        const response = await fetch('/api/projects/save/', {
+        const response = await fetch(getStudentProjectsApiBase() + '/save/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3487,7 +3495,7 @@ async function renameStudentProjectFromMenu(projectId) {
 async function deleteStudentProjectFromMenu(projectId, displayName) {
     if (!confirm(`¿Eliminar el proyecto "${displayName}"?\nEsta acción no se puede deshacer.`)) return;
     try {
-        const response = await fetch(`/api/projects/delete/${projectId}/`, {
+        const response = await fetch(`${getStudentProjectsApiBase()}/delete/${projectId}/`, {
             method: 'POST',
             headers: { 'X-CSRFToken': getCsrfToken() }
         });
@@ -3553,7 +3561,7 @@ function showStudentSaveAsModal() {
         const xmlText = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace));
         const code = arduinoGenerator.workspaceToCode(workspace);
         try {
-            const response = await fetch('/api/projects/save/', {
+            const response = await fetch(getStudentProjectsApiBase() + '/save/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3706,7 +3714,7 @@ async function saveProjectToServer() {
     }
     
     try {
-        const response = await fetch('/api/projects/save/', {
+        const response = await fetch(getStudentProjectsApiBase() + '/save/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3748,7 +3756,7 @@ async function loadProjectsList() {
     listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #8b949e;">Cargando proyectos...</div>';
     
     try {
-        const response = await fetch('/api/projects/list/');
+        const response = await fetch(getStudentProjectsApiBase() + '/list/');
         const data = await parseApiJsonResponse(response);
         
         if (data.success) {
@@ -3777,7 +3785,7 @@ async function loadProjectsList() {
 
 async function loadProjectFromServer(projectId) {
     try {
-        const response = await fetch(`/api/projects/load/${projectId}/`);
+        const response = await fetch(`${getStudentProjectsApiBase()}/load/${projectId}/`);
         const data = await parseApiJsonResponse(response);
         
         if (data.success && data.project) {
@@ -3816,7 +3824,7 @@ async function createNewProject() {
     }
     
     try {
-        const response = await fetch('/api/projects/create/', {
+        const response = await fetch(getStudentProjectsApiBase() + '/create/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

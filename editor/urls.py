@@ -160,6 +160,8 @@ urlpatterns = [
     # ============================================
     path('tutor/activities/<str:activity_id>/ide-sandbox/', ide_views.tutor_activity_ide_sandbox, name='tutor_activity_ide_sandbox'),
     path('tutor/submissions/<str:submission_id>/ide-readonly/', ide_views.tutor_submission_ide_readonly, name='tutor_submission_ide_readonly'),
+    path('tutor/projects/', student_views.tutor_projects, name='tutor_projects'),
+    path('tutor/projects/<int:project_id>/', student_views.tutor_project_detail, name='tutor_project_detail'),
     
     # ============================================
     # ✅ TUTOR - Errores

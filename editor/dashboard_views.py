@@ -249,6 +249,15 @@ def tutor_dashboard(request, slug):
         is_active=True
     ).select_related('user', 'group').order_by('-created_at')[:5]
     
+    # Proyectos personales del tutor (MAX-IDE, mismo modelo que estudiante)
+    tutor_personal_projects = Project.objects.filter(
+        tutor_owner=user,
+        institution=institution,
+        is_active=True,
+    ).order_by('-updated_at')
+    tutor_projects_total = tutor_personal_projects.count()
+    recent_tutor_projects = tutor_personal_projects[:5]
+    
     context = {
         'page_title': f'Dashboard Tutor - {institution.name}',
         'user_role': 'tutor',
@@ -258,10 +267,12 @@ def tutor_dashboard(request, slug):
             'students': total_students,
             'activities': total_activities,
             'pending': pending_submissions,
+            'projects': tutor_projects_total,
         },
         'my_groups': my_groups,
         'recent_submissions': recent_submissions,
         'recent_students': recent_students,
+        'recent_tutor_projects': recent_tutor_projects,
     }
     return render(request, 'dashboards/tutor_dashboard.html', context)
 
