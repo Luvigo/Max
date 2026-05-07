@@ -82,7 +82,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name='project',
             constraint=models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(student__isnull=False, tutor_owner__isnull=True)
                     | models.Q(student__isnull=True, tutor_owner__isnull=False)
                 ),

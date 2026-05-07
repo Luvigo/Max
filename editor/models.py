@@ -756,7 +756,7 @@ class Project(models.Model):
         ordering = ['-updated_at']
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(student__isnull=False, tutor_owner__isnull=True)
                     | models.Q(student__isnull=True, tutor_owner__isnull=False)
                 ),
