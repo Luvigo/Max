@@ -246,6 +246,12 @@
         <!-- Header -->
         <header class="header">
             <div class="header-brand">
+                <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">MAX-IDE</div>
+                <span class="logo-badge">ARDUINO</span>
+                </div>
+                <span class="header-brand-sep" role="presentation" aria-hidden="true"></span>
                 {% if activity_mode %}
                 <a href="{% url 'editor:student_group_activities' institution_slug=institution.slug %}" class="header-salir btn btn-ghost btn-sm" title="Volver a la lista de actividades">← Actividades</a>
                 {% elif tutor_submission_mode %}
@@ -253,12 +259,6 @@
                 {% else %}
                 <a href="{% url 'dashboard' %}" class="header-salir btn btn-ghost btn-sm" title="Volver al inicio / panel principal">← Inicio</a>
                 {% endif %}
-                <span class="header-brand-sep" role="presentation" aria-hidden="true"></span>
-                <div class="logo">
-                <div class="logo-icon">⚡</div>
-                <div class="logo-text">MAX-IDE</div>
-                <span class="logo-badge">ARDUINO</span>
-                </div>
             </div>
             
             <div class="header-controls">
